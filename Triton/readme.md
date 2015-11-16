@@ -1,0 +1,3 @@
+#Triton driver
+
+Since v1.1 (vector) magnets are supported. This driver should detect the configuration of magnetic fields and switch heaters automatically and decide on its own when a sweep should be initialized. This means, that if multiple vector components are set in a single step, the sweep is initialized after the last component has been set. The driver will also wait for the magnetic field to settle ("idle") and implements a sweep mode.
