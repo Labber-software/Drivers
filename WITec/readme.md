@@ -1,4 +1,4 @@
-*WITec Control FOUR remote
+#WITec Control FOUR remote
 
 ##Prerequisite
 
