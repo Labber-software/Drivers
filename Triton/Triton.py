@@ -179,7 +179,7 @@ class Driver(VISA_Driver):
         
         return value
 
-    def checkIfSweeping(quant, options={}):
+    def checkIfSweeping(self, quant, options={}):
         return (self.askAndLog('READ:SYS:VRM:ACTN').strip().rsplit(':',1)[1] != "IDLE")
         
     def waitForIdle(self):
