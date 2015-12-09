@@ -151,38 +151,50 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 data = self.traceBuffer[quant.get_cmd % self.device]
             else:
                 self.ziConnection.sync()
-                subChannels = []
+                self.ziConnection.flush()
+                rec = self.ziConnection.record(2*self.getValue("TraceLength"), 500)
+                rec.set('trigger/0/type', 0)
+                rec.set('trigger/0/duration', self.getValue("TraceLength"))
+                # Subscribe to all active modulators
                 for i in range(8):
                     if self.getValue('Demod'+str(i+1)+"On"):
-                        subChannels.append("/%s/demods/%d/sample" % (self.device, i))
-                self.ziConnection.flush()
-                self.ziConnection.subscribe(subChannels)
-                self.traceBuffer = self.ziConnection.poll(self.getValue("TraceLength"), 500, 1, True)
-                self.ziConnection.unsubscribe('*')
+                        path = "/%s/demods/%d/sample" % (self.device, i)
+                        rec.subscribe(path)
+                rec.execute()
+                rec.trigger()
+                if not self.getValue("TraceStep"):
+                    self.thread().msleep(int(self.getValue("TraceLength")*1000))
+                else:
+                    self.thread().msleep(int(self.getValue("TraceStepDelayA")*1000))
+                    self.log("Setpoint A: " + str(self.getValue("TraceStepSetpointA")))
+                    self.ziConnection.setDouble(self.instrCfg.getQuantity('TraceStepChannel').getCmdStringFromValue(self.getValue("TraceStepChannel")) % self.device, self.getValue("TraceStepSetpointA"))
+                    self.thread().msleep(int(self.getValue("TraceStepDelayB")*1000))
+                    self.log("Setpoint B: " + str(self.getValue("TraceStepSetpointB")))
+                    self.ziConnection.setDouble(self.instrCfg.getQuantity('TraceStepChannel').getCmdStringFromValue(self.getValue("TraceStepChannel")) % self.device, self.getValue("TraceStepSetpointB"))
+                while not rec.finished():
+                    self.thread().msleep(50)
+                self.traceBuffer = rec.read(True)
                 self.clockbase = float(self.ziConnection.getInt('/%s/clockbase' % self.device))
-                data = self.traceBuffer[quant.get_cmd % self.device]
-            dt = (data['timestamp'][-1] - data['timestamp'][0])/self.clockbase/(len(data['timestamp'])+1)
+                data = self.traceBuffer[quant.get_cmd % self.device][0]
+                self.log(data)
+                rec.finish()
+                rec.clear()
+            data = self.traceBuffer[quant.get_cmd % self.device][0]
+            self.log(data)
+            dt = (data['timestamp'][-1] - data['timestamp'][0])/self.clockbase/(len(data['timestamp'])-1)
             channel = quant.name[11:]
             nPoints = self.getValue("TraceLength")*self.getValue("Demod"+quant.name[10]+"SampleRate")
             if channel == "X":
                 signal = quant.getTraceDict(data["x"][:nPoints], t0=0.0, dt=dt)
-                self.log("Return X")
-                self.log(signal)
                 return signal
             elif channel == "Y":
                 signal = quant.getTraceDict(data["y"][:nPoints], t0=0.0, dt=dt)
-                self.log("Return Y")
-                self.log(signal)
                 return signal
             elif channel == "R":
                 signal = quant.getTraceDict(np.sqrt(np.array(data["x"][:nPoints])**2 + np.array(data["y"][:nPoints])**2), t0=0.0, dt=dt)
-                self.log("Return R")
-                self.log(signal)
                 return signal
             elif channel == "phi":
                 signal = quant.getTraceDict(np.degrees(np.arctan2(np.array(data["y"][:nPoints]), np.array(data["x"][:nPoints]))), t0=0.0, dt=dt)
-                self.log("Return phi")
-                self.log(signal)
                 return signal
             return quant.getTraceDict([])
         #Combos (Oscillator-selector for demodulators and Modulator mode)
