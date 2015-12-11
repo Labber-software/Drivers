@@ -87,8 +87,6 @@ class Driver(VISA_Driver):
         elif quant.name in ('Bx', 'By', 'Bz', 'Br', 'Brho', 'Bphi', 'Btheta'):
             coordFunc = self.instrCfg.getQuantity('CoordSys')
             if not self.Bresult:
-                self.performSetValue(coordFunc, coordFunc.getValue())
-                self.performGetValue(coordFunc)
                 vectValue = self.askAndLog(quant.get_cmd).strip()
                 self.Bresult = vectValue.rsplit(':',1)[1][1:-1].translate(None,string.letters).split()
             #Vector results depend on the coordinate system
