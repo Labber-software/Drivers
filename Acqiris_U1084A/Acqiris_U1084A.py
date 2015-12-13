@@ -108,6 +108,10 @@ class Driver(InstrumentDriver.InstrumentWorker):
             if quant.name == 'Trig source':
                 dPattern = {1: 0x00000001, 2: 0x00000002, -1: 0x80000000}
                 self.dig.configTrigClass(dPattern[trigSource])
+        elif quant.name in ('10 MHz Reference'):
+            # get values from relevant quants and set all
+            clockType = int(self.getCmdStringFromValue('10 MHz Reference'))
+            self.dig.configExtClock(clockType)
         elif quant.name == 'Ch1 - Enabled':
             # do nothing for enabling/disabling
             pass 
@@ -202,6 +206,9 @@ class Driver(InstrumentDriver.InstrumentWorker):
             else:
                 # trig level is in millivolt
                 value = trigLevel/1000.0
+        elif quant.name in ('10 MHz Reference'):
+            # get values from relevant quants and set all
+            value = quant.getValueFromCmdString(str(self.dig.getExtClock()[0]))
         elif quant.name == 'Ch1 - Enabled':
             # do nothing for enabling/disabling
             value = quant.getValue()

@@ -168,6 +168,35 @@ class AcqirisDigitizer():
         return (sampInterval.value, delayTime.value)
         
 
+    def configExtClock(self, clockType):
+        """
+        clockType      = 0        Internal Clock (default at start-up)
+                       = 1        External Clock (continuous operation)
+                       = 2        External Reference (10 MHz)
+                       = 4        External Clock (start/stop operation)"""
+        # ViStatus ACQ_CC AcqrsD1_configExtClock(ViSession instrumentID, ViInt32 clockType,
+        #    ViReal64 inputThreshold, ViInt32 delayNbrSamples, 
+        #    ViReal64 inputFrequency, ViReal64 sampFrequency);
+        self.callFunc('AcqrsD1_configExtClock', self.session,
+                      ViInt32(clockType), ViReal64(0.0), ViInt32(0),
+                      ViReal64(10E6), ViReal64(10E6))
+
+
+    def getExtClock(self):
+        # ViStatus ACQ_CC AcqrsD1_getExtClock(ViSession instrumentID, ViInt32* clockType,
+        # ViReal64* inputThreshold, ViInt32* delayNbrSamples,
+        # ViReal64* inputFrequency, ViReal64* sampFrequency);    
+        clockType = ViInt32()
+        inputThreshold = ViReal64()
+        delayNbrSamples = ViInt32()
+        inputFrequency = ViReal64()
+        sampFrequency = ViReal64()
+        self.callFunc('AcqrsD1_getExtClock', self.session, byref(clockType),
+                      byref(inputThreshold), byref(delayNbrSamples),
+                      byref(inputFrequency), byref(sampFrequency))
+        return (clockType.value, inputThreshold.value, delayNbrSamples.value, inputFrequency.value, sampFrequency.value)
+        
+    
     def configMemory(self, nbrSamples, nbrSegments):
         # ViStatus status = AcqrsD1_configMemory(ViSession instrumentID, 
         # ViInt32 nbrSamples, ViInt32 nbrSegments)
