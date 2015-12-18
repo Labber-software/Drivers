@@ -6,7 +6,6 @@ import visa
 from InstrumentConfig import InstrumentQuantity
 import numpy as np
 import string
-import Tkinter as Tk
 
 __version__ = "0.0.1"
 
