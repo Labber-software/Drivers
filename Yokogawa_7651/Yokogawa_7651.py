@@ -18,6 +18,31 @@ class Driver(VISA_Driver):
         self.readValueFromOther('Function')
 
 
+    def initSetConfig(self):
+        """This function is run before setting values in Set Config.
+        Check if new range is smaller than old, if so first go to new value to
+        avoid zeroing when setting the range with high value"""
+        # get functions and range, first from internal settings (from SetCfg)
+        newFunction = self.getValue('Function')
+        dRangeNew, dMaxNew = self.getMaxValueAndSmallestStep()
+        # get actual settings on instrument by first calling readFromOther
+        oldFunction = self.readValueFromOther('Function')
+        dRangeOld, dMaxOld = self.getMaxValueAndSmallestStep()
+        # check if instrument in different mode ot new range is bigger, if so return
+        if (newFunction != oldFunction) or (dMaxNew > dMaxOld):
+            return
+        # set new value, either voltage or current
+        if newFunction == 'Voltage':
+            quant = self.getQuantity('Voltage')
+        elif newFunction == 'Current':
+            quant = self.getQuantity('Current')
+        # get new value and sweep rate from internal quantity 
+        value = quant.getValue()
+        rate = quant.getSweepRate()
+        # set value here, before changing the range
+        self.sendValueToOther(quant.name, value, sweepRate=rate)
+
+
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
         """Perform the Set Value instrument operation. This function should
         return the actual value set by the instrument"""
