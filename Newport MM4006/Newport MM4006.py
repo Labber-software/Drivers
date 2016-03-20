@@ -68,7 +68,7 @@ class Driver(VISA_Driver):
             channel = quant.name[2]
             moving = (int(self.askAndLog(channel+"MS").strip()[3].encode("hex"), 16) & 0x01 != 0)
             while moving and not self.isStopped():
-                self.thread().msleep(100)
+                self.thread().msleep(200)
                 moving = (int(self.askAndLog(channel+"MS").strip()[3].encode("hex"), 16) & 0x01 != 0)
             if self.isStopped():
                 self.askAndLog(quant.stop_cmd)
