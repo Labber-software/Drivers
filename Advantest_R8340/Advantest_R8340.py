@@ -21,6 +21,8 @@ class Driver(VISA_Driver):
                 self.writeAndLog('MD1')
                 # wait some time
                 self.wait(delay_time)
+                # turn on measurement mode
+                self.writeAndLog('MD0')
             # after charging/discharing, run the visa driver case to get value
             return VISA_Driver.performGetValue(self, quant, options=options)
         else:
