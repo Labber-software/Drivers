@@ -71,7 +71,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
             vY = self.spec.intensities(correct_dark_counts=False, correct_nonlinearity=False)
             # assume equally-spaced waveform values
             vX = self.spec.wavelengths()
-            value = quant.getTraceDict(vY, dt=1E-6*(vX[1]-vX[0]), t0=1E-6*vX[0])
+            value = quant.getTraceDict(vY, dt=1E-6*((vX[-1]-vX[0])/float(len(vX)-1)),
+                    t0=1E-6*vX[0])
             # # don't return x-data
             # value = quant.getTraceDict(vY)
         # elif quant.name == 'Wavelength':
