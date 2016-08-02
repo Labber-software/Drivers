@@ -54,3 +54,9 @@ docs/_build/
 
 # PyBuilder
 target/
+
+AlazarTech_Digitizer/atsapi/__init__.py
+
+AlazarTech_Digitizer/atsapi/atsapi.py
+
+AlazarTech_Digitizer/atsapi/ATSApi32.dll

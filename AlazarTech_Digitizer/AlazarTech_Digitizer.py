@@ -4,6 +4,7 @@ import AlazarTech_Digitizer_Wrapper as AlazarDig
 import InstrumentDriver
 import numpy as np
 
+
 class Error(Exception):
     pass
 
@@ -64,10 +65,19 @@ class Driver(InstrumentDriver.InstrumentWorker):
             # internal
             SampleRateId = int(self.getCmdStringFromValue('Sample rate'),0)
             lFreq = [1E3, 2E3, 5E3, 10E3, 20E3, 50E3, 100E3, 200E3, 500E3,
-                     1E6, 2E6, 5E6, 10E6, 20E6, 50E6, 100E6, 200E6, 500E6, 1E9]
+                     1E6, 2E6, 5E6, 10E6, 20E6, 50E6, 100E6, 200E6, 500E6, 1E9,
+                     1.2E9, 1.5E9, 2E9]
             Decimation = 0
+        elif self.getValue('Clock source') == '10 MHz Reference' and self.getModel() in ('9373','9360'):
+            # 10 MHz ref, for 9373 - decimation is 1
+            #for now don't allow DES mode; talk to Simon about best implementation
+            SampleRateId = int(self.getCmdStringFromValue('Sample rate'),0)
+            lFreq = [1E3, 2E3, 5E3, 10E3, 20E3, 50E3, 100E3, 200E3, 500E3,
+                     1E6, 2E6, 5E6, 10E6, 20E6, 50E6, 100E6, 200E6, 500E6, 1E9,
+                     1.2E9, 1.5E9, 2E9]
+            Decimation = 1
         else:
-            # 10 MHz ref, use 1GHz rate + divider. NB!! divide must be 1,2,4,10 
+            # 10 MHz ref, use 1GHz rate + divider. NB!! divide must be 1,2,4, or mult of 10 
             SampleRateId = int(1E9)
             lFreq = [1E3, 2E3, 5E3, 10E3, 20E3, 50E3, 100E3, 200E3, 500E3,
                      1E6, 2E6, 5E6, 10E6, 20E6, 50E6, 100E6, 250E6, 500E6, 1E9]
@@ -80,13 +90,20 @@ class Driver(InstrumentDriver.InstrumentWorker):
         for n in range(2):
             if self.getValue('Ch%d - Enabled' % (n+1)):
                 # coupling and range
-                Coupling = int(self.getCmdStringFromValue('Ch%d - Coupling' % (n+1)))
-                InputRange = int(self.getCmdStringFromValue('Ch%d - Range' % (n+1)))
-                Impedance = int(self.getCmdStringFromValue('Ch%d - Impedance' % (n+1)))
+                if self.getModel() in ('9373', '9360'):
+                    Coupling = 2
+                    InputRange = 7
+                    Impedance = 2
+                else:
+                    Coupling = int(self.getCmdStringFromValue('Ch%d - Coupling' % (n+1)))
+                    InputRange = int(self.getCmdStringFromValue('Ch%d - Range' % (n+1)))
+                    Impedance = int(self.getCmdStringFromValue('Ch%d - Impedance' % (n+1)))
+                #set coupling, input range, impedance
                 self.dig.AlazarInputControl(n+1, Coupling, InputRange, Impedance)
-                # bandwidth limit
-                BW = int(self.getValue('Ch%d - Bandwidth limit' % (n+1)))
-                self.dig.AlazarSetBWLimit(n+1, BW)
+                # bandwidth limit, only for model 9870
+                if self.getModel() in ('9870',):
+                    BW = int(self.getValue('Ch%d - Bandwidth limit' % (n+1)))
+                    self.dig.AlazarSetBWLimit(n+1, BW)
         # 
         # configure trigger
         Source = int(self.getCmdStringFromValue('Trig source'))
@@ -109,7 +126,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         self.dig.AlazarSetTriggerOperation(0, 0, Source, Slope, Level)
         # 
         # config external input, if in use
-        if self.getValue('Trig source') == 'External':
+        if self.getValue('Trig source') == 'External' and self.getModel() in ('9870',):
             Coupling = int(self.getCmdStringFromValue('Trig coupling'))
             self.dig.AlazarSetExternalTrigger(Coupling)
         # 
@@ -130,32 +147,46 @@ class Driver(InstrumentDriver.InstrumentWorker):
         if (not bGetCh1) and (not bGetCh2):
             return
         # set data and record size
-        nPreSize = int(self.getValue('Pre-trig samples'))
+        if self.getModel() in ('9870',):
+            nPreSize = int(self.getValue('Pre-trig samples'))
+        else:
+            nPreSize = 0
         nPostSize = int(self.getValue('Post-trig samples'))
         nRecord = int(self.getValue('Number of records'))
         self.dig.AlazarSetRecordSize(nPreSize, nPostSize)
         self.dig.AlazarSetRecordCount(nRecord)
-        # start aquisition
-        self.dig.AlazarStartCapture()
-        nTry = self.dComCfg['Timeout']/0.05
-        while nTry>0 and self.dig.AlazarBusy() and not self.isStopped():
-            # sleep for a while to save resources, then try again
-            self.thread().msleep(50)
-            nTry -= 1
-        # check if timeout occurred
-        if nTry <= 0:
-            self.dig.AlazarAbortCapture()
-            raise Error('Acquisition timed out')
-        # check if user stopped
-        if self.isStopped():
-            self.dig.AlazarAbortCapture()
-            return
-        #
-        # read data for channels in use
-        if bGetCh1:
-            self.lTrace[0] = self.dig.readTraces(1)
-        if bGetCh2:
-            self.lTrace[1] = self.dig.readTraces(2)
+        
+        if self.getModel() in ('9870',):
+            # start aquisition
+            self.dig.AlazarStartCapture()
+            nTry = self.dComCfg['Timeout']/0.05
+            while nTry>0 and self.dig.AlazarBusy() and not self.isStopped():
+                # sleep for a while to save resources, then try again
+                self.thread().msleep(50)
+                nTry -= 1
+            # check if timeout occurred
+            if nTry <= 0:
+                self.dig.AlazarAbortCapture()
+                raise Error('Acquisition timed out')
+            # check if user stopped
+            if self.isStopped():
+                self.dig.AlazarAbortCapture()
+                return
+            #
+            # read data for channels in use
+            if bGetCh1:
+                self.lTrace[0] = self.dig.readTraces(1)
+            if bGetCh2:
+                self.lTrace[1] = self.dig.readTraces(2)
+        else:
+            nCh1 = nCh2 = 0
+            if bGetCh1:
+                nCh1 = 1
+            if bGetCh2:
+                nCh2 = 2
+            
+            self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(nCh1, nCh2)
+
 
 
 
