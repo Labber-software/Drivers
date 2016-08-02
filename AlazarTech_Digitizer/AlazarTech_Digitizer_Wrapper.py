@@ -103,7 +103,7 @@ class AlazarTechDigitizer():
 
     #RETURN_CODE AlazarSetBWLimit( HANDLE h, U8 Channel, U32 enable);
     def AlazarSetBWLimit(self, Channel, enable):
-        self.callFunc('AlazarSetBWLimit', self.handle, U8(Channel), U32(enable))
+        self.callFunc('AlazarSetBWLimit', self.handle, U32(Channel), U32(enable))
 
 
     #RETURN_CODE AlazarSetTriggerOperation(HANDLE h, U32 TriggerOperation
@@ -293,7 +293,8 @@ class AlazarTechDigitizer():
                     elif channels == 2:
                         #vData[0] += np.zeros(samplesPerRecord, dtype=float)
                         vData[1] += self.dRange[2]/codeRange * vBuffer16[i*samplesPerRecord:(i+1)*samplesPerRecord]
-                    elif channels == 3:               
+                    elif channels == 3:
+                        #despite not setting the flag, samples seem interleaved...
                         vData[0] += self.dRange[1]/codeRange * vBuffer16[2*i*samplesPerRecord:2*(i+1)*samplesPerRecord:2]
                         vData[1] += self.dRange[2]/codeRange * vBuffer16[(2*i*samplesPerRecord+1):(2*(i+1)*samplesPerRecord+1):2]
                         
