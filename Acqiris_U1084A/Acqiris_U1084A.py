@@ -233,15 +233,19 @@ class Driver(InstrumentDriver.InstrumentWorker):
             value = - self.dig.getVertical(2)[1]
         # signals
         elif quant.name in self.lSignalNames:
-            indx = self.lSignalNames.index(quant.name)
-            # check if first call, if so get new traces
-            if self.isFirstCall(options):
-                self.getTraces()
-            # return correct data
-            if quant.name in ('Ch1 - Data', 'Ch2 - Data'):
-                value = InstrumentQuantity.getTraceDict(self.lTrace[indx], dt=self.dt)
+            # special case for hardware looping
+            if self.isHardwareLoop(options):
+                value = self.getSignalHardwareLoop(quant, options)
             else:
-                value = self.lTrace[indx]
+                # no hardware loop, just get traces if first call
+                if self.isFirstCall(options):
+                    self.getTraces(bArm=not self.isHardwareTrig(options))
+                # return correct data
+                indx = self.lSignalNames.index(quant.name)
+                if quant.name in ('Ch1 - Data', 'Ch2 - Data'):
+                    value = InstrumentQuantity.getTraceDict(self.lTrace[indx], dt=self.dt)
+                else:
+                    value = self.lTrace[indx]
         elif quant.name in ('Modulation frequency', 'Skip start', 'Length',
                             'Use Ch2 as reference', 'Enable demodulation'):
             # just return the quantity value
@@ -249,7 +253,57 @@ class Driver(InstrumentDriver.InstrumentWorker):
         return value
 
 
-    def getTraces(self):
+    def _callbackProgress(self, progress):
+        """Report progress to server, as text string"""
+        s = 'Acquiring traces (%.0f%%)' % (100*progress)
+        self.reportStatus(s)
+
+
+    def performArm(self, quant_names, options={}):
+        """Perform the instrument arm operation"""
+        # start acquisition
+        if self.isHardwareLoop(options):
+            (seq_no, n_seq) = self.getHardwareLoopIndex(options)
+            nSample = int(self.getValue('Number of samples'))
+            nAverage = int(self.getValue('Number of averages'))
+            self.dig.getRoundRobinData(nSample, n_seq, nAverage, 
+                                       bConfig=True, bArm=True, bMeasure=False)
+        else:
+            self.getTraces(bArm=True, bMeasure=False)
+
+
+    def getSignalHardwareLoop(self, quant, options):
+        """Get data from round-robin type averaging"""
+        (seq_no, n_seq) = self.getHardwareLoopIndex(options)
+        # if first sequence call, get data
+        if seq_no == 0 and self.isFirstCall(options):
+            nSample = int(self.getValue('Number of samples'))
+            nAverage = int(self.getValue('Number of averages'))
+            bDemodulation = bool(self.getValue('Enable demodulation'))
+            self.lTrace = [np.array([]), np.array([]), 0.0, np.zeros(n_seq, dtype=complex)]
+            # show status before starting acquisition
+            self.reportStatus('Digitizer - Waiting for signal')
+            ((self.lTrace[0], self.lTrace[1]), self.dt) = \
+                 self.dig.getRoundRobinData(nSample, n_seq, nAverage,
+                 bConfig=False, bArm=False, bMeasure=True,
+                 funcStop=self.isStopped,
+                 funcProgress=self._callbackProgress)
+            # temporary, calculate I/Q signal here
+            if bDemodulation and self.dt>0:
+                self.lTrace[3] = self.getIQAmplitudes(n_seq)
+        # after getting data, pick values to return
+        indx = self.lSignalNames.index(quant.name)
+        if quant.name in ('Ch1 - Data', 'Ch2 - Data'):
+            value = InstrumentQuantity.getTraceDict(self.lTrace[indx][seq_no],
+                                                    dt=self.dt)
+        elif quant.name in ('Signal'):
+            value = self.lTrace[3][seq_no]
+        else:
+            value = self.lTrace[3]
+        return value
+
+
+    def getTraces(self, bArm=True, bMeasure=True):
         """Resample the data"""
         self.lTrace = [np.array([]), np.array([]), 0.0, np.array([], dtype=complex)]
         # get new trace
@@ -268,8 +322,15 @@ class Driver(InstrumentDriver.InstrumentWorker):
             lChannel.append(2)
         aqType = self.getValue('Acquisition type')
         bAverageMode = True if aqType == 'Average' else False
-        (vData, self.dt) = self.dig.readChannelsToNumpy(nSample, lChannel=lChannel, nAverage=nAverage,
-                        nSegment=nSegment, timeout=10000, bAverageMode=bAverageMode)
+        if bMeasure:
+            (vData, self.dt) = self.dig.readChannelsToNumpy(nSample, lChannel=lChannel, nAverage=nAverage,
+                            nSegment=nSegment, timeout=10000, bAverageMode=bAverageMode,
+                            bArm=bArm, bMeasure=bMeasure)
+        else:
+            self.dig.readChannelsToNumpy(nSample, lChannel=lChannel, nAverage=nAverage,
+                            nSegment=nSegment, timeout=10000, bAverageMode=bAverageMode,
+                            bArm=bArm, bMeasure=bMeasure)
+            return
         # put the resulting data in arrays for Ch1/Ch2
         if bGetCh1:
             self.lTrace[0] = vData[0]
@@ -279,19 +340,18 @@ class Driver(InstrumentDriver.InstrumentWorker):
             self.lTrace[1] = vData[0]
         # temporary, calculate I/Q signal here
         if bDemodulation and self.dt>0:
-            self.lTrace[3] = self.getIQAmplitudes()
+            self.lTrace[3] = self.getIQAmplitudes(nSegment)
             self.lTrace[2] = np.mean(self.lTrace[3])
         else:
             self.lTrace[3] = np.array([], dtype=complex)
             self.lTrace[2] = 0.0 + 0j
 
 
-    def getIQAmplitudes(self):
+    def getIQAmplitudes(self, nSegment=1):
         """Calculate complex signal from data and reference"""
         # get parameters
         dFreq = self.getValue('Modulation frequency')
         skipStart = self.getValue('Skip start')
-        nSegment = int(self.getValue('Number of segments'))
         skipIndex = int(round(skipStart/self.dt))
         nTotLength = self.lTrace[0].size
         length = 1 + int(round(self.getValue('Length')/self.dt))
