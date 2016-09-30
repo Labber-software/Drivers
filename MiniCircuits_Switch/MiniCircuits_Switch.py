@@ -14,16 +14,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
     
     switchLabels = {'A':0,'B':1,'C':2,'D':3,'E':4,'F':5,'G':6,'H':7}    
     
-    '''
-    def __init__(self, dInstrCfg=None, dComCfg=None, dValues=None,
-                 bNoInstrCom=False, parent=None):
-        # init parent
-        InstrumentDriver.InstrumentWorker.__init__(self, dInstrCfg, dComCfg, 
-                                                   dValues, bNoInstrCom, parent)
-        # init object
-        self.switch = None  
-    '''   
-        
+
     def performOpen(self, options={}):
         """Perform the operation of opening the instrument connection"""
         try:
