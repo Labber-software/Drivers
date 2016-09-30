@@ -82,12 +82,12 @@ class NoiseCfg():
         # calculate smallest time step of the noise
         dtNoise = 1./(2.*self.hiCutOff)
         # number of constant elements
-        nConst = np.around(dtNoise/dTimeStep)
+        nConst = int(np.around(dtNoise/dTimeStep))
         if nConst<1:
             nConst = 1
             dtNoise = dTimeStep
         # number of unique elements
-        nElem = np.ceil(nLen/nConst)
+        nElem = int(np.ceil(nLen/nConst))
         # get the unique noise vector
         if self.model == NoiseCfg.NOISE1F:
             # 1/f noise
@@ -273,8 +273,9 @@ class QubitSimulator():
         idx = mEigVal.argsort()
         mEigVec = mEigVec[:,idx]
         # transform using inverse of the eigenvectors
-#        A = np.linalg.inv(mEigVec)
-#        return np.dot(A,mStateIn)
+        # if MAC:
+        #     A = np.linalg.inv(mEigVec)
+        #     return np.dot(A,mStateIn)
         return np.linalg.solve(mEigVec,mStateIn)
 
 
@@ -361,8 +362,11 @@ class QubitSimulator():
            if bRWA:
                mState = integrateH_RWA(vStart, vTime, vDelta, np.real(vDetNoise),
                                        np.imag(vDetNoise), nReshape)
+               # mState = self.integrateH_RWA(vStart, vTime, vDelta, np.real(vDetNoise),
+               #                              np.imag(vDetNoise), nReshape)
            else:
                mState = integrateH(vStart, vTime, vDelta, vDetNoise, nReshape)
+               # mState = self.integrateH(vStart, vTime, vDelta, vDetNoise, nReshape)
            # convert the results to an eigenbasis of dDelta, dDetuning
            mState = self.convertToEigen(mState, dDelta0, dDetuning)
            # go to the rotating frame (add timeStep/2 to get the right phase)
@@ -447,5 +451,4 @@ class QubitSimulator():
         end_time = time.time()
         self.simulationTime = end_time-start_time
         return (vPz, vPx, vPy, dTimeStepOut)
-
-
+ 
