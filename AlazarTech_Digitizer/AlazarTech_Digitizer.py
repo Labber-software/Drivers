@@ -163,7 +163,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             nTry = self.dComCfg['Timeout']/0.05
             while nTry>0 and self.dig.AlazarBusy() and not self.isStopped():
                 # sleep for a while to save resources, then try again
-                self.thread().msleep(50)
+                self.wait(0.050)
                 nTry -= 1
             # check if timeout occurred
             if nTry <= 0:
