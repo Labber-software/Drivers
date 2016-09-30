@@ -1,10 +1,8 @@
 import InstrumentDriver
 
-# import numpy as np
-
 class Driver(InstrumentDriver.InstrumentWorker):
     """ This class implements a user input driver"""
-    
+
 
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
         """Perform the Set Value instrument operation"""
