@@ -115,7 +115,7 @@ class Driver(VISA_Driver):
                         self.writeAndLog(':ABOR;:INIT:CONT OFF;:INIT:IMM;')
                         self.writeAndLog('*OPC') 
                     # wait some time before first check
-                    self.thread().msleep(30)
+                    self.wait(0.03)
                     bDone = False
                     while (not bDone) and (not self.isStopped()):
                         # check if done
@@ -126,7 +126,7 @@ class Driver(VISA_Driver):
                             stb = int(self.askAndLog('*ESR?'))
                             bDone = (stb & 1) > 0
                         if not bDone:
-                            self.thread().msleep(100)
+                            self.wait(0.1)
                     # if stopped, don't get data
                     if self.isStopped():
                         self.writeAndLog('*CLS;:INIT:CONT ON;')
