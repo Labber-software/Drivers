@@ -18,8 +18,7 @@ class Driver(VISA_Driver):
         except:
             # if conversion to int failed, re-read instrument buffer to clear
             sBuffer = self.read()
-            self.logInstr.log(15, 'Extra data read from Tek: %s, %s' % 
-                              (str(status), sBuffer))
+            self.log('Extra data read from Tek: %s, %s' % (str(status), sBuffer))
         # get model name and number of channels
         sModel = self.getModel()
         self.nCh = 4 if sModel in ('5004', '5014') else 2
