@@ -15,6 +15,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         """Perform the operation of opening the instrument connection"""
         # init object
         self.dig = None
+        self.timeout = self.dComCfg['Timeout']
         # keep track of sampled traces, elements are I, Q, signal, single shot
         self.lTrace = [np.array([]), np.array([]), 0.0, np.array([], dtype=complex)]
         self.lSignalNames = ['Ch1 - Data', 'Ch2 - Data', 'Signal', 'Signal - Single shot']
@@ -324,11 +325,13 @@ class Driver(InstrumentDriver.InstrumentWorker):
         bAverageMode = True if aqType == 'Average' else False
         if bMeasure:
             (vData, self.dt) = self.dig.readChannelsToNumpy(nSample, lChannel=lChannel, nAverage=nAverage,
-                            nSegment=nSegment, timeout=10000, bAverageMode=bAverageMode,
+                            nSegment=nSegment, timeout=int(1000*self.timeout), 
+                            bAverageMode=bAverageMode,
                             bArm=bArm, bMeasure=bMeasure)
         else:
             self.dig.readChannelsToNumpy(nSample, lChannel=lChannel, nAverage=nAverage,
-                            nSegment=nSegment, timeout=10000, bAverageMode=bAverageMode,
+                            nSegment=nSegment, timeout=int(1000*self.timeout), 
+                            bAverageMode=bAverageMode,
                             bArm=bArm, bMeasure=bMeasure)
             return
         # put the resulting data in arrays for Ch1/Ch2
