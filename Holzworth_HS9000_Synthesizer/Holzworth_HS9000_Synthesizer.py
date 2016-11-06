@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 
-import InstrumentDriver
 from VISA_Driver import VISA_Driver
-import visa
 import SG_String
-from InstrumentConfig import InstrumentQuantity
 
 __version__ = "0.0.1"
 
@@ -13,15 +10,6 @@ class Error(Exception):
 
 class Driver(VISA_Driver):
     """ This class re-implements special cases of the Holzworth HS9000 driver"""
-
-    def writeAndLog(self, sCmd='', bCheckError=True):
-        """Replace read/write functions to properly deal with response from Holzworth"""
-        # send message
-        VISA_Driver.writeAndLog(self, sCmd, bCheckError)
-        # get response
-        sReply = self.read()
-        # log response
-        self.log('%s: VISA receive: %s' % (self.sName, sReply), level=15)
 
     def performGetValue(self, quant, options={}):
         """Perform the Get Value instrument operation"""
