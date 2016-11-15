@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-import InstrumentDriver
 from VISA_Driver import VISA_Driver
-from InstrumentConfig import InstrumentQuantity
 import numpy as np
 
 class Error(Exception):
@@ -103,8 +101,7 @@ class Driver(VISA_Driver):
 				value = np.average(vData)
 			else:
 				# create a trace dict
-				value = InstrumentQuantity.getTraceDict(vData, t0=startFreq, 
-																		  dt=(stopFreq-startFreq)/(nPts-1))
+				value = quant.getTraceDict(vData, x0=startFreq, x1=stopFreq)
 		elif quant.name in ('Signal - CW'):
 			# if not in continous mode, trig from computer
 			bWaitTrace = self.getValue('Wait for new trace')
@@ -163,7 +160,7 @@ class Driver(VISA_Driver):
 				cData = vData +1j*np.zeros(vData.shape)
 				samplePeriod = (1/sampleFreq)
 			
-			value = InstrumentQuantity.getTraceDict(cData, t0=0.0, dt=samplePeriod)
+			value = quant.getTraceDict(cData, x0=0.0, dx=samplePeriod)
 			
 		elif quant.name in ('Signal - CS'):
 			# if not in continous mode, trig from computer
@@ -234,8 +231,7 @@ class Driver(VISA_Driver):
 				delta = 1
 				
 				
-			value = InstrumentQuantity.getTraceDict(cData, t0=startValue, 
-																		  dt=delta)
+			value = quant.getTraceDict(cData, x0=startValue, dx=delta)
 			
 		elif quant.name in ('Wait for new trace',):
 			# do nothing, return local value

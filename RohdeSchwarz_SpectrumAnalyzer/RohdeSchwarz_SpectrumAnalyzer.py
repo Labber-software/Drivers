@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-import InstrumentDriver
 from VISA_Driver import VISA_Driver
-from InstrumentConfig import InstrumentQuantity
 import numpy as np
 
 __version__ = "0.0.1"
@@ -96,12 +94,13 @@ class Driver(VISA_Driver):
 #                if sweepType == 'Log':
 #                    startFreq = np.log10(startFreq)
 #                    stopFreq = np.log10(stopFreq)
+                # if log scale, take log of start/stop frequencies
+
                 # create a trace dict
-                value = InstrumentQuantity.getTraceDict(vData, t0=startFreq,
-                                               dt=(stopFreq-startFreq)/(nData-1))
+                value = quant.getTraceDict(vData, x0=startFreq, x1=stopFreq)
             else:
                 # not enabled, return empty array
-                value = InstrumentQuantity.getTraceDict([])
+                value = quant.getTraceDict([])
         elif quant.name in ('Wait for new trace',):
             # do nothing, return local value
             value = quant.getValue()
