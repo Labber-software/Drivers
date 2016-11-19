@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 
 import InstrumentDriver
-from InstrumentConfig import InstrumentQuantity
 import afSigGenWrapper
 
-__version__ = "0.0.1"
+__version__ = "1.0"
 
 
 class Driver(InstrumentDriver.InstrumentWorker):
@@ -21,7 +20,6 @@ class Driver(InstrumentDriver.InstrumentWorker):
             sVisaSigGen = self.dComCfg['address']
             sVisaLO = self.getValue('Local oscillator VISA')
             self.sigGen.boot_instrument(sVisaLO, sVisaSigGen)
-
         except afSigGenWrapper.Error as e:
             # re-cast afSigGen errors as a generic communication error
             msg = str(e)
@@ -35,6 +33,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
             # do nothing, object doesn't exist (probably was never opened)
             return
         try:
+            # turn of output
+            self.sigGen.rf_current_output_enable_set(False)
             # do not check for error if close was called with an error
             self.sigGen.close_instrument(bCheckError=not bError)
         except afSigGenWrapper.Error as e:
@@ -71,16 +71,31 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 else:
                     valueIndex = int(value)
                 self.sigGen.rf_modulation_source_set(valueIndex)
-#                self.sigGen.rf_modulation_source_set(quant.getValueIndex(value))
-            elif quant.name == 'Levelling mode':
+            elif quant.name == 'Leveling mode':
                 # combo, get index
                 if isinstance(value, (str, unicode)):
                     valueIndex = quant.combo_defs.index(value)
                 else:
                     valueIndex = int(value)
                 self.sigGen.rf_current_level_mode_set(valueIndex)
-#                self.sigGen.rf_current_level_mode_set(quant.getValueIndex(value))
+            elif quant.name == 'LO Reference Mode':
+                # combo, get index
+                if isinstance(value, (str, unicode)):
+                    valueIndex = quant.combo_defs.index(value)
+                else:
+                    valueIndex = int(value)
+                self.sigGen.lo_reference_set(valueIndex)
+            elif quant.name == 'Trigger Source':
+                # combo, get index
+                if isinstance(value, (str, unicode)):
+                    valueIndex = quant.combo_defs.index(value)
+                else:
+                    valueIndex = long(value)
+                self.sigGen.trigger_source_set(valueIndex)        
+                    
+                
             return value
+            
         except afSigGenWrapper.Error as e:
             # re-cast errors as a generic communication error
             msg = str(e)
@@ -100,17 +115,22 @@ class Driver(InstrumentDriver.InstrumentWorker):
             elif quant.name == 'Modulation':
                 value = self.sigGen.rf_modulation_source_get()
                 value = quant.getValueString(value)
-            elif quant.name == 'Levelling mode':
+            elif quant.name == 'Leveling mode':
                 value = self.sigGen.rf_current_level_mode_get()
                 value = quant.getValueString(value)
-            # return value
+            elif quant.name == 'LO Reference Mode':
+                value = self.sigGen.lo_reference_get()
+                value = quant.getValueString(value)
+            elif quant.name == 'Trigger Source':
+                value = self.sigGen.trigger_source_get()
+                value = quant.getValueString(value)
+                
             return value
         except afSigGenWrapper.Error as e:
             # re-cast errors as a generic communication error
             msg = str(e)
-            raise InstrumentDriver.CommunicationError(msg)
-            
-   
+            raise InstrumentDriver.CommunicationError(msg)   
+
 if __name__ == '__main__':
 	pass
 
