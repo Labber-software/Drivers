@@ -94,7 +94,7 @@ class Driver(VISA_Driver):
             currValue = self.performGetValue(quant)
             if value == currValue:
                 # already at the final value, return
-                return currValue
+                return value
             # if sweep range is less than two minimal steps, don't sweep
             if abs(value-currValue) < 2.5*dStep:
                 return VISA_Driver.performSetValue(self, quant, value, 0.0, options=options)
@@ -109,8 +109,8 @@ class Driver(VISA_Driver):
             sMsg = sCmd.replace('<*>', sValue)
             # start sweep
             self.writeAndLog(sMsg)
-            # return init value
-            return currValue
+            # return target value
+            return value
         else:
             # for all other quantities, call the generic VISA driver
             return VISA_Driver.performSetValue(self, quant, value, sweepRate,
