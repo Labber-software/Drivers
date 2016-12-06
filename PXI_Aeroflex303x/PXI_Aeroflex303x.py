@@ -205,8 +205,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             elif quant.name == 'Power trace':
                 value = self.getTraceDict(self.getPTrace())
             elif quant.name == 'AvgTrace':
-                value = self.getTraceAvg()
-                value = self.getMeanUnAvg()    
+                value = self.getTraceAvg()  
             elif quant.name == 'AvgPower':
                 value = self.getAvgPower()
             elif quant.name == 'Level correction':
