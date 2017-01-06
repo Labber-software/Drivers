@@ -277,7 +277,7 @@ class AlazarTechDigitizer():
                 # Wait for the buffer at the head of the list of available
                 # buffers to be filled by the board.
                 buffer = buffers[buffersCompleted % len(buffers)]
-                self.AlazarWaitAsyncBufferComplete(buffer.addr, timeout_ms=5000)
+                self.AlazarWaitAsyncBufferComplete(buffer.addr, timeout_ms=9000)
                 buffersCompleted += 1
                 bytesTransferred += buffer.size_bytes
     

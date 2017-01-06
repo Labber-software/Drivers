@@ -66,16 +66,16 @@ class Driver(InstrumentDriver.InstrumentWorker):
             SampleRateId = int(self.getCmdStringFromValue('Sample rate'),0)
             lFreq = [1E3, 2E3, 5E3, 10E3, 20E3, 50E3, 100E3, 200E3, 500E3,
                      1E6, 2E6, 5E6, 10E6, 20E6, 50E6, 100E6, 200E6, 500E6, 1E9,
-                     1.2E9, 1.5E9, 2E9]
+                     1.2E9, 1.5E9, 2E9, 2.4E9, 3E9, 3.6E9, 4E9]
             Decimation = 0
         elif self.getValue('Clock source') == '10 MHz Reference' and self.getModel() in ('9373','9360'):
             # 10 MHz ref, for 9373 - decimation is 1
             #for now don't allow DES mode; talk to Simon about best implementation
-            SampleRateId = int(self.getCmdStringFromValue('Sample rate'),0)
             lFreq = [1E3, 2E3, 5E3, 10E3, 20E3, 50E3, 100E3, 200E3, 500E3,
                      1E6, 2E6, 5E6, 10E6, 20E6, 50E6, 100E6, 200E6, 500E6, 1E9,
-                     1.2E9, 1.5E9, 2E9]
-            Decimation = 1
+                     1.2E9, 1.5E9, 2E9, 2.4E9, 3E9, 3.6E9, 4E9]
+            SampleRateId = int(lFreq[self.getValueIndex('Sample rate')])
+            Decimation = 0
         else:
             # 10 MHz ref, use 1GHz rate + divider. NB!! divide must be 1,2,4, or mult of 10 
             SampleRateId = int(1E9)
@@ -109,6 +109,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         Source = int(self.getCmdStringFromValue('Trig source'))
         Slope = int(self.getCmdStringFromValue('Trig slope'))
         Delay = self.getValue('Trig delay')
+        timeout = self.dComCfg['Timeout']
         # trig level is relative to full range
         trigLevel = self.getValue('Trig level')
         vAmp = np.array([4, 2, 1, 0.4, 0.2, 0.1, .04], dtype=float)
@@ -118,6 +119,10 @@ class Driver(InstrumentDriver.InstrumentWorker):
             maxLevel = vAmp[self.getValueIndex('Ch2 - Range')]
         elif self.getValue('Trig source') == 'External':
             maxLevel = 5.0
+        elif self.getValue('Trig source') == 'Immediate':
+            maxLevel = 5.0
+            # set timeout to very short with immediate triggering
+            timeout = 0.001
         # convert relative level to U8
         if abs(trigLevel)>maxLevel:
             trigLevel = maxLevel*np.sign(trigLevel)
@@ -133,7 +138,6 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # set trig delay and timeout
         Delay = int(self.getValue('Trig delay')/self.dt)
         self.dig.AlazarSetTriggerDelay(Delay)
-        timeout = self.dComCfg['Timeout']
         self.dig.AlazarSetTriggerTimeOut(time=timeout)
 
 
