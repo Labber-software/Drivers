@@ -34,6 +34,7 @@ class AlazarTechDigitizer():
         # range settings; default value of 400mV for 9373; 
         #will be overwritten if model is 9870 and AlazarInputControl called
         self.dRange = {1: 0.4, 2: 0.4}
+        self.buffers = []
         # create a session id
         func = getattr(DLL, 'AlazarNumOfSystems')
         func.restype = U32 
@@ -44,7 +45,8 @@ class AlazarTechDigitizer():
         if handle is None:
             raise Error('Device with system ID=%d and board ID=%d could not be found.' % (systemId, boardId))
         self.handle = handle
-
+        # get mem and bitsize
+        (self.memorySize_samples, self.bitsPerSample) = self.AlazarGetChannelInfo()
 
     def testLED(self):
         import time
@@ -83,7 +85,7 @@ class AlazarTechDigitizer():
         memorySize_samples = U32(0)
         bitsPerSample = U8(0)
         self.callFunc('AlazarGetChannelInfo', self.handle, byref(memorySize_samples), byref(bitsPerSample))
-        return (memorySize_samples, bitsPerSample)
+        return (int(memorySize_samples.value), int(bitsPerSample.value))
 
 
     #RETURN_CODE AlazarSetCaptureClock( HANDLE h, U32 Source, U32 Rate, U32 Edge, U32 Decimation);
@@ -198,6 +200,12 @@ class AlazarTechDigitizer():
 
     def readTracesDMA(self, Channel1, Channel2):
         """read traces in NPT AutoDMA mode, convert to float, average to single trace"""
+        import logging
+        lg = logging.getLogger('LabberDriver')
+        import time
+        t0 = time.clock()
+        lT = []
+
         #Select the number of pre-trigger samples...not supported in NPT, keeping for consistency
         preTriggerSamplesValue = 0
         #change alignment to be 128
@@ -226,8 +234,7 @@ class AlazarTechDigitizer():
 
     
         # Compute the number of bytes per record and per buffer
-        memorySize_samples, bitsPerSample = self.AlazarGetChannelInfo()
-        bytesPerSample = (bitsPerSample.value + 7) // 8
+        bytesPerSample = (self.bitsPerSample + 7) // 8
         samplesPerRecord = preTriggerSamples + postTriggerSamples
         bytesPerRecord = bytesPerSample * samplesPerRecord
         bytesPerBuffer = bytesPerRecord * recordsPerBuffer * channelCount
@@ -236,19 +243,22 @@ class AlazarTechDigitizer():
         bufferCount = 1
     
         # Allocate DMA buffers
-    
         sample_type = ctypes.c_uint8
         if bytesPerSample > 1:
             sample_type = ctypes.c_uint16
-    
+
+        lT.append('Start: %.1f ms' % ((time.clock()-t0)*1000))
+        
         buffers = []
         for i in range(bufferCount):
             buffers.append(ats.DMABuffer(sample_type, bytesPerBuffer))
         
+        lT.append('Allocate: %.1f ms' % ((time.clock()-t0)*1000))
         # Set the record size
         self.AlazarSetRecordSize(preTriggerSamples, postTriggerSamples)
     
         recordsPerAcquisition = recordsPerBuffer * buffersPerAcquisition
+        lT.append('Prepare: %.1f ms' % ((time.clock()-t0)*1000))
     
         # Configure the board to make a Traditional AutoDMA acquisition
         self.AlazarBeforeAsyncRead(channels,
@@ -258,46 +268,55 @@ class AlazarTechDigitizer():
                               recordsPerAcquisition,
                               ats.ADMA_EXTERNAL_STARTCAPTURE | ats.ADMA_NPT)
 
+        lT.append('Config: %.1f ms' % ((time.clock()-t0)*1000))
     
         # Post DMA buffers to board
-        for buffer in buffers:
-            self.AlazarPostAsyncBuffer(buffer.addr, buffer.size_bytes)
+        for buf in buffers:
+            self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
     
+        lT.append('Post: %.1f ms' % ((time.clock()-t0)*1000))
         try:
             self.AlazarStartCapture() # Start the acquisition
+            lT.append('Start: %.1f ms' % ((time.clock()-t0)*1000))
             buffersCompleted = 0
             bytesTransferred = 0
             #initialize data array
             #vData = np.zeros(channelCount*samplesPerRecord, dtype=float)
             vData = [np.zeros(samplesPerRecord, dtype=float), np.zeros(samplesPerRecord, dtype=float)]
             #range and zero for conversion to voltages
-            codeZero = 2 ** (float(bitsPerSample.value) - 1) - 0.5
-            codeRange = 2 ** (float(bitsPerSample.value) - 1) - 0.5 
+            codeZero = 2 ** (float(self.bitsPerSample) - 1) - 0.5
+            codeRange = 2 ** (float(self.bitsPerSample) - 1) - 0.5 
+            # range and zero for each channel, combined with bit shifting
+            range1 = self.dRange[1]/codeRange/16.
+            range2 = self.dRange[2]/codeRange/16.
+            offset = 16.*codeZero
+
             while (buffersCompleted < buffersPerAcquisition):
                 # Wait for the buffer at the head of the list of available
                 # buffers to be filled by the board.
-                buffer = buffers[buffersCompleted % len(buffers)]
-                self.AlazarWaitAsyncBufferComplete(buffer.addr, timeout_ms=9000)
+                buf = buffers[buffersCompleted % len(buffers)]
+                self.AlazarWaitAsyncBufferComplete(buf.addr, timeout_ms=9000)
+                lT.append('Wait: %.1f ms' % ((time.clock()-t0)*1000))
                 buffersCompleted += 1
-                bytesTransferred += buffer.size_bytes
+                bytesTransferred += buf.size_bytes
     
-                # TODO: Process sample data in this buffer. Data is available
-                # as a NumPy array at buffer.buffer
-                vBuffer = buffer.buffer
-                vBuffer16 = (vBuffer/16 - codeZero)
+                # reshape, sort and average data
+                if channels == 1:
+                    rs = buf.buffer.reshape((recordsPerBuffer, samplesPerRecord))
+                    # vData[0] += self.dRange[1]/codeRange * np.mean(rs, 0)
+                    vData[0] += range1 * (np.mean(rs, 0)  - offset)
+                elif channels == 2:
+                    rs = buf.buffer.reshape((recordsPerBuffer, samplesPerRecord))
+                    # vData[1] += self.dRange[2]/codeRange * np.mean(rs, 0)
+                    vData[1] += range2 * (np.mean(rs, 0)  - offset)
+                elif channels == 3:
+                    rs = buf.buffer.reshape((recordsPerBuffer, samplesPerRecord, 2))
+                    # vData[0] += self.dRange[1]/codeRange * (np.mean(rs[:,:,0], 0) /16 - codeZero)
+                    # vData[1] += self.dRange[2]/codeRange * (np.mean(rs[:,:,1], 0) /16 - codeZero)
+                    vData[0] += range1 * (np.mean(rs[:,:,0], 0)  - offset)
+                    vData[1] += range2 * (np.mean(rs[:,:,1], 0)  - offset)
 
-                for i in range(recordsPerBuffer):
-                    if channels == 1:
-                        vData[0] += self.dRange[1]/codeRange * vBuffer16[i*samplesPerRecord:(i+1)*samplesPerRecord]
-                        #vData[1] += np.zeros(samplesPerRecord, dtype=float)
-                    elif channels == 2:
-                        #vData[0] += np.zeros(samplesPerRecord, dtype=float)
-                        vData[1] += self.dRange[2]/codeRange * vBuffer16[i*samplesPerRecord:(i+1)*samplesPerRecord]
-                    elif channels == 3:
-                        #despite not setting the flag, samples seem interleaved...
-                        vData[0] += self.dRange[1]/codeRange * vBuffer16[2*i*samplesPerRecord:2*(i+1)*samplesPerRecord:2]
-                        vData[1] += self.dRange[2]/codeRange * vBuffer16[(2*i*samplesPerRecord+1):(2*(i+1)*samplesPerRecord+1):2]
-                        
+                lT.append('Sort: %.1f ms' % ((time.clock()-t0)*1000))
                 #
                 # Sample codes are unsigned by default. As a result:
                 # - 0x00 represents a negative full scale input signal.
@@ -305,14 +324,25 @@ class AlazarTechDigitizer():
                 # - 0xFF represents a positive full scale input signal.
     
                 # Add the buffer to the end of the list of available buffers.
-                self.AlazarPostAsyncBuffer(buffer.addr, buffer.size_bytes)
-        finally:
+                # self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
+        except:
             self.AlazarAbortAsyncRead()
+            self.AlazarAbortCapture()
+            raise
+        lT.append('Final: %.1f ms' % ((time.clock()-t0)*1000))
         #normalize        
-        vData[0] /= self.nRecord
-        vData[1] /= self.nRecord
+        vData[0] /= buffersPerAcquisition
+        vData[1] /= buffersPerAcquisition
+        lT.append('Norm: %.1f ms' % ((time.clock()-t0)*1000))
+        # make sure buffers release memory
+        for buf in buffers:
+            buf.__exit__()
+        lT.append('Done: %.1f ms' % ((time.clock()-t0)*1000))
+        # log timing information
+        lg.log(20, str(lT))
         #return data - requested vector length, not restricted to 128 multiple
         return vData[0][:samplesPerRecordValue], vData[1][:samplesPerRecordValue]
+
     
     def readTraces(self, Channel):
         """Read traces, convert to float, average to a single trace"""
