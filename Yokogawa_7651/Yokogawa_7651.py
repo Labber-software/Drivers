@@ -81,7 +81,7 @@ class Driver(VISA_Driver):
             if abs(value) > dMax:
                 # new value out of range, return error
                 raise InstrumentDriver.InstrStateError( \
-                      InstrumentDriver.InstrStateError.SET, self.sName, sQuant=quant.name,
+                      1, self.sName, sQuant=quant.name,
                       message = 'New value (%.6g) is out of range (max = %.6g)' % (value, dMax))
             # calculate actual value based on smallest step size
             value = dStep * np.round(value/dStep)
