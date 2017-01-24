@@ -21,7 +21,9 @@ class Driver(InstrumentDriver.InstrumentWorker):
         self.dt = 1.0
         # open connection
         boardId = int(self.comCfg.address)
-        self.dig = AlazarDig.AlazarTechDigitizer(systemId=1, boardId=boardId)
+        timeout = self.dComCfg['Timeout']
+        self.dig = AlazarDig.AlazarTechDigitizer(systemId=1, boardId=boardId,
+                   timeout=timeout)
         self.dig.testLED()
 
 
@@ -148,7 +150,6 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # get channels in use
         bGetCh1 = bool(self.getValue('Ch1 - Enabled'))
         bGetCh2 = bool(self.getValue('Ch2 - Enabled'))
-        bDemodulation = bool(self.getValue('Enable demodulation'))
         if (not bGetCh1) and (not bGetCh2):
             return
         # set data and record size
@@ -189,53 +190,9 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 nCh1 = 1
             if bGetCh2:
                 nCh2 = 2
+            self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(nCh1, nCh2,
+                                             bAverage=self.getValue('Average'))
             
-            self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(nCh1, nCh2)
-            
-        # temporary, calculate I/Q signal here
-        if bDemodulation and self.dt>0:
-            self.lTrace[3] = self.getIQAmplitudes()
-            self.lTrace[2] = np.mean(self.lTrace[3])
-        else:
-            self.lTrace[3] = np.array([], dtype=complex)
-            self.lTrace[2] = 0.0 + 0j
-            
-            
-    def getIQAmplitudes(self):
-        """Calculate complex signal from data and reference"""
-        # get parameters
-        dFreq = self.getValue('Modulation frequency')
-        skipStart = self.getValue('Skip start')
-        nSegment = 1 #int(self.getValue('Number of segments'))
-        skipIndex = int(round(skipStart/self.dt))
-        nTotLength = self.lTrace[0].size
-        length = 1 + int(round(self.getValue('Length')/self.dt))
-        length = min(length, nTotLength/nSegment-skipIndex)
-        bUseRef = bool(self.getValue('Use Ch2 as reference'))
-        # define data to use, put in 2d array of segments
-        vData = np.reshape(self.lTrace[0], (nSegment, nTotLength/nSegment))
-        # calculate cos/sin vectors, allow segmenting
-        vTime = self.dt * (skipIndex + np.arange(length, dtype=float))
-        vCos = np.cos(2*np.pi * vTime * dFreq)
-        vSin = np.sin(2*np.pi * vTime * dFreq)
-        # calc I/Q
-        dI = 2. * np.trapz(vCos * vData[:,skipIndex:skipIndex+length]) / float(length-1)
-        dQ = 2. * np.trapz(vSin * vData[:,skipIndex:skipIndex+length]) / float(length-1)
-        signal = dI + 1j*dQ
-        if bUseRef:
-            vRef = np.reshape(self.lTrace[1], (nSegment, nTotLength/nSegment))
-            dIref = 2. * np.trapz(vCos * vRef[:,skipIndex:skipIndex+length]) / float(length-1)
-            dQref = 2. * np.trapz(vSin * vRef[:,skipIndex:skipIndex+length]) / float(length-1)
-            # subtract the reference angle
-            dAngleRef = np.arctan2(dQref, dIref)
-            signal /= (np.cos(dAngleRef) + 1j*np.sin(dAngleRef))
-    #        elif nSegment>1:
-    #            # return absolute value if segmenting without reference
-    #            signal = np.abs(signal)
-    #        signal = np.mean(signal)
-        return signal
-
-
 
 
 if __name__ == '__main__':
