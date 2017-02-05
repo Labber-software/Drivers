@@ -25,7 +25,7 @@ def integrateH(np.ndarray[double, ndim=1] vStart, np.ndarray[double, ndim=1] vTi
     cdef np.ndarray[double, ndim=1] vSinEn = np.sin(vAngle)/vEnergy
 
     # apply hamiltonian N times
-    for n1 in xrange(len(vDTime)):
+    for n1 in range(len(vDTime)):
         U11 = vCos[n1] + 1j*0.5*vDetuning[n1]*vSinEn[n1]
         U12 = 1j*0.5*vDelta[n1]*vSinEn[n1]
         U21 = 1j*0.5*vDelta[n1]*vSinEn[n1]
@@ -61,7 +61,7 @@ def integrateH_RWA(np.ndarray[double, ndim=1] vStart, np.ndarray[double, ndim=1]
     cdef np.ndarray[double, ndim=1] vSinEn = np.sin(vAngle)/vEnergy
 
     # apply hamiltonian N times
-    for n1 in xrange(len(vDTime)):
+    for n1 in range(len(vDTime)):
         U11 = vCos[n1] + 1j*0.5*vDetX[n1]*vSinEn[n1]
         U12 = 0.5*(1j*vDelta[n1] - vDetY[n1]) * vSinEn[n1]
         U21 = 0.5*(1j*vDelta[n1] + vDetY[n1]) * vSinEn[n1]
@@ -92,7 +92,7 @@ def goToRotatingFrame(np.ndarray[complex, ndim=2] mState, \
         cdef complex A11
         cdef complex A22
         # perform rotations around Z
-        for n2 in xrange(len(vTime)):
+        for n2 in range(len(vTime)):
             A11 = np.exp(-1j*np.pi*dDriveFreq*(vTime[n2]-dTimeZero))
             A22 = 1/A11
             mState[0,n2] = A11*mState[0,n2] 

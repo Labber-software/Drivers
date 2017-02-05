@@ -465,7 +465,7 @@ class Driver(VISA_Driver):
 			#self.writeAndLog(str(sData))
 			sData = self.askAndLog("DSPY ? 0",)
 			sData = sData.split(",")
-			for i in xrange(len(sData)):
+			for i in range(len(sData)):
 				sData[i] = float(sData[i])
 			xData = sData
 			if self.getValue('Measurement Group') == '3 Swept Sine':
