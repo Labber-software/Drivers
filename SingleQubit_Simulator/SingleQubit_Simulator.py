@@ -30,7 +30,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         dPol = {'Polarization - X': 0, 'Polarization - Y': 1, 'Polarization - Z': 2}
         dTrace = {'Trace - Px': 0, 'Trace - Py': 1, 'Trace - Pz': 2}
         # check type of quantity
-        if quant.name in (dPol.keys() + dTrace.keys()):
+        if quant.name in (list(dPol.keys()) + list(dTrace.keys())):
             # output data, check if simulation needs to be performed
             if self.isConfigUpdated():
                 self.performSimulation()

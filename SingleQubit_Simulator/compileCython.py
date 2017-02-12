@@ -10,5 +10,6 @@ setup(
 
 # run with python .\compileCython.py build_ext --inplace --compiler=mingw32
 
-                            
+# MAC, Py3: run with python compileCython.py build_ext --inplace
+                
 
