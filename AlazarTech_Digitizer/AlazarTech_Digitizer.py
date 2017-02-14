@@ -157,12 +157,13 @@ class Driver(InstrumentDriver.InstrumentWorker):
             nPreSize = int(self.getValue('Pre-trig samples'))
         else:
             nPreSize = 0
-        nPostSize = int(self.getValue('Post-trig samples'))
+        nPostSize = int(self.getValue('Number of samples'))
         nRecord = int(self.getValue('Number of records'))
-        self.dig.AlazarSetRecordSize(nPreSize, nPostSize)
-        self.dig.AlazarSetRecordCount(nRecord)
+        nAverage = int(self.getValue('Number of averages'))
         
         if self.getModel() in ('9870',):
+            self.dig.AlazarSetRecordSize(nPreSize, nPostSize)
+            self.dig.AlazarSetRecordCount(nRecord*nAverage)
             # start aquisition
             self.dig.AlazarStartCapture()
             nTry = self.dComCfg['Timeout']/0.05
@@ -185,13 +186,10 @@ class Driver(InstrumentDriver.InstrumentWorker):
             if bGetCh2:
                 self.lTrace[1] = self.dig.readTraces(2)
         else:
-            nCh1 = nCh2 = 0
-            if bGetCh1:
-                nCh1 = 1
-            if bGetCh2:
-                nCh2 = 2
+            nCh1 = 1 if bGetCh1 else 0
+            nCh2 = 2 if bGetCh2 else 0
             self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(nCh1, nCh2,
-                                             bAverage=self.getValue('Average'))
+                                             nPostSize, nRecord, nAverage)
             
 
 
