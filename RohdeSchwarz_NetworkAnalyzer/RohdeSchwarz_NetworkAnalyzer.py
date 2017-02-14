@@ -102,8 +102,8 @@ class Driver(VISA_Driver):
                 if bWaitTrace and not bAverage:
                     self.writeAndLog(':INIT:CONT ON;')
                 # strip header to find # of points
-                i0 = sData.find('#')
-                nDig = int(sData[i0+1])
+                i0 = sData.find(b'#')
+                nDig = int(sData[i0+1:i0+2])
                 nByte = int(sData[i0+2:i0+2+nDig])
                 nData = nByte/4
                 nPts = nData/2

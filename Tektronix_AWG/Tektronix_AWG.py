@@ -9,6 +9,9 @@ class Driver(VISA_Driver):
     
     def performOpen(self, options={}):
         """Perform the operation of opening the instrument connection"""
+        # add compatibility with pre-python 3 version of Labber
+        if not hasattr(self, 'write_raw'):
+            self.write_raw = self.write
         # start by calling the generic VISA open to make sure we have a connection
         VISA_Driver.performOpen(self, options)
         # check for strange bug by reading the status bit
@@ -304,26 +307,26 @@ class Driver(VISA_Driver):
         if not self.bIsStopped:
             self.writeAndLog(':AWGC:STOP;')
             self.bIsStopped = True
-        # create data as string with header
-        sLen = '%d' % (2*length)
-        sHead = '#%d%s' % (len(sLen), sLen)
+        # create binary data as bytes with header
+        sLen = b'%d' % (2*length)
+        sHead = b'#%d%s' % (len(sLen), sLen)
         # send to tek, start by turning off output
         if seq is None:
             # non-sequence mode, get name
-            name = 'Labber_%d' % channel
-            sSend = ':OUTP%d:STAT 0;' % channel
-            sSend += ':WLIS:WAV:DATA "%s",%d,%d,%s' % (name, start, length,
-                     sHead + vU16[start:start+length].tostring())
-            self.write(sSend)
+            name = b'Labber_%d' % channel
+            sSend = b':OUTP%d:STAT 0;' % channel
+            sSend += b':WLIS:WAV:DATA "%s",%d,%d,%s' % (name, start, length,
+                     sHead + vU16[start:start+length].tobytes())
+            self.write_raw(sSend)
             # (re-)set waveform to channel
-            self.writeAndLog(':SOUR%d:WAV "%s"' % (channel, name))
+            self.writeAndLog(':SOUR%d:WAV "%s"' % (channel, name.decode()))
         else:
             # sequence mode, get name
-            name = 'Labber_%d_%d' % (channel, seq+1)
-            sSend = ':OUTP%d:STAT 0;' % channel
-            sSend += ':WLIS:WAV:DATA "%s",%d,%d,%s' % (name, start, length,
-                     sHead + vU16[start:start+length].tostring())
-            self.write(sSend)
+            name = b'Labber_%d_%d' % (channel, seq+1)
+            sSend = b':OUTP%d:STAT 0;' % channel
+            sSend += b':WLIS:WAV:DATA "%s",%d,%d,%s' % (name, start, length,
+                     sHead + vU16[start:start+length].tobytes())
+            self.write_raw(sSend)
         # store new waveform for next call
         self.lOldU16[iSeq][n] = vU16
         return True

@@ -36,8 +36,8 @@ class Driver(VISA_Driver):
                 self.write('CURV?', bCheckError=False)
                 sData = self.read(ignore_termination=True)
                 # strip header to find # of points
-                i0 = sData.find('#')
-                nDig = int(sData[i0+1])
+                i0 = sData.find(b'#')
+                nDig = int(sData[i0+1:i0+2])
                 nByte = int(sData[i0+2:i0+2+nDig])
                 nData = nByte/2
                 # get data to numpy array

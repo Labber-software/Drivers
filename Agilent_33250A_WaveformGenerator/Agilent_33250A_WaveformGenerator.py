@@ -10,6 +10,9 @@ class Driver(VISA_Driver):
 
     def performOpen(self, options={}):
         """Perform the operation of opening the instrument connection"""
+        # add compatibility with pre-python 3 version of Labber
+        if not hasattr(self, 'write_raw'):
+            self.write_raw = self.write
         # start by calling the generic VISA open to make sure we have a connection
         VISA_Driver.performOpen(self, options)
         # clear value of waveform
@@ -44,11 +47,11 @@ class Driver(VISA_Driver):
         Vpp = self.getValue('Voltage')
         vI16 = self.scaleWaveformToI16(vData, Vpp)
         length = len(vI16)
-        # create data as string with header
-        sLen = '%d' % (2*length)
-        sHead = ':DATA:DAC VOLATILE, #%d%s' % (len(sLen), sLen)
+        # create data as bytes with header
+        sLen = b'%d' % (2*length)
+        sHead = b':DATA:DAC VOLATILE, #%d%s' % (len(sLen), sLen)
         # write header + data
-        self.write(sHead + vI16.tostring())
+        self.write_raw(sHead + vI16.tobytes())
         # select volatile waveform
         self.write(':FUNC:USER VOLATILE')
 

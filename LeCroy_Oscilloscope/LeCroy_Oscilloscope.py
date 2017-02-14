@@ -42,7 +42,7 @@ class Driver(VISA_Driver):
                 self.write('C%d:WF? DESC;' % channel, bCheckError=False)
                 sDesc = self.read(ignore_termination=True)
                 # start by finding byte count, skip 9 bytes after
-                indx = sDesc.find('#9')
+                indx = sDesc.find(b'#9')
                 sDesc = sDesc[indx+2+9:]
                 # strip out relevant info
                 iFirst = struct.unpack('>i', sDesc[124:128])[0]
