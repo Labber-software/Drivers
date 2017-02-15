@@ -39,7 +39,7 @@ class Driver(VISA_Driver):
                 i0 = sData.find(b'#')
                 nDig = int(sData[i0+1:i0+2])
                 nByte = int(sData[i0+2:i0+2+nDig])
-                nData = nByte/2
+                nData = int(nByte/2)
                 # get data to numpy array
                 vData = np.frombuffer(sData[(i0+2+nDig):(i0+2+nDig+nByte)], 
                                       dtype='>h', count=nData)

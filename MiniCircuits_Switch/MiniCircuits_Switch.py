@@ -87,7 +87,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 
 
     def updateStateAndCounters(self):    
-        for name in ['Current Switch State (HGFEDCBA->)'] + self.switchLabels.keys():        
+        for name in ['Current Switch State (HGFEDCBA->)'] + list(self.switchLabels.keys()):        
             self.readValueFromOther(name)
 
 

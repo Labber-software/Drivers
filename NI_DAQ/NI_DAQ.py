@@ -49,7 +49,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 trigSource = self.lChDig[iTrig-len(self.lChName)]
             trigSlopePositive = (self.getValue('Trig slope')=='Positive')
             trigLevel = float(self.getValue('Trig level'))
-        print trigSource, trigSlopePositive, trigLevel 
+        print (trigSource, trigSlopePositive, trigLevel) 
         # get channels and limits
         limit = []
         lCh = []
@@ -121,7 +121,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 
 
 
-class MultiChannelAnalogInput():
+class MultiChannelAnalogInput(object):
     """Class to create a multi-channel analog input
     
     Usage: AI = MultiChannelInput(physicalChannel)

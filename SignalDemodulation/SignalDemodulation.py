@@ -57,12 +57,12 @@ class Driver(InstrumentDriver.InstrumentWorker):
         skipIndex = int(round(skipStart/dt))
         nTotLength = vY.size
         length = 1 + int(round(self.getValue('Length')/dt))
-        length = min(length, nTotLength/nSegment-skipIndex)
+        length = min(length, int(nTotLength/nSegment)-skipIndex)
         if length <=1:
             return complex(0.0)
         bUseRef = bool(self.getValue('Use phase reference signal'))
         # define data to use, put in 2d array of segments
-        vData = np.reshape(vY, (nSegment, nTotLength/nSegment))
+        vData = np.reshape(vY, (nSegment, int(nTotLength/nSegment)))
         # calculate cos/sin vectors, allow segmenting
         vTime = dt * (skipIndex + np.arange(length, dtype=float))
         vCos = np.cos(2*np.pi * vTime * dFreq)
@@ -76,7 +76,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             # skip reference if trace length doesn't match
             if len(traceRef['y']) != len(vY):
                 return signal
-            vRef = np.reshape(traceRef['y'], (nSegment, nTotLength/nSegment))
+            vRef = np.reshape(traceRef['y'], (nSegment, int(nTotLength/nSegment)))
             dIref = 2. * np.trapz(vCos * vRef[:,skipIndex:skipIndex+length]) / float(length-1)
             dQref = 2. * np.trapz(vSin * vRef[:,skipIndex:skipIndex+length]) / float(length-1)
             # subtract the reference angle
