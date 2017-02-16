@@ -79,10 +79,18 @@ class Driver(InstrumentDriver.InstrumentWorker):
             direction = int(self.getCmdStringFromValue('Trig I/O'))
             sync = int(self.getCmdStringFromValue('Trig Sampling Mode'))
             self.AWG.triggerIOconfig(direction, sync)
-        elif quant.name in ('External Trig Source', 'External Trig Config'):
-            extSource = int(self.getCmdStringFromValue('External Trig Source'))
-            trigBehavior = int(self.getCmdStringFromValue('External Trig Config'))
+        elif quant.name in ('External Trig Source', 'External Trig Config') or\
+                   name in ('External Trig Source', 'External Trig Config'):
             for ch in range(self.nCh):
+                # check if separate trigger is used
+                if self.getValue('Ch%d - Separate trigger' % ch):
+                    # use unique trigger for this channel
+                    extSource = int(self.getCmdStringFromValue('Ch%d - External Trig Source' % ch))
+                    trigBehavior = int(self.getCmdStringFromValue('Ch%d - External Trig Config' % ch))
+                else:
+                    # use default
+                    extSource = int(self.getCmdStringFromValue('External Trig Source'))
+                    trigBehavior = int(self.getCmdStringFromValue('External Trig Config'))
                 self.AWG.AWGtriggerExternalConfig(ch, extSource, trigBehavior)
         elif name in ('Function', 'Enabled'):
             if self.getValue('Ch%d - Enabled' % ch):
