@@ -51,14 +51,19 @@ class Driver(VISA_Driver):
                 Vgain = struct.unpack('>f', sDesc[156:160])[0]
                 dt = struct.unpack('>f', sDesc[176:180])[0]
                 nPts = struct.unpack('>i', sDesc[116:120])[0]
-    #            print (iFirst, iLast, Voffs, Vgain, dt, nPts)
+    #            self.log(iFirst, iLast, Voffs, Vgain, dt, nPts)
                 #
                 # do a second call to get data, convert to numpy array
                 self.write('C%d:WF? DAT1;' % channel, bCheckError=False)
                 sData = self.read(ignore_termination=True)
                 head = 16
+                # always convert one less point, to avoid length changes
+                iLast -= 1
+                # only extract as much data as we have, to fix bug
+                if len(sData) < (head + (iLast+1)*2):
+                    iLast = (len(sData) - head)//2 - 1
                 vData = np.fromstring(sData[(head + iFirst*2):(head + (iLast+1)*2)], 
-                                      dtype='>h', count=nPts)
+                                      dtype='>h')
                 value = InstrumentQuantity.getTraceDict(vData*Vgain + Voffs, dt=dt)
             else:
                 # not enabled, return empty array
