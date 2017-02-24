@@ -112,14 +112,18 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 # add plateau
                 vPulse = (vTime >= (dTime-dPlateau/2)) & \
                     (vTime < (dTime+dPlateau/2))
-                # before plateau
-                vPulse = vPulse + (vTime < (dTime-dPlateau/2)) * \
-                    (np.exp(-(vTime-(dTime-dPlateau/2))**2/(2*dStd**2))-dOffset)/(1-dOffset)
-                # after plateau
-                vPulse = vPulse + (vTime >= (dTime+dPlateau/2)) * \
-                    (np.exp(-(vTime-(dTime+dPlateau/2))**2/(2*dStd**2))-dOffset)/(1-dOffset)
+                if dStd > 0:
+                    # before plateau
+                    vPulse = vPulse + (vTime < (dTime-dPlateau/2)) * \
+                        (np.exp(-(vTime-(dTime-dPlateau/2))**2/(2*dStd**2))-dOffset)/(1-dOffset)
+                    # after plateau
+                    vPulse = vPulse + (vTime >= (dTime+dPlateau/2)) * \
+                        (np.exp(-(vTime-(dTime+dPlateau/2))**2/(2*dStd**2))-dOffset)/(1-dOffset)
             else:
-                vPulse = (np.exp(-(vTime-dTime)**2/(2*dStd**2))-dOffset)/(1-dOffset)
+                if dStd > 0:
+                    vPulse = (np.exp(-(vTime-dTime)**2/(2*dStd**2))-dOffset)/(1-dOffset)
+                else:
+                    vPulse = np.zeros_like(vTime)
 #        # add the pulse to the previous ones
 #        vY[iPulse] = vY[iPulse] + dAmp * vPulse
         vPulse = dAmp * vPulse
