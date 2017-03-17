@@ -62,14 +62,14 @@ class Driver(VISA_Driver):
                 self.writeAndLog(':SENS:AVER:CLE;')
                 self.writeAndLog(':ABOR;:INIT:CONT OFF;:INIT:IMM;*OPC')
                 # wait some time before first check
-                self.thread().msleep(30)
+                self.wait(0.03)
                 bDone = False
                 while (not bDone) and (not self.isStopped()):
                     # check if done
                     stb = int(self.askAndLog('*ESR?'))
                     bDone = (stb & 1) > 0
                     if not bDone:
-                        self.thread().msleep(50)
+                        self.wait(0.05)
                 # if stopped, don't get data
                 if self.isStopped():
                     self.writeAndLog('*CLS;:INIT:CONT ON;')
@@ -112,14 +112,14 @@ class Driver(VISA_Driver):
                 self.writeAndLog(':WAV:AVER:CLE;')
                 self.writeAndLog(':ABOR;:INIT:CONT OFF;:INIT:IMM;*OPC')
                 # wait some time before first check
-                self.thread().msleep(30)
+                self.wait(0.03)
                 bDone = False
                 while (not bDone) and (not self.isStopped()):
                     # check if done
                     stb = int(self.askAndLog('*ESR?'))
                     bDone = (stb & 1) > 0
                     if not bDone:
-                        self.thread().msleep(50)
+                        self.wait(0.05)
                 # if stopped, don't get data
                 if self.isStopped():
                     self.writeAndLog('*CLS;:INIT:CONT ON;')
@@ -172,14 +172,14 @@ class Driver(VISA_Driver):
                 self.writeAndLog(':SPEC:AVER:CLE;')
                 self.writeAndLog(':ABOR;:INIT:CONT OFF;:INIT:IMM;*OPC')
                 # wait some time before first check
-                self.thread().msleep(30)
+                self.wait(0.03)
                 bDone = False
                 while (not bDone) and (not self.isStopped()):
                     # check if done
                     stb = int(self.askAndLog('*ESR?'))
                     bDone = (stb & 1) > 0
                     if not bDone:
-                        self.thread().msleep(50)
+                        self.wait(0.05)
                 # if stopped, don't get data
                 if self.isStopped():
                     self.writeAndLog('*CLS;:INIT:CONT ON;')

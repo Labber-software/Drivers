@@ -163,16 +163,16 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 rec.execute()
                 rec.trigger()
                 if not self.getValue("TraceStep"):
-                    self.thread().msleep(int(self.getValue("TraceLength")*1000))
+                    self.wait(self.getValue("TraceLength"))
                 else:
-                    self.thread().msleep(int(self.getValue("TraceStepDelayA")*1000))
+                    self.wait(self.getValue("TraceStepDelayA"))
                     self.log("Setpoint A: " + str(self.getValue("TraceStepSetpointA")))
                     self.ziConnection.setDouble(self.instrCfg.getQuantity('TraceStepChannel').getCmdStringFromValue(self.getValue("TraceStepChannel")) % self.device, self.getValue("TraceStepSetpointA"))
-                    self.thread().msleep(int(self.getValue("TraceStepDelayB")*1000))
+                    self.wait(self.getValue("TraceStepDelayB"))
                     self.log("Setpoint B: " + str(self.getValue("TraceStepSetpointB")))
                     self.ziConnection.setDouble(self.instrCfg.getQuantity('TraceStepChannel').getCmdStringFromValue(self.getValue("TraceStepChannel")) % self.device, self.getValue("TraceStepSetpointB"))
                 while not rec.finished():
-                    self.thread().msleep(50)
+                    self.wait(0.05)
                 self.traceBuffer = rec.read(True)
                 self.clockbase = float(self.ziConnection.getInt('/%s/clockbase' % self.device))
                 data = self.traceBuffer[quant.get_cmd % self.device][0]

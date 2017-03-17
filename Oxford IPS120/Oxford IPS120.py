@@ -49,7 +49,7 @@ class Driver(VISA_Driver):
         current = float(self.askAndLog('R7').strip()[1:])
         precision = self.getValue("Precision")
         while abs(target-current) > precision and not self.isStopped():
-            self.thread().msleep(100)
+            self.wait(0.1)
             current = float(self.askAndLog('R7').strip()[1:])
         self.askAndLog('A0')
 

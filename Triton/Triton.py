@@ -19,8 +19,6 @@ class Driver(VISA_Driver):
         """Perform the operation of opening the instrument connection"""
         # calling the generic VISA open to make sure we have a connection
         VISA_Driver.performOpen(self, options=options)
-        # fix issue with termination for read
-        visa.vpp43.set_attribute(self.com.vi, visa.VI_ATTR_SUPPRESS_END_EN, visa.VI_FALSE)
         
         #Detect options: (vector) magnet and swicth heater
         detectedOptions = []
@@ -182,7 +180,7 @@ class Driver(VISA_Driver):
     def waitForIdle(self):
         idle = (self.askAndLog('READ:SYS:VRM:ACTN').strip().rsplit(':',1)[1] == "IDLE")
         while not idle and not self.isStopped():
-            self.thread().msleep(100)
+            self.wait(0.1)
             idle = (self.askAndLog('READ:SYS:VRM:ACTN').strip().rsplit(':',1)[1] == "IDLE")
         if self.isStopped():
             self.askAndLog('SET:SYS:VRM:ACTN:HOLD')
