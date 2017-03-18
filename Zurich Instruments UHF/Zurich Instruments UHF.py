@@ -79,7 +79,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                         ['Mod1OutAmp', 'Mod2OutAmp'] + \
                         ['Mod1SB1OutAmp', 'Mod2SB1OutAmp'] + \
                         ['Mod1SB2OutAmp', 'Mod2SB2OutAmp']:
-            self.ziConnection.setDouble(quant.get_cmd % self.device, value)
+            self.ziConnection.setDouble(quant.get_cmd % self.device, float(value))
         #Combos (Oscillator-selector for demodulators and Modulator mode)
         elif quant.name in ['Demod'+str(x+1)+'Osc' for x in range(8)] + \
                             ['Mod1Mode', 'Mod2Mode'] + \
@@ -88,7 +88,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                             ['Mod1Osc', 'Mod2Osc'] + \
                             ['Mod1SB1Osc', 'Mod2SB1Osc'] + \
                             ['Mod1SB2Osc', 'Mod2SB2Osc']:
-            self.ziConnection.setInt(quant.get_cmd % self.device, value)
+            self.ziConnection.setInt(quant.get_cmd % self.device, int(value))
         return value
 
 
