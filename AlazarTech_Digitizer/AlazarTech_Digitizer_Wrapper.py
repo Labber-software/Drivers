@@ -74,11 +74,11 @@ class TimeoutError(Error):
 
 # open dll
 try:
-    DLL = ctypes.CDLL('ATSApi32')
+    DLL = ctypes.CDLL('ATSApi')
 except:
     # if failure, try to open in driver folder
     sPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'atsapi')
-    DLL = ctypes.CDLL(os.path.join(sPath, 'ATSApi32'))
+    DLL = ctypes.CDLL(os.path.join(sPath, 'ATSApi'))
 
 
 class AlazarTechDigitizer():
