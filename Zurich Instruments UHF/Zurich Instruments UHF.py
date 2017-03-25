@@ -88,7 +88,10 @@ class Driver(InstrumentDriver.InstrumentWorker):
                             ['Mod1Osc', 'Mod2Osc'] + \
                             ['Mod1SB1Osc', 'Mod2SB1Osc'] + \
                             ['Mod1SB2Osc', 'Mod2SB2Osc']:
-            self.ziConnection.setInt(quant.get_cmd % self.device, int(value))
+            # convert input to integer
+            intValue = int(quant.getCmdStringFromValue(value))
+#            self.log('input: ' + str(value) + ', output:' + str(intValue))
+            self.ziConnection.setInt(quant.get_cmd % self.device, intValue)
         return value
 
 
