@@ -29,7 +29,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             self.device = self.comCfg.address
         
         try:
-            devtype = self.ziConnection.getByte('/%s/features/devtype' % self.device)
+            devtype = self.ziConnection.getByte(str('/%s/features/devtype' % self.device))
         except:
             raise InstrumentDriver.CommunicationError("Device " + self.device + " not found.")
             return
@@ -42,7 +42,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             return
         
         #Check Options
-        devoptions = self.ziConnection.getByte('/%s/features/options' % self.device)
+        devoptions = self.ziConnection.getByte(str('/%s/features/options' % self.device))
         detectedOptions = []
         if re.search('MOD', devoptions):
             detectedOptions.append("MOD")
@@ -62,7 +62,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                         ['Mod1On', 'Mod2On'] + \
                         ['Out'+str(x+1)+'SigOut' + str(y+1) + 'On' for x in range(8) for y in range(2)] + \
                         ['Demod'+str(x+1)+'On' for x in range(8)]:
-            self.ziConnection.setInt(str(quant.get_cmd % self.device, 1 if value else 0))
+            self.ziConnection.setInt(str(quant.get_cmd % self.device), 1 if value else 0)
         #Simple floating points
         elif quant.name in ['SigIn1Range', 'SigIn2Range'] + \
                         ['Oscillator'+str(x+1)+'Frequency' for x in range(8)] + \
@@ -171,14 +171,14 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 else:
                     self.wait(self.getValue("TraceStepDelayA"))
                     self.log("Setpoint A: " + str(self.getValue("TraceStepSetpointA")))
-                    self.ziConnection.setDouble(self.instrCfg.getQuantity('TraceStepChannel').getCmdStringFromValue(self.getValue("TraceStepChannel")) % self.device, self.getValue("TraceStepSetpointA"))
+                    self.ziConnection.setDouble(str(self.instrCfg.getQuantity('TraceStepChannel').getCmdStringFromValue(self.getValue("TraceStepChannel")) % self.device), self.getValue("TraceStepSetpointA"))
                     self.wait(self.getValue("TraceStepDelayB"))
                     self.log("Setpoint B: " + str(self.getValue("TraceStepSetpointB")))
-                    self.ziConnection.setDouble(self.instrCfg.getQuantity('TraceStepChannel').getCmdStringFromValue(self.getValue("TraceStepChannel")) % self.device, self.getValue("TraceStepSetpointB"))
+                    self.ziConnection.setDouble(str(self.instrCfg.getQuantity('TraceStepChannel').getCmdStringFromValue(self.getValue("TraceStepChannel")) % self.device), self.getValue("TraceStepSetpointB"))
                 while not rec.finished():
                     self.wait(0.05)
                 self.traceBuffer = rec.read(True)
-                self.clockbase = float(self.ziConnection.getInt('/%s/clockbase' % self.device))
+                self.clockbase = float(self.ziConnection.getInt(str('/%s/clockbase' % self.device)))
                 data = self.traceBuffer[quant.get_cmd % self.device][0]
                 self.log(data)
                 rec.finish()
