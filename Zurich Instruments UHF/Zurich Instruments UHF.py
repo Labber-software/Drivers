@@ -67,6 +67,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         elif quant.name in ['SigIn1Range', 'SigIn2Range'] + \
                         ['Oscillator'+str(x+1)+'Frequency' for x in range(8)] + \
                         ['Out'+str(x+1)+'SigOut' + str(y+1) + 'Amp' for x in range(8) for y in range(2)] + \
+                        ['SigOut1Offset', 'SigOut2Offset'] + \
                         ['Demod'+str(x+1)+'RefPhase' for x in range(8)] + \
                         ['Demod'+str(x+1)+'TC' for x in range(8)] + \
                         ['Demod'+str(x+1)+'SampleRate' for x in range(8)] + \
@@ -111,6 +112,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         elif quant.name in ['SigIn1Range', 'SigIn2Range'] + \
                         ['Oscillator'+str(x+1)+'Frequency' for x in range(8)] + \
                         ['Out'+str(x+1)+'SigOut' + str(y+1) + 'Amp' for x in range(8) for y in range(2)] + \
+                        ['SigOut1Offset', 'SigOut2Offset'] + \
                         ['Demod'+str(x+1)+'RefPhase' for x in range(8)] + \
                         ['Demod'+str(x+1)+'TC' for x in range(8)] + \
                         ['Demod'+str(x+1)+'SampleRate' for x in range(8)] + \
