@@ -62,14 +62,14 @@ class Driver(VISA_Driver):
                     self.writeAndLog(':SENS:AVER:CLE;')
                 self.writeAndLog(':ABOR;:INIT:CONT OFF;:INIT:IMM;*OPC')
                 # wait some time before first check
-                self.thread().msleep(30)
+                self.wait(0.03)
                 bDone = False
                 while (not bDone) and (not self.isStopped()):
                     # check if done
                     stb = int(self.askAndLog('*ESR?'))
                     bDone = (stb & 1) > 0
                     if not bDone:
-                        self.thread().msleep(50)
+                        self.wait(0.05)
                 # if stopped, don't get data
                 if self.isStopped():
                     self.writeAndLog('*CLS;:INIT:CONT ON;')
@@ -80,10 +80,10 @@ class Driver(VISA_Driver):
             if bWaitTrace and not bAverage:
                 self.writeAndLog(':INIT:CONT ON;')
             # strip header to find # of points
-            i0 = sData.find('#')
-            nDig = int(sData[i0+1])
+            i0 = sData.find(b'#')
+            nDig = int(sData[i0+1:i0+2])
             nByte = int(sData[i0+2:i0+2+nDig])
-            nPts = nByte/4
+            nPts = int(nByte/4)
             # get data to numpy array
             vData = np.frombuffer(sData[(i0+2+nDig):(i0+2+nDig+nByte)], 
                                   dtype='>f', count=nPts)

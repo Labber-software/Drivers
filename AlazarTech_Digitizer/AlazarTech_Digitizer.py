@@ -4,6 +4,7 @@ import AlazarTech_Digitizer_Wrapper as AlazarDig
 import InstrumentDriver
 import numpy as np
 
+
 class Error(Exception):
     pass
 
@@ -20,7 +21,9 @@ class Driver(InstrumentDriver.InstrumentWorker):
         self.dt = 1.0
         # open connection
         boardId = int(self.comCfg.address)
-        self.dig = AlazarDig.AlazarTechDigitizer(systemId=1, boardId=boardId)
+        timeout = self.dComCfg['Timeout']
+        self.dig = AlazarDig.AlazarTechDigitizer(systemId=1, boardId=boardId,
+                   timeout=timeout)
         self.dig.testLED()
 
 
@@ -64,10 +67,19 @@ class Driver(InstrumentDriver.InstrumentWorker):
             # internal
             SampleRateId = int(self.getCmdStringFromValue('Sample rate'),0)
             lFreq = [1E3, 2E3, 5E3, 10E3, 20E3, 50E3, 100E3, 200E3, 500E3,
-                     1E6, 2E6, 5E6, 10E6, 20E6, 50E6, 100E6, 200E6, 500E6, 1E9]
+                     1E6, 2E6, 5E6, 10E6, 20E6, 50E6, 100E6, 200E6, 500E6, 1E9,
+                     1.2E9, 1.5E9, 2E9, 2.4E9, 3E9, 3.6E9, 4E9]
+            Decimation = 0
+        elif self.getValue('Clock source') == '10 MHz Reference' and self.getModel() in ('9373','9360'):
+            # 10 MHz ref, for 9373 - decimation is 1
+            #for now don't allow DES mode; talk to Simon about best implementation
+            lFreq = [1E3, 2E3, 5E3, 10E3, 20E3, 50E3, 100E3, 200E3, 500E3,
+                     1E6, 2E6, 5E6, 10E6, 20E6, 50E6, 100E6, 200E6, 500E6, 1E9,
+                     1.2E9, 1.5E9, 2E9, 2.4E9, 3E9, 3.6E9, 4E9]
+            SampleRateId = int(lFreq[self.getValueIndex('Sample rate')])
             Decimation = 0
         else:
-            # 10 MHz ref, use 1GHz rate + divider. NB!! divide must be 1,2,4,10 
+            # 10 MHz ref, use 1GHz rate + divider. NB!! divide must be 1,2,4, or mult of 10 
             SampleRateId = int(1E9)
             lFreq = [1E3, 2E3, 5E3, 10E3, 20E3, 50E3, 100E3, 200E3, 500E3,
                      1E6, 2E6, 5E6, 10E6, 20E6, 50E6, 100E6, 250E6, 500E6, 1E9]
@@ -80,18 +92,26 @@ class Driver(InstrumentDriver.InstrumentWorker):
         for n in range(2):
             if self.getValue('Ch%d - Enabled' % (n+1)):
                 # coupling and range
-                Coupling = int(self.getCmdStringFromValue('Ch%d - Coupling' % (n+1)))
-                InputRange = int(self.getCmdStringFromValue('Ch%d - Range' % (n+1)))
-                Impedance = int(self.getCmdStringFromValue('Ch%d - Impedance' % (n+1)))
+                if self.getModel() in ('9373', '9360'):
+                    Coupling = 2
+                    InputRange = 7
+                    Impedance = 2
+                else:
+                    Coupling = int(self.getCmdStringFromValue('Ch%d - Coupling' % (n+1)))
+                    InputRange = int(self.getCmdStringFromValue('Ch%d - Range' % (n+1)))
+                    Impedance = int(self.getCmdStringFromValue('Ch%d - Impedance' % (n+1)))
+                #set coupling, input range, impedance
                 self.dig.AlazarInputControl(n+1, Coupling, InputRange, Impedance)
-                # bandwidth limit
-                BW = int(self.getValue('Ch%d - Bandwidth limit' % (n+1)))
-                self.dig.AlazarSetBWLimit(n+1, BW)
+                # bandwidth limit, only for model 9870
+                if self.getModel() in ('9870',):
+                    BW = int(self.getValue('Ch%d - Bandwidth limit' % (n+1)))
+                    self.dig.AlazarSetBWLimit(n+1, BW)
         # 
         # configure trigger
         Source = int(self.getCmdStringFromValue('Trig source'))
         Slope = int(self.getCmdStringFromValue('Trig slope'))
         Delay = self.getValue('Trig delay')
+        timeout = self.dComCfg['Timeout']
         # trig level is relative to full range
         trigLevel = self.getValue('Trig level')
         vAmp = np.array([4, 2, 1, 0.4, 0.2, 0.1, .04], dtype=float)
@@ -101,6 +121,10 @@ class Driver(InstrumentDriver.InstrumentWorker):
             maxLevel = vAmp[self.getValueIndex('Ch2 - Range')]
         elif self.getValue('Trig source') == 'External':
             maxLevel = 5.0
+        elif self.getValue('Trig source') == 'Immediate':
+            maxLevel = 5.0
+            # set timeout to very short with immediate triggering
+            timeout = 0.001
         # convert relative level to U8
         if abs(trigLevel)>maxLevel:
             trigLevel = maxLevel*np.sign(trigLevel)
@@ -116,47 +140,57 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # set trig delay and timeout
         Delay = int(self.getValue('Trig delay')/self.dt)
         self.dig.AlazarSetTriggerDelay(Delay)
-        timeout = self.dComCfg['Timeout']
         self.dig.AlazarSetTriggerTimeOut(time=timeout)
 
 
     def getTraces(self):
         """Resample the data"""
         # get new trace
-        self.lTrace = [np.array([]), np.array([])]
+        self.lTrace = [np.array([]), np.array([]), 0.0, np.array([], dtype=complex)]
         # get channels in use
         bGetCh1 = bool(self.getValue('Ch1 - Enabled'))
         bGetCh2 = bool(self.getValue('Ch2 - Enabled'))
         if (not bGetCh1) and (not bGetCh2):
             return
         # set data and record size
-        nPreSize = int(self.getValue('Pre-trig samples'))
-        nPostSize = int(self.getValue('Post-trig samples'))
+        if self.getModel() in ('9870',):
+            nPreSize = int(self.getValue('Pre-trig samples'))
+        else:
+            nPreSize = 0
+        nPostSize = int(self.getValue('Number of samples'))
         nRecord = int(self.getValue('Number of records'))
-        self.dig.AlazarSetRecordSize(nPreSize, nPostSize)
-        self.dig.AlazarSetRecordCount(nRecord)
-        # start aquisition
-        self.dig.AlazarStartCapture()
-        nTry = self.dComCfg['Timeout']/0.05
-        while nTry>0 and self.dig.AlazarBusy() and not self.isStopped():
-            # sleep for a while to save resources, then try again
-            self.thread().msleep(50)
-            nTry -= 1
-        # check if timeout occurred
-        if nTry <= 0:
-            self.dig.AlazarAbortCapture()
-            raise Error('Acquisition timed out')
-        # check if user stopped
-        if self.isStopped():
-            self.dig.AlazarAbortCapture()
-            return
-        #
-        # read data for channels in use
-        if bGetCh1:
-            self.lTrace[0] = self.dig.readTraces(1)
-        if bGetCh2:
-            self.lTrace[1] = self.dig.readTraces(2)
-
+        nAverage = int(self.getValue('Number of averages'))
+        
+        if self.getModel() in ('9870',):
+            self.dig.AlazarSetRecordSize(nPreSize, nPostSize)
+            self.dig.AlazarSetRecordCount(nRecord*nAverage)
+            # start aquisition
+            self.dig.AlazarStartCapture()
+            nTry = self.dComCfg['Timeout']/0.05
+            while nTry>0 and self.dig.AlazarBusy() and not self.isStopped():
+                # sleep for a while to save resources, then try again
+                self.wait(0.050)
+                nTry -= 1
+            # check if timeout occurred
+            if nTry <= 0:
+                self.dig.AlazarAbortCapture()
+                raise Error('Acquisition timed out')
+            # check if user stopped
+            if self.isStopped():
+                self.dig.AlazarAbortCapture()
+                return
+            #
+            # read data for channels in use
+            if bGetCh1:
+                self.lTrace[0] = self.dig.readTraces(1)
+            if bGetCh2:
+                self.lTrace[1] = self.dig.readTraces(2)
+        else:
+            nCh1 = 1 if bGetCh1 else 0
+            nCh2 = 2 if bGetCh2 else 0
+            self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(nCh1, nCh2,
+                                             nPostSize, nRecord, nAverage)
+            
 
 
 if __name__ == '__main__':

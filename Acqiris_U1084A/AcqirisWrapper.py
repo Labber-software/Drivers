@@ -3,10 +3,26 @@ from ctypes import byref
 import numpy as np
 
 # treat timout errors seperately
-ACQIRIS_ERROR_ACQ_TIMEOUT = 0xBFFA4900L
-ACQIRIS_ERROR_PROC_TIMEOUT = 0xBFFA4902L
+ACQIRIS_ERROR_MEZZIO_ACQ_TIMEOUT = -1074116395
+ACQIRIS_ERROR_ACQ_TIMEOUT = -1074116352
+ACQIRIS_ERROR_PROC_TIMEOUT = -1074116350
+ACQIRIS_ERROR_LOAD_TIMEOUT = -1074116349
+ACQIRIS_ERROR_READ_TIMEOUT = -1074116348
+ACQIRIS_ERROR_WAIT_TIMEOUT = -1074116346
+ACQIRIS_ERROR_FLASH_ACCESS_TIMEOUT = -1074116048
+ACQIRIS_ERROR_NO_DATA = -1074116601
+
+TIMEOUTS = (ACQIRIS_ERROR_MEZZIO_ACQ_TIMEOUT, 
+            ACQIRIS_ERROR_ACQ_TIMEOUT,
+            ACQIRIS_ERROR_PROC_TIMEOUT,
+            ACQIRIS_ERROR_LOAD_TIMEOUT,
+            ACQIRIS_ERROR_READ_TIMEOUT,
+            ACQIRIS_ERROR_WAIT_TIMEOUT,
+            ACQIRIS_ERROR_FLASH_ACCESS_TIMEOUT,
+            ACQIRIS_ERROR_NO_DATA)
+
 # ignore error codes below the warning limit
-WARNING_LIMIT = 0x40000000L
+WARNING_LIMIT = 0
 
 # error type returned by this class
 class Error(Exception):
@@ -92,6 +108,8 @@ class AcqirisDigitizer():
         """The init case defines a session ID, used to identify the instrument"""
         # create a session id
         self.session = ViSession()
+        # store data buffer, to avoid re-allocation
+        self.lBuffer = [None for a in range(2)]
 
 
     def callFunc(self, sFunc, *args, **kargs):
@@ -105,12 +123,13 @@ class AcqirisDigitizer():
             bIgnoreError = kargs['bIgnoreError']
         else:
             bIgnoreError = False
-        if status and not bIgnoreError and status>WARNING_LIMIT:
+        if status and not bIgnoreError and status<WARNING_LIMIT:
             sError = self.getError(status)
             # special treatment of TimeoutError
-            if status in (ACQIRIS_ERROR_ACQ_TIMEOUT, ACQIRIS_ERROR_PROC_TIMEOUT):
+            if status in TIMEOUTS: 
                 raise TimeoutError(sError)
             else:
+                print sError
                 raise Error(sError)
 
     
@@ -203,6 +222,30 @@ class AcqirisDigitizer():
         self.callFunc('AcqrsD1_configMemory', self.session,
                       ViInt32(nbrSamples), ViInt32(nbrSegments))
         
+
+    def configMemoryEx(self, nbrSamples, nbrSegments, nbrBanks=2, flags=1):
+#ACQ_DLL ViStatus ACQ_CC AcqrsD1_configMemoryEx(ViSession instrumentID, ViUInt32 nbrSamplesHi, 
+#    ViUInt32 nbrSamplesLo, ViInt32 nbrSegments, ViInt32 nbrBanks, ViInt32 flags);
+#
+#  Configures the memory control parameters of the digitizer.
+#  'nbrSamplesHi'      = reserved for future use, must be set to 0.
+#    'nbrSamplesLo'      = nominal number of samples to record (per segment!).
+#    'nbrSegments'       = number of segments to acquire per bank
+#                          1 corresponds to the normal single-trace acquisition mode.
+#    'nbrBanks'          = number of banks in which the memory will be split, 
+#                          for buffered reading (SAR).
+#                          1 corresponds to the normal acquisition mode.
+#    'flags'             = 0 no flags. 
+#                        = 1 force use of internal memory (for digitizers with extended 
+#                          memory options only).
+        self.callFunc('AcqrsD1_configMemoryEx', self.session,
+                      ViUInt32(0), ViUInt32(nbrSamples), 
+                      ViInt32(nbrSegments), ViInt32(nbrBanks), ViInt32(flags))
+
+    def freeBank(self):
+#ACQ_DLL ViStatus ACQ_CC AcqrsD1_freeBank(ViSession instrumentID, ViInt32 reserved);
+        self.callFunc('AcqrsD1_freeBank', self.session, ViInt32(0))
+
 
     def getMemory(self):
         # ViStatus status = AcqrsD1_getMemory(ViSession instrumentID,
@@ -419,28 +462,46 @@ class AcqirisDigitizer():
                           ViString(parameterString), byref(value))
         return value.value
 
+    def acqDone(self):
+#ACQ_DLL ViStatus ACQ_CC AcqrsD1_acqDone(ViSession instrumentID, ViBoolean* done);
+#//! Checks if the acquisition has terminated.
+#/*! Returns 'done' = VI_TRUE if the acquisition is terminated
+#
+#    Returns one of the following ViStatus values:
+#    ACQIRIS_ERROR_IO_READ    if a link error has been detected (e.g. PCI link lost).
+#    VI_SUCCESS otherwise. */
+        value = ViBoolean()
+        self.callFunc('AcqrsD1_acqDone', self.session, byref(value))
+        return value.value
 
-    def waitForEndOfAcquisition(self, timeout=10000):
+
+    def waitForEndOfAcquisition(self, timeout=60000, funcStop=None):
         # ViStatus status = AcqrsD1_waitForEndOfAcquisition (ViSession instrumentID,
         # ViInt32 timeout);
-        # max timout is 10 second
-        iMaxTime = 10000
-        # do multiple calls to fix max timeout of 10 seconds
+        # max timout is 1 second
+        iMaxTime = 1000
+        # do multiple calls to check stop function once in a while
         while timeout > 0:
             try:
                 self.callFunc('AcqrsD1_waitForEndOfAcquisition', self.session,
-                              ViInt32(timeout))
+                              ViInt32(int(iMaxTime)))
                 # completed, break out of loop
                 break
             except TimeoutError:
                 timeout -= iMaxTime
                 if timeout > 0:
+                    # check if stopped
+                    if funcStop is not None and funcStop():
+                        # stop acquisition, break loop
+                        self.stopAcquisition()
+                        return False
                     # try again
                     continue
                 else:
                     self.stopAcquisition()
                     # re-raise timeout error
                     raise
+        return True
     
 
     def acquire(self):
@@ -485,7 +546,14 @@ class AcqirisDigitizer():
             dataType = ctypes.c_int
         elif readPar.dataType == self.DATATYPE_DOUBLE:
             dataType = ctypes.c_double
-        dataArray = (dataType * (nbrSamples + 32))()
+        # get buffer
+        bufSize = nbrSamples + 32
+        dataArray = self.lBuffer[channel-1]
+        # if no old buffer, reallocate
+        if dataArray is None or bufSize != len(dataArray):
+            dataArray = (dataType * bufSize)()
+            self.lBuffer[channel-1] = dataArray
+#        dataArray = (dataType * (nbrSamples + 32))()
         # allocate data descriptor struct
         descriptor = AqDataDescriptor()
         # allocate segment descriptor array
@@ -498,7 +566,7 @@ class AcqirisDigitizer():
         else:
             raise Exception('Unknown readMode: %d' % (readPar.readMode))
         segDesc = (segDescType * nbrSegments)()
-        
+
         # set the sizes of data and segment descriptor arrays
         readPar.dataArraySize = ctypes.sizeof(dataArray)
         readPar.segDescArraySize = ctypes.sizeof(segDesc)
@@ -511,40 +579,42 @@ class AcqirisDigitizer():
         return (dataArray, descriptor, segDesc)
         
 
-    def readChannelsToNumpy(self, nSample, lChannel=[1], nAverage=1,
-                            nSegment=1, timeout=10000, bAverageMode=False):
+    def readChannelsToNumpy(self, nSample, lChannel=[1], nAverage=1, nSegment=1,
+                            timeout=10000, bAverageMode=False, bArm=True, bMeasure=True):
         """Convenience method for getting multiple channels to a list of numpy
         arrays"""
-        if bAverageMode:
-            # average
-            readPar = AqReadParameters(dataType=self.DATATYPE_DOUBLE,
-                                              readMode=2, 
-                                              nbrSegments=nSegment,
-                                              nbrSamplesInSeg=nSample,
-                                              firstSegment=0,
-                                              firstSampleInSegment=0)
-        else:
-            # single trace
-            readPar = AqReadParameters(dataType=self.DATATYPE_DOUBLE,
-                                              readMode=0, 
-                                              nbrSegments=nSegment,
-                                              nbrSamplesInSeg=nSample,
-                                              firstSegment=0,
-                                              firstSampleInSegment=0)
-        # start acquisition
-        self.acquire()
-        self.waitForEndOfAcquisition(timeout)
-        # get waveforms for all channels
-        lData = []
-        for channel in lChannel:
-            (dataArray, descriptor, segDesc) = self.readData(channel, readPar)
-            vData = self.getResultAsNumpyArray(dataArray, descriptor)
-            lData.append(vData)
-        # get time data
-        dt = descriptor.sampTime
-        # return new numpy 2d array
-        return (lData, dt)
-#        return (np.array(lData), dt)
+        if bArm:
+            if bAverageMode:
+                # average
+                self.readPar = AqReadParameters(dataType=self.DATATYPE_DOUBLE,
+                                                  readMode=2, 
+                                                  nbrSegments=nSegment,
+                                                  nbrSamplesInSeg=nSample,
+                                                  firstSegment=0,
+                                                  firstSampleInSegment=0)
+            else:
+                # single trace
+                self.readPar = AqReadParameters(dataType=self.DATATYPE_DOUBLE,
+                                                  readMode=0, 
+                                                  nbrSegments=nSegment,
+                                                  nbrSamplesInSeg=nSample,
+                                                  firstSegment=0,
+                                                  firstSampleInSegment=0)
+            # start acquisition
+            self.acquire()
+        if bMeasure:
+            if not self.waitForEndOfAcquisition(timeout):
+                return ([np.array([])]*len(lChannel), 1.0)
+            # get waveforms for all channels
+            lData = []
+            for channel in lChannel:
+                (dataArray, descriptor, segDesc) = self.readData(channel, self.readPar)
+                vData = self.getResultAsNumpyArray(dataArray, descriptor)
+                lData.append(vData)
+            # get time data
+            dt = descriptor.sampTime
+            # return new numpy 2d array
+            return (lData, dt)
 
 
     def getResultAsNumpyArray(self, dataArray, descriptor):
@@ -560,30 +630,138 @@ class AcqirisDigitizer():
         return vData
 
 
+    def getRoundRobinData(self, nSample, nSegment, nAverage, 
+                          bConfig=True, bArm=True, bMeasure=True,
+                          funcStop=None, funcProgress=None):
+        """Get round-robin type data by continuous segmented acquisition"""
+        # total number of segments*nSample is 1024*8192
+        nMax = 1024*8192
+#        nMax = 1024*2048
+        # calculate number of calls, and number of segments per call
+        nOneRound = nSample * nSegment
+        # max number of averages per call
+        nMaxAvCall = int(np.floor(nMax / float(nOneRound) ))
+        # number of calls to make
+        nCall = int(np.ceil(nAverage / float(nMaxAvCall) ))
+        # actual number of averaeges per call
+        nAvCall = int(np.ceil(nAverage / float(nCall) ))
+        # total number of segments per call
+        nSegCall = nSegment * nAvCall
+        # always get both channels
+        lChannel = [1, 2]
+        # configure
+        if bConfig:
+            # set mode (averagin + SAR)
+            self.configMode(2, 0, 10)
+            # config memory (2 banks, use internal memory)
+            self.configMemory(nSample, nSegCall)
+            self.configMemoryEx(nSample, nSegCall, 2, 1)
+            # configure averaging for both channels
+            for ch in lChannel:
+                self.configAveraging(ch, NbrSamples=nSample, NbrSegments=nSegCall,
+                                     NbrWaveforms=1, StartDelay=0, StopDelay=0)
+            # define read parameters
+            self.readPar = AqReadParameters(dataType=self.DATATYPE_DOUBLE,
+                                       readMode=2, 
+                                       nbrSegments=nSegCall,
+                                       nbrSamplesInSeg=nSample,
+                                       firstSegment=0,
+                                       firstSampleInSegment=0)
+        # start acquisition
+        if bArm:
+            self.acquire()
+        if not bMeasure:
+            return
+        # allocate memory
+        lData = [np.zeros((nSegment, nSample)) for n in range(2)]
+        n1 = 0
+        while n1 < nCall:
+            # wait to acquire data for one buffer
+            if not self.waitForEndOfAcquisition(timeout=600E3, funcStop=funcStop):
+                return (lData, 1.0)
+            for n2, channel in enumerate(lChannel):
+                # get data as numpy array
+                (dataArray, descriptor, segDesc) = self.readData(channel, self.readPar)
+                vData = self.getResultAsNumpyArray(dataArray, descriptor)
+                # get time stamps
+                vL = np.array([o.timeStampLo for o in segDesc], dtype=np.uint64)
+                vH = np.array([o.timeStampHi for o in segDesc], dtype=np.uint64)
+                vTimeStamp = vL + vH * np.uint64(2**32)
+                # if first call, get typical trig time step for reference
+                if n1==0 and n2==0:
+                    t0 = vTimeStamp[0]
+                    dt = vTimeStamp[1] - vTimeStamp[0]
+                # convert time stamps to index
+                vIndx = np.array((vTimeStamp - t0 + dt/np.uint64(2)) /dt, dtype=int)
+                iSeg = vIndx[0] % nSegCall
+                # if not starting at first segment, rotate if necessary
+                if iSeg != 0:
+                    vData = np.roll(vData, iSeg*nSample)
+                # add data to corresponding segment
+                if len(vData)>0:
+                    lData[n2] += np.sum(vData.reshape(nAvCall, nSegment, nSample), 0)
+            # free data bank and continue with next values
+            self.freeBank()
+            n1 += 1
+            # check if stopped
+            if funcStop is not None:
+                if funcStop():
+                    break
+            # report progress
+            if funcProgress is not None:
+                funcProgress(float(n1)/float(nCall))
+        self.stopAcquisition()
+        # finallly, divide summed arrays to get average
+        for n in range(2):
+            lData[n] /= float(nAverage)
+        # get time data
+        dt = descriptor.sampTime
+        # remove reference
+        self.readPar = None
+        # turn off segmenting, to avoid limits on averaging in hardware
+        nSegCall = 1
+        self.configMemory(nSample, nSegCall)
+        self.configMemoryEx(nSample, nSegCall, 1, 0)
+        # configure averaging for both channels
+        for ch in lChannel:
+            self.configAveraging(ch, NbrSamples=nSample, NbrSegments=nSegCall,
+                                 NbrWaveforms=1, StartDelay=0, StopDelay=0)
+        self.configMode(2, 0, 10)
+        # return data
+        return (lData, dt)
+
+
+def reportProgress(value):
+    print 'Progress: %.0f %%' % (100*value)
+
 
 if __name__ == '__main__':
     #
-#    descriptor = AqDataDescriptor()
-#    for s in descriptor._fields_:
-#        print s[0], getattr(descriptor, s[0])
-    
     # test driver
     Digitizer = AcqirisDigitizer()
     Digitizer.init('PCI::INSTR0')
     # trigger
-    Digitizer.configTrigSource(0, 0, 1, 0.3)
+    Digitizer.configTrigSource(-1, 0, 0, 300.)
     Digitizer.configTrigClass(0x80000000L)
+    Digitizer.configHorizontal(1E-9, 0.0)
 #    Digitizer.configTrigSource(2, 0, 1, 0.05)
 #    Digitizer.configTrigClass(0x00000002L)
     # test, single trace
-    Digitizer.configMode(0, 0, 0) 
-    vRes = Digitizer.readChannelsToNumpy(nSample=1000, lChannel=[1], bAverageMode=False)[0]
-    print vRes
-    # test, average
-    Digitizer.configMode(2, 0, 0)
-    Digitizer.configAveraging(1, NbrSamples=1024, NbrSegments=1,
-                         NbrWaveforms=100, StartDelay=0, StopDelay=0)
-    vRes2 = Digitizer.readChannelsToNumpy(nSample=1000, lChannel=[1], bAverageMode=True)[0]
+#    Digitizer.configMode(0, 0, 0) 
+#    vRes = Digitizer.readChannelsToNumpy(nSample=1000, lChannel=[1], bAverageMode=False)[0]
+#    print vRes
+    print 'start acquire'
+
+    ((vCh1, vCh2), dt) = Digitizer.getRoundRobinData(2048, 26, 1000,
+                                             funcProgress=reportProgress)
+#    print vCh1.shape
+
+#    # test, average
+#    Digitizer.configMode(2, 0, 0)
+#    Digitizer.configAveraging(1, NbrSamples=1024, NbrSegments=1,
+#                         NbrWaveforms=100, StartDelay=0, StopDelay=0)
+#    vRes2 = Digitizer.readChannelsToNumpy(nSample=1000, lChannel=[1], bAverageMode=True)[0]
+
     # close digitizer
     Digitizer.close()
     Digitizer.closeAll()
@@ -591,12 +769,8 @@ if __name__ == '__main__':
     # plot data
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(1, 1)
-    ax.plot(vRes[0], 'r-', label='raw')
-    ax.plot(vRes2[0], 'k-', label='averaged')
+#    ax.plot(vRes[0], 'r-', label='raw')
+#    ax.plot(vAll[:1E4], 'k-', label='averaged')
+    ax.plot(vCh1.flatten(), 'k-', label='averaged')
     plt.show()
-
-
-
-    
-
 

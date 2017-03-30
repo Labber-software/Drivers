@@ -161,7 +161,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         activeManip.update()
         statInt, statBool = activeManip.GetSingleValueAsInt()
         while statInt > 0 and statBool == True:
-            self.thread().msleep(500)
+            self.wait(0.5)
             activeManip.update()
             statInt, statBool = activeManip.GetSingleValueAsInt()
         return indexManip.getValue()

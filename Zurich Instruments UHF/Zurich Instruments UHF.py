@@ -29,7 +29,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             self.device = self.comCfg.address
         
         try:
-            devtype = self.ziConnection.getByte('/%s/features/devtype' % self.device)
+            devtype = self.ziConnection.getByte(str('/%s/features/devtype' % self.device))
         except:
             raise InstrumentDriver.CommunicationError("Device " + self.device + " not found.")
             return
@@ -42,7 +42,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             return
         
         #Check Options
-        devoptions = self.ziConnection.getByte('/%s/features/options' % self.device)
+        devoptions = self.ziConnection.getByte(str('/%s/features/options' % self.device))
         detectedOptions = []
         if re.search('MOD', devoptions):
             detectedOptions.append("MOD")
@@ -62,7 +62,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                         ['Mod1On', 'Mod2On'] + \
                         ['Out'+str(x+1)+'SigOut' + str(y+1) + 'On' for x in range(8) for y in range(2)] + \
                         ['Demod'+str(x+1)+'On' for x in range(8)]:
-            self.ziConnection.setInt(quant.get_cmd % self.device, 1 if value else 0)
+            self.ziConnection.setInt(str(quant.get_cmd % self.device), 1 if value else 0)
         #Simple floating points
         elif quant.name in ['SigIn1Range', 'SigIn2Range'] + \
                         ['Oscillator'+str(x+1)+'Frequency' for x in range(8)] + \
@@ -79,7 +79,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                         ['Mod1OutAmp', 'Mod2OutAmp'] + \
                         ['Mod1SB1OutAmp', 'Mod2SB1OutAmp'] + \
                         ['Mod1SB2OutAmp', 'Mod2SB2OutAmp']:
-            self.ziConnection.setDouble(quant.get_cmd % self.device, value)
+            self.ziConnection.setDouble(str(quant.get_cmd % self.device), float(value))
         #Combos (Oscillator-selector for demodulators and Modulator mode)
         elif quant.name in ['Demod'+str(x+1)+'Osc' for x in range(8)] + \
                             ['Mod1Mode', 'Mod2Mode'] + \
@@ -88,7 +88,9 @@ class Driver(InstrumentDriver.InstrumentWorker):
                             ['Mod1Osc', 'Mod2Osc'] + \
                             ['Mod1SB1Osc', 'Mod2SB1Osc'] + \
                             ['Mod1SB2Osc', 'Mod2SB2Osc']:
-            self.ziConnection.setInt(quant.get_cmd % self.device, value)
+            # convert input to integer
+            intValue = int(quant.getCmdStringFromValue(value))
+            self.ziConnection.setInt(str(quant.get_cmd % self.device), intValue)
         return value
 
 
@@ -104,7 +106,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                         ['Mod1On', 'Mod2On'] + \
                         ['Out'+str(x+1)+'SigOut' + str(y+1) + 'On' for x in range(8) for y in range(2)] + \
                         ['Demod'+str(x+1)+'On' for x in range(8)]:
-            return (self.ziConnection.getInt(quant.get_cmd % self.device) > 0)
+            return (self.ziConnection.getInt(str(quant.get_cmd % self.device)) > 0)
         #Simple floating points
         elif quant.name in ['SigIn1Range', 'SigIn2Range'] + \
                         ['Oscillator'+str(x+1)+'Frequency' for x in range(8)] + \
@@ -121,7 +123,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                         ['Mod1OutAmp', 'Mod2OutAmp'] + \
                         ['Mod1SB1OutAmp', 'Mod2SB1OutAmp'] + \
                         ['Mod1SB2OutAmp', 'Mod2SB2OutAmp']:
-            return self.ziConnection.getDouble(quant.get_cmd % self.device)
+            return self.ziConnection.getDouble(str(quant.get_cmd % self.device))
         #Read-out channels of demodulator
         elif quant.name in ['Demod'+str(x+1)+'R' for x in range(8)] + \
                         ['Demod'+str(x+1)+'phi' for x in range(8)] + \
@@ -130,7 +132,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             if quant.get_cmd in self.resultBuffer.keys():
                 data = self.resultBuffer[quant.get_cmd]
             else:
-                data = self.ziConnection.getSample(quant.get_cmd % self.device)
+                data = self.ziConnection.getSample(str(quant.get_cmd % self.device))
                 self.resultBuffer[quant.get_cmd] = data
             channel = quant.name[6:]
             if channel == "X":
@@ -163,18 +165,18 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 rec.execute()
                 rec.trigger()
                 if not self.getValue("TraceStep"):
-                    self.thread().msleep(int(self.getValue("TraceLength")*1000))
+                    self.wait(self.getValue("TraceLength"))
                 else:
-                    self.thread().msleep(int(self.getValue("TraceStepDelayA")*1000))
+                    self.wait(self.getValue("TraceStepDelayA"))
                     self.log("Setpoint A: " + str(self.getValue("TraceStepSetpointA")))
-                    self.ziConnection.setDouble(self.instrCfg.getQuantity('TraceStepChannel').getCmdStringFromValue(self.getValue("TraceStepChannel")) % self.device, self.getValue("TraceStepSetpointA"))
-                    self.thread().msleep(int(self.getValue("TraceStepDelayB")*1000))
+                    self.ziConnection.setDouble(str(self.instrCfg.getQuantity('TraceStepChannel').getCmdStringFromValue(self.getValue("TraceStepChannel")) % self.device), self.getValue("TraceStepSetpointA"))
+                    self.wait(self.getValue("TraceStepDelayB"))
                     self.log("Setpoint B: " + str(self.getValue("TraceStepSetpointB")))
-                    self.ziConnection.setDouble(self.instrCfg.getQuantity('TraceStepChannel').getCmdStringFromValue(self.getValue("TraceStepChannel")) % self.device, self.getValue("TraceStepSetpointB"))
+                    self.ziConnection.setDouble(str(self.instrCfg.getQuantity('TraceStepChannel').getCmdStringFromValue(self.getValue("TraceStepChannel")) % self.device), self.getValue("TraceStepSetpointB"))
                 while not rec.finished():
-                    self.thread().msleep(50)
+                    self.wait(0.05)
                 self.traceBuffer = rec.read(True)
-                self.clockbase = float(self.ziConnection.getInt('/%s/clockbase' % self.device))
+                self.clockbase = float(self.ziConnection.getInt(str('/%s/clockbase' % self.device)))
                 data = self.traceBuffer[quant.get_cmd % self.device][0]
                 self.log(data)
                 rec.finish()
@@ -205,7 +207,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                             ['Mod1Osc', 'Mod2Osc'] + \
                             ['Mod1SB1Osc', 'Mod2SB1Osc'] + \
                             ['Mod1SB2Osc', 'Mod2SB2Osc']:
-            return quant.getValueFromCmdString(self.ziConnection.getInt(quant.get_cmd % self.device))
+            return quant.getValueFromCmdString(self.ziConnection.getInt(str(quant.get_cmd % self.device)))
         # for other quantities, just return current value of control
         return quant.getValue()
 

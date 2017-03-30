@@ -33,7 +33,7 @@ class Driver(VISA_Driver):
             self.writeAndLog(quant.set_cmd.replace('<*>', str(value)))
             diff = abs(float(self.askAndLog("RDGFIELD?")) - value)
             while diff > precision:
-                self.thread().msleep(100)
+                self.wait(0.1)
                 diff = abs(float(self.askAndLog("RDGFIELD?")) - value)
             value = float(self.askAndLog("RDGFIELD?"))
         return value

@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-import InstrumentDriver
 from VISA_Driver import VISA_Driver
-from InstrumentConfig import InstrumentQuantity
 import numpy as np
 
 __version__ = "0.0.1"
@@ -52,7 +50,7 @@ class Driver(VISA_Driver):
                     else:
                         self.writeAndLog(':ABOR;:INIT:CONT OFF;:SENS:AVER:COUN 1;:INIT:IMM;*OPC')
                     # wait some time before first check
-                    self.thread().msleep(30)
+                    self.wait(0.03)
                     bDone = False
                     while (not bDone) and (not self.isStopped()):
                         # check if done
@@ -65,7 +63,7 @@ class Driver(VISA_Driver):
                             stb = int(self.askAndLog('*ESR?'))
                             bDone = (stb & 1) > 0
                         if not bDone:
-                            self.thread().msleep(100)
+                            self.wait(0.1)
                     # if stopped, don't get data
                     if self.isStopped():
                         self.writeAndLog('*CLS;:INIT:CONT ON;')
@@ -75,10 +73,10 @@ class Driver(VISA_Driver):
                 if bWaitTrace and not bAverage:
                     self.writeAndLog(':INIT:CONT ON;')
                 # strip header to find # of points
-                i0 = sData.find('#')
-                nDig = int(sData[i0+1])
+                i0 = sData.find(b'#')
+                nDig = int(sData[i0+1:i0+2])
                 nByte = int(sData[i0+2:i0+2+nDig])
-                nData = nByte/4
+                nData = int(nByte/4)
                 # get data to numpy array
                 vData = np.frombuffer(sData[(i0+2+nDig):(i0+2+nDig+nByte)], 
                                       dtype='<f', count=nData)
@@ -96,12 +94,13 @@ class Driver(VISA_Driver):
 #                if sweepType == 'Log':
 #                    startFreq = np.log10(startFreq)
 #                    stopFreq = np.log10(stopFreq)
+                # if log scale, take log of start/stop frequencies
+
                 # create a trace dict
-                value = InstrumentQuantity.getTraceDict(vData, t0=startFreq,
-                                               dt=(stopFreq-startFreq)/(nData-1))
+                value = quant.getTraceDict(vData, x0=startFreq, x1=stopFreq)
             else:
                 # not enabled, return empty array
-                value = InstrumentQuantity.getTraceDict([])
+                value = quant.getTraceDict([])
         elif quant.name in ('Wait for new trace',):
             # do nothing, return local value
             value = quant.getValue()

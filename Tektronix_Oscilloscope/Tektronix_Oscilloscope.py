@@ -21,19 +21,25 @@ class Driver(VISA_Driver):
             # check if channel is on
             if self.getValue('Ch%d - Enabled' % channel):
                 # select channel and set # of bytes to send
-                self.write(':DATA:SOU CH%d;:WFMO:BYT_N 2;' % channel, bCheckError=False)
+                if self.getModel()=='TDS 3000':
+                    self.write(':DATA:SOU CH%d;:WFMP:BYT_N 2;' % channel, bCheckError=False)
+                else:
+                    self.write(':DATA:SOU CH%d;:WFMO:BYT_N 2;' % channel, bCheckError=False)
                 # query range and offset
-                sRange = self.ask(':WFMO:XZE?;:WFMO:XIN?;:WFMO:YMU?;:WFMO:YOF?;:WFMO:YZE?;', bCheckError=False)
+                if self.getModel()=='TDS 3000':
+                    sRange = self.ask(':WFMP:XZE?;:WFMP:XIN?;:WFMP:YMU?;:WFMP:YOF?;:WFMP:YZE?;', bCheckError=False)
+                else:
+                    sRange = self.ask(':WFMO:XZE?;:WFMO:XIN?;:WFMO:YMU?;:WFMO:YOF?;:WFMO:YZE?;', bCheckError=False)
                 lRange = sRange.split(';')
                 (t0, dt, gain, ioffset, offset) = [float(s) for s in lRange]
                 # get data as i16, convert to numpy array
                 self.write('CURV?', bCheckError=False)
                 sData = self.read(ignore_termination=True)
                 # strip header to find # of points
-                i0 = sData.find('#')
-                nDig = int(sData[i0+1])
+                i0 = sData.find(b'#')
+                nDig = int(sData[i0+1:i0+2])
                 nByte = int(sData[i0+2:i0+2+nDig])
-                nData = nByte/2
+                nData = int(nByte/2)
                 # get data to numpy array
                 vData = np.frombuffer(sData[(i0+2+nDig):(i0+2+nDig+nByte)], 
                                       dtype='>h', count=nData)

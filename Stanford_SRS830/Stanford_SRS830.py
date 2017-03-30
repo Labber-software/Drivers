@@ -19,7 +19,7 @@ class Driver(VISA_Driver):
             #(0.12e-3,4.56e-70.12e-3,4.56e-7 instead of 0.12e-3,4.56e-7)
             #This is a simple fix:
             if len(lData) > 2:
-                lData =  sAns[:len(sAns)/2].split(',')
+                lData =  sAns[:int(len(sAns)/2)].split(',')
             #Also, sometimes we receive an additional "-" at the end of a value
             #(0.12e-3,4.56e-7- instead of 0.12e-3,4.56e-7)
             #Hence, another simple fix:
