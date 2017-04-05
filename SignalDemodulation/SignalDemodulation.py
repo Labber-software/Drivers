@@ -32,6 +32,9 @@ class Driver(InstrumentDriver.InstrumentWorker):
         if quant.name == 'Value':
             # calculate I/Q signal here
             value = np.mean(self.getIQAmplitudes())
+        elif quant.name == 'Value - Single shot':
+            # calculate I/Q signal here
+            value = self.getIQAmplitudes()
         else:
             # just return the quantity value
             value = quant.getValue()
@@ -43,8 +46,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # get parameters
         dFreq = self.getValue('Modulation frequency')
         skipStart = self.getValue('Skip start')
-#        nSegment = int(self.getValue('Number of segments'))
-        nSegment = 1
+        nSegment = int(self.getValue('Number of segments'))
+#        nSegment = 1
         # get input data from dict, with keys {'y': value, 't0': t0, 'dt': dt}
         traceIn = self.getValue('Input data')
         if traceIn is None:
