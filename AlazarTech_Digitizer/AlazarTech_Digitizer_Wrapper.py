@@ -254,7 +254,9 @@ class AlazarTechDigitizer():
         self.callFunc('AlazarWaitAsyncBufferComplete', self.handle, buffer, timeout_ms)
 
 
-    def readTracesDMA(self, Channel1, Channel2, nSamples, nRecord, nAverage=1):
+    def readTracesDMA(self, bGetCh1, bGetCh2, nSamples, nRecord, nAverage=1,
+                      bConfig=True, bArm=True, bMeasure=True,
+                      funcStop=None, funcProgress=None):
         """read traces in NPT AutoDMA mode, convert to float, average to single trace"""
         # import logging
         # lg = logging.getLogger('LabberDriver')
@@ -289,11 +291,18 @@ class AlazarTechDigitizer():
             recordsPerBuffer = nRecordTotal
 
         #Select the active channels.
+        Channel1 = 1 if bGetCh1 else 0
+        Channel2 = 2 if bGetCh2 else 0
+
         channels = Channel1 | Channel2
         channelCount = 0
         for n in range(16):
             c = int(2**n)
             channelCount += (c & channels == c)
+
+        # return directly if no active channels
+        if channelCount == 0:
+            return [np.array([], dtype=float), np.array([], dtype=float)]
     
         # Compute the number of bytes per record and per buffer
         bytesPerSample = (self.bitsPerSample + 7) // 8
@@ -301,35 +310,47 @@ class AlazarTechDigitizer():
         bytesPerRecord = bytesPerSample * samplesPerRecord
         bytesPerBuffer = bytesPerRecord * recordsPerBuffer * channelCount
         recordsPerAcquisition = recordsPerBuffer * buffersPerAcquisition
-    
-        self.AlazarSetRecordSize(preTriggerSamples, postTriggerSamples)
-        self.AlazarSetRecordCount(recordsPerAcquisition)
-
         # TODO: Select number of DMA buffers to allocate
         bufferCount = 4
-        # Allocate DMA buffers
-        sample_type = ctypes.c_uint8
-        if bytesPerSample > 1:
-            sample_type = ctypes.c_uint16
-        buffers = []
-        for i in range(bufferCount):
-            buffers.append(DMABuffer(sample_type, bytesPerBuffer))
+    
+        # configure board, if wanted
+        if bConfig:
+            self.AlazarSetRecordSize(preTriggerSamples, postTriggerSamples)
+            self.AlazarSetRecordCount(recordsPerAcquisition)
+            # Allocate DMA buffers
+            sample_type = ctypes.c_uint8
+            if bytesPerSample > 1:
+                sample_type = ctypes.c_uint16
+            self.buffers = []
+            for i in range(bufferCount):
+                self.buffers.append(DMABuffer(sample_type, bytesPerBuffer))
+            # Configure the board to make a Traditional AutoDMA acquisition
+            self.AlazarBeforeAsyncRead(channels,
+                                  -preTriggerSamples,
+                                  samplesPerRecord,
+                                  recordsPerBuffer,
+                                  recordsPerAcquisition,
+                                  ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT)
+            # Post DMA buffers to board
+            for buf in self.buffers:
+                self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
 
-    
-        # Configure the board to make a Traditional AutoDMA acquisition
-        self.AlazarBeforeAsyncRead(channels,
-                              -preTriggerSamples,
-                              samplesPerRecord,
-                              recordsPerBuffer,
-                              recordsPerAcquisition,
-                              ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT)
-    
-        # Post DMA buffers to board
-        for buf in buffers:
-            self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
+        # arm and start capture, if wanted
+        if bArm:
+            try:
+                self.AlazarStartCapture()
+            except:
+                # make sure buffers release memory if failed
+                for buf in self.buffers:
+                    buf.__exit__()
+                raise
+
+        # if not waiting for result, return here
+        if not bMeasure:
+            return
+
         # lT.append('Post: %.1f ms' % ((time.clock()-t0)*1000))
         try:
-            self.AlazarStartCapture() # Start the acquisition
             # lT.append('Start: %.1f ms' % ((time.clock()-t0)*1000))
             buffersCompleted = 0
             bytesTransferred = 0
@@ -348,12 +369,20 @@ class AlazarTechDigitizer():
             while (buffersCompleted < buffersPerAcquisition):
                 # Wait for the buffer at the head of the list of available
                 # buffers to be filled by the board.
-                buf = buffers[buffersCompleted % len(buffers)]
+                buf = self.buffers[buffersCompleted % len(self.buffers)]
                 self.AlazarWaitAsyncBufferComplete(buf.addr, timeout_ms=int(self.timeout*1000))
                 # lT.append('Wait: %.1f ms' % ((time.clock()-t0)*1000))
+
                 buffersCompleted += 1
                 bytesTransferred += buf.size_bytes
     
+                # break if stopped from outside
+                if funcStop is not None and funcStop():
+                    break
+                # report progress
+                if funcProgress is not None:
+                    funcProgress(float(buffersCompleted)/float(buffersPerAcquisition))
+
                 # reshape, sort and average data
                 if nAverage > 1:
                     if channels == 1:
@@ -393,7 +422,7 @@ class AlazarTechDigitizer():
                 pass
             # lT.append('Abort: %.1f ms' % ((time.clock()-t0)*1000))
             # make sure buffers release memory
-            for buf in buffers:
+            for buf in self.buffers:
                 buf.__exit__()
         #normalize        
         vData[0] /= buffersPerAcquisition

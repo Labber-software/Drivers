@@ -47,15 +47,82 @@ class Driver(InstrumentDriver.InstrumentWorker):
         """Perform the Get Value instrument operation"""
         # only implmeneted for traces
         if quant.name in self.lSignalNames:
+            # special case for hardware looping
+            if self.isHardwareLoop(options):
+                return self.getSignalHardwareLoop(quant, options)
             # check if first call, if so get new traces
             if self.isFirstCall(options):
-                self.getTraces()
+                # clear trace buffer
+                self.lTrace = [np.array([]), np.array([])]
+                # read traced to buffer, proceed depending on model
+                if self.getModel() in ('9870',):
+                    self.getTracesNonDMA()
+                else:
+                    self.getTracesDMA(hardware_trig=self.isHardwareTrig(options))
             indx = self.lSignalNames.index(quant.name)
             # return correct data
             value = quant.getTraceDict(self.lTrace[indx], dt=self.dt)
         else:
             # just return the quantity value
             value = quant.getValue()
+        return value
+
+
+    def performArm(self, quant_names, options={}):
+        """Perform the instrument arm operation"""
+        # arming is only implemented for DMA reaoud
+        if self.getModel() in ('9870',):
+            return
+        # get config
+        bGetCh1 = bool(self.getValue('Ch1 - Enabled'))
+        bGetCh2 = bool(self.getValue('Ch2 - Enabled'))
+        nSample = int(self.getValue('Number of samples'))
+        nRecord = int(self.getValue('Number of records'))
+        nAverage = int(self.getValue('Number of averages'))
+        if (not bGetCh1) and (not bGetCh2):
+            return
+        # configure and start acquisition
+        if self.isHardwareLoop(options):
+            # in hardware looping, number of records is set by the hardware looping
+            (seq_no, n_seq) = self.getHardwareLoopIndex(options)
+            self.dig.readTracesDMA(bGetCh1, bGetCh2, nSample, n_seq, nAverage,
+                                   bConfig=True, bArm=True, bMeasure=False)
+        else:
+            # in hardware looping, number of records is set by the hardware looping
+            self.dig.readTracesDMA(bGetCh1, bGetCh2, nSample, nRecord, nAverage,
+                                   bConfig=True, bArm=True, bMeasure=False)
+
+
+    def _callbackProgress(self, progress):
+        """Report progress to server, as text string"""
+        s = 'Acquiring traces (%.0f%%)' % (100*progress)
+        self.reportStatus(s)
+
+
+    def getSignalHardwareLoop(self, quant, options):
+        """Get data from round-robin type averaging"""
+        (seq_no, n_seq) = self.getHardwareLoopIndex(options)
+        # if first sequence call, get data
+        if seq_no == 0 and self.isFirstCall(options):
+            bGetCh1 = bool(self.getValue('Ch1 - Enabled'))
+            bGetCh2 = bool(self.getValue('Ch2 - Enabled'))
+            nSample = int(self.getValue('Number of samples'))
+            nAverage = int(self.getValue('Number of averages'))
+            # show status before starting acquisition
+            self.reportStatus('Digitizer - Waiting for signal')
+            # get data
+            (vCh1, vCh2) = self.dig.readTracesDMA(bGetCh1, bGetCh2,
+                           nSample, n_seq, nAverage,
+                           bConfig=False, bArm=False, bMeasure=True,
+                           funcStop=self.isStopped,
+                           funcProgress=self._callbackProgress)
+            # re-shape data and place in trace buffer
+            self.lTrace[0] = vCh1.reshape((n_seq, nSample))
+            self.lTrace[1] = vCh2.reshape((n_seq, nSample))
+        # after getting data, pick values to return
+        indx = self.lSignalNames.index(quant.name)
+        value = quant.getTraceDict(self.lTrace[indx][seq_no],
+                                                dt=self.dt)
         return value
 
 
@@ -93,6 +160,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             if self.getValue('Ch%d - Enabled' % (n+1)):
                 # coupling and range
                 if self.getModel() in ('9373', '9360'):
+                    # these options are not available for these models, set to default
                     Coupling = 2
                     InputRange = 7
                     Impedance = 2
@@ -143,53 +211,58 @@ class Driver(InstrumentDriver.InstrumentWorker):
         self.dig.AlazarSetTriggerTimeOut(time=timeout)
 
 
-    def getTraces(self):
-        """Resample the data"""
-        # get new trace
-        self.lTrace = [np.array([]), np.array([]), 0.0, np.array([], dtype=complex)]
+    def getTracesDMA(self, hardware_trig=False):
+        """Resample the data for units with DMA"""
         # get channels in use
         bGetCh1 = bool(self.getValue('Ch1 - Enabled'))
         bGetCh2 = bool(self.getValue('Ch2 - Enabled'))
-        if (not bGetCh1) and (not bGetCh2):
-            return
-        # set data and record size
-        if self.getModel() in ('9870',):
-            nPreSize = int(self.getValue('Pre-trig samples'))
-        else:
-            nPreSize = 0
         nPostSize = int(self.getValue('Number of samples'))
         nRecord = int(self.getValue('Number of records'))
         nAverage = int(self.getValue('Number of averages'))
+        # in hardware trig mode, there is no noed to re-configure and arm the card
+        bConfig = not hardware_trig
+        bArm = not hardware_trig
+        # get data
+        self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(bGetCh1, bGetCh2,
+                                         nPostSize, nRecord, nAverage,
+                                         bConfig=bConfig, bArm=bArm, bMeasure=True)
+
+
+    def getTracesNonDMA(self):
+        """Resample the data"""
+        # get channels in use
+        bGetCh1 = bool(self.getValue('Ch1 - Enabled'))
+        bGetCh2 = bool(self.getValue('Ch2 - Enabled'))
+        nPreSize = int(self.getValue('Pre-trig samples'))
+        nPostSize = int(self.getValue('Number of samples'))
+        nRecord = int(self.getValue('Number of records'))
+        nAverage = int(self.getValue('Number of averages'))
+        if (not bGetCh1) and (not bGetCh2):
+            return
         
-        if self.getModel() in ('9870',):
-            self.dig.AlazarSetRecordSize(nPreSize, nPostSize)
-            self.dig.AlazarSetRecordCount(nRecord*nAverage)
-            # start aquisition
-            self.dig.AlazarStartCapture()
-            nTry = self.dComCfg['Timeout']/0.05
-            while nTry>0 and self.dig.AlazarBusy() and not self.isStopped():
-                # sleep for a while to save resources, then try again
-                self.wait(0.050)
-                nTry -= 1
-            # check if timeout occurred
-            if nTry <= 0:
-                self.dig.AlazarAbortCapture()
-                raise Error('Acquisition timed out')
-            # check if user stopped
-            if self.isStopped():
-                self.dig.AlazarAbortCapture()
-                return
-            #
-            # read data for channels in use
-            if bGetCh1:
-                self.lTrace[0] = self.dig.readTraces(1)
-            if bGetCh2:
-                self.lTrace[1] = self.dig.readTraces(2)
-        else:
-            nCh1 = 1 if bGetCh1 else 0
-            nCh2 = 2 if bGetCh2 else 0
-            self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(nCh1, nCh2,
-                                             nPostSize, nRecord, nAverage)
+        self.dig.AlazarSetRecordSize(nPreSize, nPostSize)
+        self.dig.AlazarSetRecordCount(nRecord*nAverage)
+        # start aquisition
+        self.dig.AlazarStartCapture()
+        nTry = self.dComCfg['Timeout']/0.05
+        while nTry>0 and self.dig.AlazarBusy() and not self.isStopped():
+            # sleep for a while to save resources, then try again
+            self.wait(0.050)
+            nTry -= 1
+        # check if timeout occurred
+        if nTry <= 0:
+            self.dig.AlazarAbortCapture()
+            raise Error('Acquisition timed out')
+        # check if user stopped
+        if self.isStopped():
+            self.dig.AlazarAbortCapture()
+            return
+        #
+        # read data for channels in use
+        if bGetCh1:
+            self.lTrace[0] = self.dig.readTraces(1)
+        if bGetCh2:
+            self.lTrace[1] = self.dig.readTraces(2)
             
 
 
