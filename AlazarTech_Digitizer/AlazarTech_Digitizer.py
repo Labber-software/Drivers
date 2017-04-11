@@ -115,7 +115,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
                            nSample, n_seq, nAverage,
                            bConfig=False, bArm=False, bMeasure=True,
                            funcStop=self.isStopped,
-                           funcProgress=self._callbackProgress)
+                           funcProgress=self._callbackProgress,
+                           timeout=self.dComCfg['Timeout']+60.0)
             # re-shape data and place in trace buffer
             self.lTrace[0] = vCh1.reshape((n_seq, nSample))
             self.lTrace[1] = vCh2.reshape((n_seq, nSample))

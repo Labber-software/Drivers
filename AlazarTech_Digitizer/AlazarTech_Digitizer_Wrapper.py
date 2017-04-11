@@ -256,13 +256,16 @@ class AlazarTechDigitizer():
 
     def readTracesDMA(self, bGetCh1, bGetCh2, nSamples, nRecord, nAverage=1,
                       bConfig=True, bArm=True, bMeasure=True,
-                      funcStop=None, funcProgress=None):
+                      funcStop=None, funcProgress=None, timeout=None):
         """read traces in NPT AutoDMA mode, convert to float, average to single trace"""
         # import logging
         # lg = logging.getLogger('LabberDriver')
         # import time
         # t0 = time.clock()
         # lT = []
+
+        # use global timeout if not given
+        timeout = self.timeout if timeout is None else timeout
 
         #Select the number of pre-trigger samples...not supported in NPT, keeping for consistency
         preTriggerSamplesValue = 0
@@ -370,7 +373,7 @@ class AlazarTechDigitizer():
                 # Wait for the buffer at the head of the list of available
                 # buffers to be filled by the board.
                 buf = self.buffers[buffersCompleted % len(self.buffers)]
-                self.AlazarWaitAsyncBufferComplete(buf.addr, timeout_ms=int(self.timeout*1000))
+                self.AlazarWaitAsyncBufferComplete(buf.addr, timeout_ms=int(timeout*1000))
                 # lT.append('Wait: %.1f ms' % ((time.clock()-t0)*1000))
 
                 buffersCompleted += 1
