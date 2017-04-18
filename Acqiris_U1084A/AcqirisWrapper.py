@@ -634,9 +634,11 @@ class AcqirisDigitizer():
                           bConfig=True, bArm=True, bMeasure=True,
                           funcStop=None, funcProgress=None):
         """Get round-robin type data by continuous segmented acquisition"""
+#        import logging
+#        lg = logging.getLogger('LabberDriver')
         # total number of segments*nSample is 1024*8192
         nMax = 1024*8192
-#        nMax = 1024*2048
+#        nMax = 1024*8192
         # calculate number of calls, and number of segments per call
         nOneRound = nSample * nSegment
         # max number of averages per call
@@ -694,8 +696,8 @@ class AcqirisDigitizer():
                 # convert time stamps to index
                 vIndx = np.array((vTimeStamp - t0 + dt/np.uint64(2)) /dt, dtype=int)
                 iSeg = vIndx[0] % nSegCall
-                # if not starting at first segment, rotate if necessary
-                if iSeg != 0:
+                # if not starting at first segment, rotate. ignore if too few index values 
+                if iSeg != 0 and vIndx[0] > (nSegCall*n1):
                     vData = np.roll(vData, iSeg*nSample)
                 # add data to corresponding segment
                 if len(vData)>0:
