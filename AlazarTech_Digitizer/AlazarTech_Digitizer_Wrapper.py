@@ -94,7 +94,6 @@ class AlazarTechDigitizer():
         # create a session id
         func = getattr(DLL, 'AlazarNumOfSystems')
         func.restype = U32 
-        print 'Number of systems:', func()
         func = getattr(DLL, 'AlazarGetBoardBySystemID')
         func.restype = c_void_p
         handle = func(U32(systemId), U32(boardId))
@@ -473,10 +472,6 @@ class AlazarTechDigitizer():
 
 if __name__ == '__main__':
     #
-#    descriptor = AqDataDescriptor()
-#    for s in descriptor._fields_:
-#        print s[0], getattr(descriptor, s[0])
-    
     # test driver
     Digitizer = AlazarTechDigitizer()
 

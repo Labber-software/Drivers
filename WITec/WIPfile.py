@@ -40,9 +40,9 @@ def readAllTags(f, start, end, depth, indices, parentName):
     pos = start
     while pos < end:
         tName, tType, tStart, tEnd = readTag(f, pos)            
-        print "  " * depth + "[" + str(tType) + "] " + tName,
+        print ("  " * depth + "[" + str(tType) + "] " + tName)
         if tType == 0:
-            print " -> " + str(tStart) + ".." + str(tEnd)
+            print (" -> " + str(tStart) + ".." + str(tEnd))
             indices, newIndexRet = readAllTags(f, tStart, tEnd, depth+1, indices, tName)
             if newIndexRet >= 0:
                 if parentName != "TData" and tName != "TData":
@@ -52,19 +52,19 @@ def readAllTags(f, start, end, depth, indices, parentName):
         elif tType == 2:
             f.seek(tStart)
             v = struct.unpack("<d", f.read(8))[0]
-            print " -> " + str(v)
+            print (" -> " + str(v))
         elif tType == 5:
             f.seek(tStart)
             v = struct.unpack("<i", f.read(4))[0]
-            print " -> " + str(v)
+            print (" -> " + str(v))
             if tName == "ID":
                 newIndex = v
         elif tType == 9:
             f.seek(tStart)
             strLength = struct.unpack("<i", f.read(4))[0]
-            print " -> " + f.read(strLength)
+            print (" -> " + f.read(strLength))
         else:
-            print ""
+            print ("")
         pos = tEnd
     return [indices, newIndex]
 
@@ -112,9 +112,9 @@ def loadWIP(file):
 
     #Read tags within first tag
     dataDict = readAllTags(f, rootStart, rootEnd, 1, None, None)[0]
-    print ""
-    print "Data-Dictionary:"
-    print dataDict
+    print ("")
+    print ("Data-Dictionary:")
+    print (dataDict)
 
     dataName, dataType, dataStart, dataEnd = findTag(f, rootStart, rootEnd, "Data", False) #Tag containing all datasets
     dsName, dsType, dsStart, dsEnd = lastTagOfDataClass(f, dataStart, dataEnd, "TDGraph") #last dataset of type "TDGraph"
@@ -147,15 +147,15 @@ def loadWIP(file):
             #Sanity check from gwyddion
             if calibration["type"] != 1 or calibration["m"] < 0.01 or calibration["f"] < 0.01 or calibration["nC"] < 0:
                 calibration = None
-                print "Warning: Calibration found but dismissed as unreasonable."
+                print ("Warning: Calibration found but dismissed as unreasonable.")
             
 
-    print ""
-    print "Calibration Data:"
+    print ("")
+    print ("Calibration Data:")
     if calibration == None:
-        print "No valid calbiration found."
+        print ("No valid calbiration found.")
     else:
-        print calibration
+        print (calibration)
 
     #Check if image data
     sizeX = readIntFromTag(f, tdgStart, tdgEnd, "SizeX", False)
@@ -210,14 +210,14 @@ def loadWIP(file):
         if d > maxDev:
             maxDev = d
 
-    print ""
-    print "Linearization results:"
-    print "dx=" + str(dx) + "   x0=" + str(x0) + "   maxDev=" + str(maxDev)
+    print ("")
+    print ("Linearization results:")
+    print ("dx=" + str(dx) + "   x0=" + str(x0) + "   maxDev=" + str(maxDev))
 
-    print ""
+    print ("")
     return [npdataY, x0, dx]
     
 if __name__ == "__main__":
     import sys
-    print loadWIP(sys.argv[1])
+    print (loadWIP(sys.argv[1]))
 

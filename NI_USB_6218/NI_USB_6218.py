@@ -54,7 +54,6 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 trigSource = self.lChDig[iTrig-len(self.lChName)]
             trigSlopePositive = (self.getValue('Trig slope')=='Positive')
             trigLevel = float(self.getValue('Trig level'))
-        print (trigSource, trigSlopePositive, trigLevel) 
         # get channels and limits
         limit = []
         lCh = []

@@ -129,7 +129,6 @@ class AcqirisDigitizer():
             if status in TIMEOUTS: 
                 raise TimeoutError(sError)
             else:
-                print sError
                 raise Error(sError)
 
     
@@ -734,7 +733,7 @@ class AcqirisDigitizer():
 
 
 def reportProgress(value):
-    print 'Progress: %.0f %%' % (100*value)
+    print ('Progress: %.0f %%' % (100*value))
 
 
 if __name__ == '__main__':
@@ -751,12 +750,11 @@ if __name__ == '__main__':
     # test, single trace
 #    Digitizer.configMode(0, 0, 0) 
 #    vRes = Digitizer.readChannelsToNumpy(nSample=1000, lChannel=[1], bAverageMode=False)[0]
-#    print vRes
-    print 'start acquire'
+#    print (vRes)
+    print ('start acquire')
 
     ((vCh1, vCh2), dt) = Digitizer.getRoundRobinData(2048, 26, 1000,
                                              funcProgress=reportProgress)
-#    print vCh1.shape
 
 #    # test, average
 #    Digitizer.configMode(2, 0, 0)

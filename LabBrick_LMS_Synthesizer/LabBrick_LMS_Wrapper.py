@@ -111,7 +111,6 @@ class LabBrick_Synthesizer():
         self.minPower = float(fnLMS_GetMinPwr(self.device_id))*0.25
         self.maxFreq = float(fnLMS_GetMaxFreq(self.device_id))*10.
         self.minFreq = float(fnLMS_GetMinFreq(self.device_id))*10.
-#        print self.maxFreq,self.minFreq, self.maxPower, self.minPower
         self.check_error(status)
 
     def closeDevice(self):
@@ -226,23 +225,23 @@ if __name__ == '__main__':
     # test driver
     SG = LabBrick_Synthesizer(bTestMode=True)
     lDevice = SG.getListOfDevices()
-    print lDevice
+    print (lDevice)
     SG.initDevice(100103)
     SG.setFrequency(61.4E9)
-    print 'Frequency', SG.getFrequency()
+    print ('Frequency', SG.getFrequency())
     SG.setPowerLevel(6)
-    print 'Power', SG.getPowerLevel()
+    print ('Power', SG.getPowerLevel())
     SG.setRFOn(True)
-    print SG.getRFOn()
+    print (SG.getRFOn())
     SG.setUseInternalRef(False)
-    print SG.getUseInternalRef()
-    print 'Get pulse mod:'
+    print (SG.getUseInternalRef())
+    print ('Get pulse mod:')
     SG.setExternalPulseMod(True)
     SG.setInternalPulseMod(2E-3, 10E-3, True)
-    print SG.getExternalPulseMod()
-    print SG.getInternalPulseMod()
-    print SG.getPulseOnTime()
-    print SG.getPulseOffTime()
-    print SG.getPulsePeriod()
+    print (SG.getExternalPulseMod())
+    print (SG.getInternalPulseMod())
+    print (SG.getPulseOnTime())
+    print (SG.getPulseOffTime())
+    print (SG.getPulsePeriod())
     SG.closeDevice()
 

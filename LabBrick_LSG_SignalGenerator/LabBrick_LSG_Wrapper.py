@@ -99,7 +99,6 @@ class LabBrick_SignalGenerator():
         self.minPower = float(fnLMS_GetMinPwr(self.device_id))*0.25
         self.maxFreq = float(fnLMS_GetMaxFreq(self.device_id))*100E3
         self.minFreq = float(fnLMS_GetMinFreq(self.device_id))*100E3
-#        print self.maxFreq,self.minFreq, self.maxPower, self.minPower
         self.check_error(status)
 
     def closeDevice(self):
@@ -187,15 +186,15 @@ if __name__ == '__main__':
     # test driver
     SG = LabBrick_SignalGenerator(bTestMode=True)
     lDevice = SG.getListOfDevices()
-    print lDevice
+    print (lDevice)
     SG.initDevice(456602)
     SG.setFrequency(0.4E9)
-    print 'Frequency', SG.getFrequency()/1E9
+    print ('Frequency', SG.getFrequency()/1E9)
     SG.setPowerLevel(-29)
-    print SG.getPowerLevel()
+    print (SG.getPowerLevel())
     SG.setRFOn(True)
-    print SG.getRFOn()
+    print (SG.getRFOn())
     SG.setUseInternalRef(False)
-    print SG.getUseInternalRef()
+    print (SG.getUseInternalRef())
     SG.closeDevice()
 
