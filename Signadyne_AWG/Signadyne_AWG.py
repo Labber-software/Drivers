@@ -29,8 +29,20 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # set model
         self.setModel(validName)
         self.AWG.openWithSlot(AWGPart, 1, int(self.comCfg.address))
+        # sampling rate and number of channles is set by model
+        if validName in ('M3202', 'H3344'):
+            # 1GS/s models
+            self.dt = 1E-9
+            self.nCh = 4
+        elif validName in ('M3302',):
+            # two-channel, 500 MS/s model
+            self.dt = 2E-9
+            self.nCh = 2
+        else:
+            # assume 500 MS/s for all other models
+            self.dt = 2E-9
+            self.nCh = 4
         # keep track of if waveform was updated
-        self.nCh = 4
         self.lWaveUpdated = [False]*self.nCh
         # clear old waveforms
         self.AWG.waveformFlush()
@@ -150,6 +162,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 # turn on outputs
                 self.AWG.AWGstartMultiple(iChMask)
         return value
+
 
     def sendWaveform(self, nCh):
         """Send waveform to AWG channel"""
