@@ -15,7 +15,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # create AWG instance
         self.AWG = signadyne.SD_AOU()
         AWGPart = self.AWG.getProductNameBySlot(1, int(self.comCfg.address))
-        if not isinstance(AWGPart, (str, unicode)):
+        if not isinstance(AWGPart, str):
             raise InstrumentDriver.Error('Unit not available')
         # check that model is supported
         dOptionCfg = self.dInstrCfg['options']
