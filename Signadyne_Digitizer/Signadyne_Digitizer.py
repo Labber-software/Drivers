@@ -108,7 +108,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
         if name == 'Signal':
             # get traces if first call
             if self.isFirstCall(options):
-                self.getTraces()
+                # don't arm if in hardware trig mode
+                self.getTraces(bArm=(not self.isHardwareTrig(options)))
             # return correct data
             value = quant.getTraceDict(self.lTrace[ch], dt=self.dt)
         else:
@@ -118,7 +119,13 @@ class Driver(InstrumentDriver.InstrumentWorker):
         return value
 
 
-    def getTraces(self):
+    def performArm(self, quant_names, options={}):
+        """Perform the instrument arm operation"""
+        # arm by calling get traces
+        self.getTraces(bArm=True, bMeasure=False)
+
+
+    def getTraces(self, bArm=True, bMeasure=True):
         """Get all active traces"""
         # test timing
 #        import time
@@ -138,28 +145,34 @@ class Driver(InstrumentDriver.InstrumentWorker):
         nAv = int(self.getValue('Number of averages'))
         # trigger delay is in 1/sample rate
         nTrigDelay = int(self.getValue('Trig Delay')/self.dt)
-        # configure trigger for all active channels
-        for ch in lCh:
-            # extra config for trig mode
-            if self.getValue('Trig Mode') == 'Digital trigger':
-                extSource = int(self.getCmdStringFromValue('External Trig Source'))
-                trigBehavior = int(self.getCmdStringFromValue('External Trig Config'))
-                self.dig.DAQtriggerExternalConfig(ch, extSource, trigBehavior)
-#                analogTriggerMask = 0
-#                self.dig.DAQtriggerConfig(ch, trigBehavior, extSource, analogTriggerMask)
-            elif self.getValue('Trig Mode') == 'Analog channel':
-                digitalTriggerMode= 0
-                digitalTriggerSource = 0
-                trigCh = self.getValueIndex('Analog Trig Channel')
-                analogTriggerMask = 2**trigCh
-                self.dig.DAQtriggerConfig(ch, digitalTriggerMode, digitalTriggerSource, analogTriggerMask)
-            # config daq and trig mode
-            trigMode = int(self.getCmdStringFromValue('Trig Mode'))
-            self.dig.DAQconfig(ch, nPts, nSeg*nAv, nTrigDelay, trigMode)
-        #
-        # start acquiring data
-        self.dig.DAQstartMultiple(iChMask)
+
+        if bArm:
+            # configure trigger for all active channels
+            for ch in lCh:
+                # extra config for trig mode
+                if self.getValue('Trig Mode') == 'Digital trigger':
+                    extSource = int(self.getCmdStringFromValue('External Trig Source'))
+                    trigBehavior = int(self.getCmdStringFromValue('External Trig Config'))
+                    self.dig.DAQtriggerExternalConfig(ch, extSource, trigBehavior)
+    #                analogTriggerMask = 0
+    #                self.dig.DAQtriggerConfig(ch, trigBehavior, extSource, analogTriggerMask)
+                elif self.getValue('Trig Mode') == 'Analog channel':
+                    digitalTriggerMode= 0
+                    digitalTriggerSource = 0
+                    trigCh = self.getValueIndex('Analog Trig Channel')
+                    analogTriggerMask = 2**trigCh
+                    self.dig.DAQtriggerConfig(ch, digitalTriggerMode, digitalTriggerSource, analogTriggerMask)
+                # config daq and trig mode
+                trigMode = int(self.getCmdStringFromValue('Trig Mode'))
+                self.dig.DAQconfig(ch, nPts, nSeg*nAv, nTrigDelay, trigMode)
+            #
+            # start acquiring data
+            self.dig.DAQstartMultiple(iChMask)
 #        lT.append('Start %.1f ms' % (1000*(time.clock()-t0)))
+        #
+        # return if not measure
+        if not bMeasure:
+            return
         # define number of cycles to read at a time
         nCycleTotal = nSeg*nAv
         # set cycles equal to number of records, else 100

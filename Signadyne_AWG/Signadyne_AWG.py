@@ -104,6 +104,13 @@ class Driver(InstrumentDriver.InstrumentWorker):
                     extSource = int(self.getCmdStringFromValue('External Trig Source'))
                     trigBehavior = int(self.getCmdStringFromValue('External Trig Config'))
                 self.AWG.AWGtriggerExternalConfig(ch, extSource, trigBehavior)
+        # 
+        # software trig for all channels
+        elif quant.name in ('Software Trig',):
+            # mask to trig all AWG channels
+            nMask = int(2**self.nCh - 1)
+            self.AWG.AWGtriggerMultiple(nMask)
+        # 
         elif name in ('Function', 'Enabled'):
             if self.getValue('Ch%d - Enabled' % ch):
                 func = int(self.getCmdStringFromValue('Ch%d - Function' % ch))
