@@ -106,7 +106,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 self.AWG.AWGtriggerExternalConfig(ch, extSource, trigBehavior)
         # 
         # software trig for all channels
-        elif quant.name in ('Software Trig',):
+        elif quant.name in ('Trig All',):
             # mask to trig all AWG channels
             nMask = int(2**self.nCh - 1)
             self.AWG.AWGtriggerMultiple(nMask)
