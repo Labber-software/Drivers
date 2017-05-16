@@ -96,3 +96,7 @@ NI_USB_6218/PyDAQmx/example/ContinuousPulseTrainGeneration.py
 NI_USB_6218/PyDAQmx/example/MultiChannelAnalogInput.py
 
 NI_USB_6218/PyDAQmx/Task.py
+
+Keysight_PXI_AWG/signadyne.py
+
+Keysight_PXI_Digitizer/signadyne.py
