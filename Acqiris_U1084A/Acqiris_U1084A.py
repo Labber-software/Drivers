@@ -179,7 +179,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 value = sampInterval * self.dig.getAvgConfig(1, 'StartDelay')
         elif quant.name == 'Trig source':
             pattern = abs(self.dig.getTrigClass()[0])
-            dPattern = {0x00000001L: 1, 0x00000002L: 2, 0x80000000L: -1}
+            dPattern = {0x00000001: 1, 0x00000002: 2, 0x80000000: -1}
             value = quant.getValueFromCmdString(str(dPattern[pattern]))
         elif quant.name == 'Trig coupling':
             # get from current trig source

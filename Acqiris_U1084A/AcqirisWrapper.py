@@ -146,6 +146,8 @@ class AcqirisDigitizer():
     def init(self, sResource='', bIdQuery=False, bReset=False):
         # ViStatus status = Acqrs_init(ViRsrc resourceName, ViBoolean IDQuery,
         # ViBoolean resetDevice, ViSession* instrumentID)
+        if not isinstance(sResource, bytes):
+            sResource = sResource.encode()
         self.callFunc('Acqrs_init', ViRsrc(sResource), ViBoolean(bIdQuery),
                       ViBoolean(bReset), byref(self.session))
 
@@ -154,6 +156,8 @@ class AcqirisDigitizer():
                          sOption='CAL=FALSE'):
         # ViStatus status = Acqrs_InitWithOptions(ViRsrc resourceName, ViBoolean IDQuery,
         # ViBoolean resetDevice, ViString optionsString, ViSession* instrumentID);
+        if not isinstance(sResource, bytes):
+            sResource = sResource.encode()
         self.callFunc('Acqrs_InitWithOptions', ViRsrc(sResource), ViBoolean(bIdQuery),
                       ViBoolean(bReset), ViString(sOption), byref(self.session))
 
@@ -430,7 +434,9 @@ class AcqirisDigitizer():
 
 
     def configAvgConfig(self, channelNbr, parameterString, value):
-        lFloat = ("NoiseBase", "StartDeltaPosPeakV", "Threshold", "ValidDeltaPosPeakV")
+        if not isinstance(parameterString, bytes):
+            parameterString = parameterString.encode()
+        lFloat = (b"NoiseBase", b"StartDeltaPosPeakV", b"Threshold", b"ValidDeltaPosPeakV")
         # proceed depending on Int or Float
         if parameterString in lFloat:
             # ViStatus status = AcqrsD1_configAvgConfigReal64(ViSession instrumentID,
@@ -445,7 +451,9 @@ class AcqirisDigitizer():
             
 
     def getAvgConfig(self, channelNbr, parameterString):
-        lFloat = ("NoiseBase", "StartDeltaPosPeakV", "Threshold", "ValidDeltaPosPeakV")
+        if not isinstance(parameterString, bytes):
+            parameterString = parameterString.encode()
+        lFloat = (b"NoiseBase", b"StartDeltaPosPeakV", b"Threshold", b"ValidDeltaPosPeakV")
         # proceed depending on Int or Float
         if parameterString in lFloat:
             # ViStatus status = AcqrsD1_getAvgConfigReal64(ViSession instrumentID,
@@ -743,7 +751,8 @@ if __name__ == '__main__':
     Digitizer.init('PCI::INSTR0')
     # trigger
     Digitizer.configTrigSource(-1, 0, 0, 300.)
-    Digitizer.configTrigClass(0x80000000L)
+    Digitizer.configTrigClass(0x80000000)
+    print('Trig', Digitizer.getTrigClass())
     Digitizer.configHorizontal(1E-9, 0.0)
 #    Digitizer.configTrigSource(2, 0, 1, 0.05)
 #    Digitizer.configTrigClass(0x00000002L)
