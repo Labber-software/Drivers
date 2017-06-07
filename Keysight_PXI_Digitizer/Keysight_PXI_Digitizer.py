@@ -189,7 +189,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 scale = (self.getRange(ch)/self.bitRange)
                 if nAv > 1 and data.size>0:
                     nAvHere = nCycle/nSeg
-                    data = data.reshape((nAvHere, nPts*nSeg)).mean(0)
+                    data = data.reshape((int(nAvHere), nPts*nSeg)).mean(0)
                     # adjust scaling to account for summing averages
                     scale = lScale[ch]*(nAvHere/nAv)
                 else:
