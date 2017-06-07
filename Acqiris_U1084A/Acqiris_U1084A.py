@@ -4,6 +4,8 @@ import AcqirisWrapper as Aq
 import InstrumentDriver
 from InstrumentConfig import InstrumentQuantity
 import numpy as np
+# for long integer py2/py3 compatibility
+from builtins import int
 
 class Error(Exception):
     pass
@@ -107,7 +109,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                          trigLevel2=0.0)
             # change active trigger if source was changed 
             if quant.name == 'Trig source':
-                dPattern = {1: 0x00000001, 2: 0x00000002, -1: 0x80000000}
+                dPattern = {1: int(0x00000001), 2: int(0x00000002), -1: int(0x80000000)}
                 self.dig.configTrigClass(dPattern[trigSource])
         elif quant.name in ('10 MHz Reference'):
             # get values from relevant quants and set all
@@ -179,7 +181,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 value = sampInterval * self.dig.getAvgConfig(1, 'StartDelay')
         elif quant.name == 'Trig source':
             pattern = abs(self.dig.getTrigClass()[0])
-            dPattern = {0x00000001: 1, 0x00000002: 2, 0x80000000: -1}
+            dPattern = {int(0x00000001): 1, int(0x00000002): 2, int(0x80000000): -1}
             value = quant.getValueFromCmdString(str(dPattern[pattern]))
         elif quant.name == 'Trig coupling':
             # get from current trig source
