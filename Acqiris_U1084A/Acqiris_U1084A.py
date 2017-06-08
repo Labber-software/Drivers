@@ -360,10 +360,10 @@ class Driver(InstrumentDriver.InstrumentWorker):
         skipIndex = int(round(skipStart/self.dt))
         nTotLength = self.lTrace[0].size
         length = 1 + int(round(self.getValue('Length')/self.dt))
-        length = min(length, nTotLength/nSegment-skipIndex)
+        length = int(min(length, nTotLength//nSegment-skipIndex))
         bUseRef = bool(self.getValue('Use Ch2 as reference'))
         # define data to use, put in 2d array of segments
-        vData = np.reshape(self.lTrace[0], (nSegment, nTotLength/nSegment))
+        vData = np.reshape(self.lTrace[0], (nSegment, int(nTotLength//nSegment)))
         # calculate cos/sin vectors, allow segmenting
         vTime = self.dt * (skipIndex + np.arange(length, dtype=float))
         vCos = np.cos(2*np.pi * vTime * dFreq)
@@ -373,7 +373,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         dQ = 2. * np.trapz(vSin * vData[:,skipIndex:skipIndex+length]) / float(length-1)
         signal = dI + 1j*dQ
         if bUseRef:
-            vRef = np.reshape(self.lTrace[1], (nSegment, nTotLength/nSegment))
+            vRef = np.reshape(self.lTrace[1], (nSegment, int(nTotLength//nSegment)))
             dIref = 2. * np.trapz(vCos * vRef[:,skipIndex:skipIndex+length]) / float(length-1)
             dQref = 2. * np.trapz(vSin * vRef[:,skipIndex:skipIndex+length]) / float(length-1)
             # subtract the reference angle
