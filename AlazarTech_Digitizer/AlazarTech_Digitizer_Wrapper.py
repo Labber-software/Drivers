@@ -103,6 +103,7 @@ class AlazarTechDigitizer():
         # get mem and bitsize
         (self.memorySize_samples, self.bitsPerSample) = self.AlazarGetChannelInfo()
 
+
     def testLED(self):
         import time
         self.callFunc('AlazarSetLED', self.handle, U32(1))
@@ -253,15 +254,15 @@ class AlazarTechDigitizer():
         self.callFunc('AlazarWaitAsyncBufferComplete', self.handle, buffer, timeout_ms)
 
 
-    def readTracesDMA(self, bGetCh1, bGetCh2, nSamples, nRecord, nAverage=1,
+    def readTracesDMA(self, bGetCh1, bGetCh2, nSamples, nRecord, nBuffer, nAverage=1,
                       bConfig=True, bArm=True, bMeasure=True,
                       funcStop=None, funcProgress=None, timeout=None):
         """read traces in NPT AutoDMA mode, convert to float, average to single trace"""
-        # import logging
-        # lg = logging.getLogger('LabberDriver')
-        # import time
-        # t0 = time.clock()
-        # lT = []
+        import logging
+        lg = logging.getLogger('LabberDriver')
+        import time
+        t0 = time.clock()
+        lT = []
 
         # use global timeout if not given
         timeout = self.timeout if timeout is None else timeout
@@ -287,7 +288,7 @@ class AlazarTechDigitizer():
             recordsPerBuffer = nRecord
         else:
             # else, use 100 records per buffers
-            recordsPerBuffer = 100
+            recordsPerBuffer = nBuffer
         buffersPerAcquisition = int(np.ceil(nRecordTotal/float(recordsPerBuffer)))
         if nRecordTotal < recordsPerBuffer:
             recordsPerBuffer = nRecordTotal
@@ -313,7 +314,11 @@ class AlazarTechDigitizer():
         bytesPerBuffer = bytesPerRecord * recordsPerBuffer * channelCount
         recordsPerAcquisition = recordsPerBuffer * buffersPerAcquisition
         # TODO: Select number of DMA buffers to allocate
-        bufferCount = 4
+        MEM_SIZE = .5E9
+        maxBufferCount = int(MEM_SIZE//bytesPerBuffer)
+        bufferCount = maxBufferCount
+        lT.append('Buffer count: %d' % bufferCount)
+#        bufferCount = 10 if (nRecord > 1) else 3
     
         # configure board, if wanted
         if bConfig:
@@ -351,9 +356,9 @@ class AlazarTechDigitizer():
         if not bMeasure:
             return
 
-        # lT.append('Post: %.1f ms' % ((time.clock()-t0)*1000))
+        lT.append('Post: %.1f ms' % ((time.clock()-t0)*1000))
         try:
-            # lT.append('Start: %.1f ms' % ((time.clock()-t0)*1000))
+            lT.append('Start: %.1f ms' % ((time.clock()-t0)*1000))
             buffersCompleted = 0
             bytesTransferred = 0
             #initialize data array
@@ -373,7 +378,7 @@ class AlazarTechDigitizer():
                 # buffers to be filled by the board.
                 buf = self.buffers[buffersCompleted % len(self.buffers)]
                 self.AlazarWaitAsyncBufferComplete(buf.addr, timeout_ms=int(timeout*1000))
-                # lT.append('Wait: %.1f ms' % ((time.clock()-t0)*1000))
+                lT.append('Wait: %.1f ms' % ((time.clock()-t0)*1000))
 
                 buffersCompleted += 1
                 bytesTransferred += buf.size_bytes
@@ -407,7 +412,7 @@ class AlazarTechDigitizer():
                         vData[0] = range1 * (rs[:,0]  - offset)
                         vData[1] = range2 * (rs[:,1]  - offset)
 
-                # lT.append('Sort: %.1f ms' % ((time.clock()-t0)*1000))
+                lT.append('Sort: %.1f ms' % ((time.clock()-t0)*1000))
                 #
                 # Sample codes are unsigned by default. As a result:
                 # - 0x00 represents a negative full scale input signal.
@@ -415,6 +420,8 @@ class AlazarTechDigitizer():
                 # - 0xFF represents a positive full scale input signal.
     
                 # Add the buffer to the end of the list of available buffers.
+                lg.log(20, str(lT))
+                lT = []
                 self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
         finally:
             # release resources
@@ -430,8 +437,8 @@ class AlazarTechDigitizer():
         vData[0] /= buffersPerAcquisition
         vData[1] /= buffersPerAcquisition
         # # log timing information
-        # lT.append('Done: %.1f ms' % ((time.clock()-t0)*1000))
-        # lg.log(20, str(lT))
+        lT.append('Done: %.1f ms' % ((time.clock()-t0)*1000))
+        lg.log(20, str(lT))
         #return data - requested vector length, not restricted to 128 multiple
         if nPtsOut != (samplesPerRecordValue*nRecord):
             if len(vData[0])>0:

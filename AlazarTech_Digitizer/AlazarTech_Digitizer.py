@@ -79,17 +79,18 @@ class Driver(InstrumentDriver.InstrumentWorker):
         nSample = int(self.getValue('Number of samples'))
         nRecord = int(self.getValue('Number of records'))
         nAverage = int(self.getValue('Number of averages'))
+        nBuffer = int(self.getValue('Records per Buffer'))
         if (not bGetCh1) and (not bGetCh2):
             return
         # configure and start acquisition
         if self.isHardwareLoop(options):
             # in hardware looping, number of records is set by the hardware looping
             (seq_no, n_seq) = self.getHardwareLoopIndex(options)
-            self.dig.readTracesDMA(bGetCh1, bGetCh2, nSample, n_seq, nAverage,
+            self.dig.readTracesDMA(bGetCh1, bGetCh2, nSample, n_seq, nBuffer, nAverage,
                                    bConfig=True, bArm=True, bMeasure=False)
         else:
             # in hardware looping, number of records is set by the hardware looping
-            self.dig.readTracesDMA(bGetCh1, bGetCh2, nSample, nRecord, nAverage,
+            self.dig.readTracesDMA(bGetCh1, bGetCh2, nSample, nRecord, nBuffer, nAverage,
                                    bConfig=True, bArm=True, bMeasure=False)
 
 
@@ -108,11 +109,12 @@ class Driver(InstrumentDriver.InstrumentWorker):
             bGetCh2 = bool(self.getValue('Ch2 - Enabled'))
             nSample = int(self.getValue('Number of samples'))
             nAverage = int(self.getValue('Number of averages'))
+            nBuffer = int(self.getValue('Records per Buffer'))
             # show status before starting acquisition
             self.reportStatus('Digitizer - Waiting for signal')
             # get data
             (vCh1, vCh2) = self.dig.readTracesDMA(bGetCh1, bGetCh2,
-                           nSample, n_seq, nAverage,
+                           nSample, n_seq, nBuffer, nAverage,
                            bConfig=False, bArm=False, bMeasure=True,
                            funcStop=self.isStopped,
                            funcProgress=self._callbackProgress,
@@ -220,12 +222,13 @@ class Driver(InstrumentDriver.InstrumentWorker):
         nPostSize = int(self.getValue('Number of samples'))
         nRecord = int(self.getValue('Number of records'))
         nAverage = int(self.getValue('Number of averages'))
+        nBuffer = int(self.getValue('Records per Buffer'))
         # in hardware trig mode, there is no noed to re-configure and arm the card
         bConfig = not hardware_trig
         bArm = not hardware_trig
         # get data
         self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(bGetCh1, bGetCh2,
-                                         nPostSize, nRecord, nAverage,
+                                         nPostSize, nRecord, nBuffer, nAverage,
                                          bConfig=bConfig, bArm=bArm, bMeasure=True)
 
 
@@ -238,6 +241,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         nPostSize = int(self.getValue('Number of samples'))
         nRecord = int(self.getValue('Number of records'))
         nAverage = int(self.getValue('Number of averages'))
+        nBuffer = int(self.getValue('Records per Buffer'))
         if (not bGetCh1) and (not bGetCh2):
             return
         
