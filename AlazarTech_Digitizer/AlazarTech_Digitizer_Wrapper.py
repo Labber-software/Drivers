@@ -256,7 +256,8 @@ class AlazarTechDigitizer():
 
     def readTracesDMA(self, bGetCh1, bGetCh2, nSamples, nRecord, nBuffer, nAverage=1,
                       bConfig=True, bArm=True, bMeasure=True,
-                      funcStop=None, funcProgress=None, timeout=None):
+                      funcStop=None, funcProgress=None, timeout=None, bufferSize=512,
+                      firstTimeout=None):
         """read traces in NPT AutoDMA mode, convert to float, average to single trace"""
         import logging
         lg = logging.getLogger('LabberDriver')
@@ -266,6 +267,8 @@ class AlazarTechDigitizer():
 
         # use global timeout if not given
         timeout = self.timeout if timeout is None else timeout
+        # first timeout can be different in case of slow initial arming
+        firstTimeout = timeout if firstTimeout is None else firstTimeout
 
         #Select the number of pre-trigger samples...not supported in NPT, keeping for consistency
         preTriggerSamplesValue = 0
@@ -314,9 +317,13 @@ class AlazarTechDigitizer():
         bytesPerBuffer = bytesPerRecord * recordsPerBuffer * channelCount
         recordsPerAcquisition = recordsPerBuffer * buffersPerAcquisition
         # TODO: Select number of DMA buffers to allocate
-        MEM_SIZE = .5E9
-        maxBufferCount = int(MEM_SIZE//bytesPerBuffer)
-        bufferCount = maxBufferCount
+        MEM_SIZE = int(bufferSize * 1024*1024)
+        # force buffer count to be even number, seems faster for allocating
+        maxBufferCount = int(MEM_SIZE//(2*bytesPerBuffer))
+        bufferCount = max(1, 2*maxBufferCount)
+        # don't allocate more buffers than needed for all data
+        bufferCount = min(bufferCount, buffersPerAcquisition)
+        lT.append('Total buffers needed: %d' % buffersPerAcquisition)
         lT.append('Buffer count: %d' % bufferCount)
 #        bufferCount = 10 if (nRecord > 1) else 3
     
@@ -373,12 +380,17 @@ class AlazarTechDigitizer():
             range2 = self.dRange[2]/codeRange/16.
             offset = 16.*codeZero
 
+            timeout_ms = int(firstTimeout*1000)
+
             while (buffersCompleted < buffersPerAcquisition):
                 # Wait for the buffer at the head of the list of available
                 # buffers to be filled by the board.
                 buf = self.buffers[buffersCompleted % len(self.buffers)]
-                self.AlazarWaitAsyncBufferComplete(buf.addr, timeout_ms=int(timeout*1000))
+                self.AlazarWaitAsyncBufferComplete(buf.addr, timeout_ms=timeout_ms)
                 lT.append('Wait: %.1f ms' % ((time.clock()-t0)*1000))
+
+                # reset timeout time, can be different than first call
+                timeout_ms = int(timeout*1000)
 
                 buffersCompleted += 1
                 bytesTransferred += buf.size_bytes
@@ -412,7 +424,7 @@ class AlazarTechDigitizer():
                         vData[0] = range1 * (rs[:,0]  - offset)
                         vData[1] = range2 * (rs[:,1]  - offset)
 
-                lT.append('Sort: %.1f ms' % ((time.clock()-t0)*1000))
+                lT.append('Sort/Avg: %.1f ms' % ((time.clock()-t0)*1000))
                 #
                 # Sample codes are unsigned by default. As a result:
                 # - 0x00 represents a negative full scale input signal.
@@ -429,10 +441,11 @@ class AlazarTechDigitizer():
                 self.AlazarAbortAsyncRead()
             except:
                 pass
-            # lT.append('Abort: %.1f ms' % ((time.clock()-t0)*1000))
+            lT.append('Abort: %.1f ms' % ((time.clock()-t0)*1000))
             # make sure buffers release memory
             for buf in self.buffers:
                 buf.__exit__()
+            lT.append('Remove: %.1f ms' % ((time.clock()-t0)*1000))
         #normalize        
         vData[0] /= buffersPerAcquisition
         vData[1] /= buffersPerAcquisition

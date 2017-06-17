@@ -80,6 +80,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         nRecord = int(self.getValue('Number of records'))
         nAverage = int(self.getValue('Number of averages'))
         nBuffer = int(self.getValue('Records per Buffer'))
+        nMemSize = int(self.getValue('Max buffer size'))
         if (not bGetCh1) and (not bGetCh2):
             return
         # configure and start acquisition
@@ -87,11 +88,11 @@ class Driver(InstrumentDriver.InstrumentWorker):
             # in hardware looping, number of records is set by the hardware looping
             (seq_no, n_seq) = self.getHardwareLoopIndex(options)
             self.dig.readTracesDMA(bGetCh1, bGetCh2, nSample, n_seq, nBuffer, nAverage,
-                                   bConfig=True, bArm=True, bMeasure=False)
+                                   bConfig=True, bArm=True, bMeasure=False, bufferSize=nMemSize)
         else:
             # in hardware looping, number of records is set by the hardware looping
             self.dig.readTracesDMA(bGetCh1, bGetCh2, nSample, nRecord, nBuffer, nAverage,
-                                   bConfig=True, bArm=True, bMeasure=False)
+                                   bConfig=True, bArm=True, bMeasure=False, bufferSize=nMemSize)
 
 
     def _callbackProgress(self, progress):
@@ -110,6 +111,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             nSample = int(self.getValue('Number of samples'))
             nAverage = int(self.getValue('Number of averages'))
             nBuffer = int(self.getValue('Records per Buffer'))
+            nMemSize = int(self.getValue('Max buffer size'))
             # show status before starting acquisition
             self.reportStatus('Digitizer - Waiting for signal')
             # get data
@@ -118,7 +120,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
                            bConfig=False, bArm=False, bMeasure=True,
                            funcStop=self.isStopped,
                            funcProgress=self._callbackProgress,
-                           timeout=self.dComCfg['Timeout']+60.0)
+                           firstTimeout=self.dComCfg['Timeout']+180.0,
+                           bufferSize=nMemSize)
             # re-shape data and place in trace buffer
             self.lTrace[0] = vCh1.reshape((n_seq, nSample))
             self.lTrace[1] = vCh2.reshape((n_seq, nSample))
@@ -223,13 +226,15 @@ class Driver(InstrumentDriver.InstrumentWorker):
         nRecord = int(self.getValue('Number of records'))
         nAverage = int(self.getValue('Number of averages'))
         nBuffer = int(self.getValue('Records per Buffer'))
+        nMemSize = int(self.getValue('Max buffer size'))
         # in hardware trig mode, there is no noed to re-configure and arm the card
         bConfig = not hardware_trig
         bArm = not hardware_trig
         # get data
         self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(bGetCh1, bGetCh2,
                                          nPostSize, nRecord, nBuffer, nAverage,
-                                         bConfig=bConfig, bArm=bArm, bMeasure=True)
+                                         bConfig=bConfig, bArm=bArm, bMeasure=True,
+                                         bufferSize=nMemSize)
 
 
     def getTracesNonDMA(self):
