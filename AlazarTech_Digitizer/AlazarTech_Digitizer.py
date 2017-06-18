@@ -29,6 +29,12 @@ class Driver(InstrumentDriver.InstrumentWorker):
 
     def performClose(self, bError=False, options={}):
         """Perform the close instrument connection operation"""
+        # try to remove buffers
+        try:
+            self.dig.removeBuffersDMA()
+        except:
+            pass
+        # remove digitizer object
         del self.dig
 
 
@@ -87,12 +93,13 @@ class Driver(InstrumentDriver.InstrumentWorker):
         if self.isHardwareLoop(options):
             # in hardware looping, number of records is set by the hardware looping
             (seq_no, n_seq) = self.getHardwareLoopIndex(options)
+            # need to re-configure the card since record size was not known at config
             self.dig.readTracesDMA(bGetCh1, bGetCh2, nSample, n_seq, nBuffer, nAverage,
                                    bConfig=True, bArm=True, bMeasure=False, bufferSize=nMemSize)
         else:
-            # in hardware looping, number of records is set by the hardware looping
+            # if not hardware looping, just trig the card, buffers are already configured 
             self.dig.readTracesDMA(bGetCh1, bGetCh2, nSample, nRecord, nBuffer, nAverage,
-                                   bConfig=True, bArm=True, bMeasure=False, bufferSize=nMemSize)
+                                   bConfig=False, bArm=True, bMeasure=False, bufferSize=nMemSize)
 
 
     def _callbackProgress(self, progress):
@@ -215,6 +222,21 @@ class Driver(InstrumentDriver.InstrumentWorker):
         Delay = int(self.getValue('Trig delay')/self.dt)
         self.dig.AlazarSetTriggerDelay(Delay)
         self.dig.AlazarSetTriggerTimeOut(time=timeout)
+        # config memeory buffers, only possible for cards using DMA read
+        if self.getModel() not in ('9360', '9373'):
+            return
+        bGetCh1 = bool(self.getValue('Ch1 - Enabled'))
+        bGetCh2 = bool(self.getValue('Ch2 - Enabled'))
+        nPostSize = int(self.getValue('Number of samples'))
+        nRecord = int(self.getValue('Number of records'))
+        nAverage = int(self.getValue('Number of averages'))
+        nBuffer = int(self.getValue('Records per Buffer'))
+        nMemSize = int(self.getValue('Max buffer size'))
+        # configure DMA read
+        self.dig.readTracesDMA(bGetCh1, bGetCh2,
+                               nPostSize, nRecord, nBuffer, nAverage,
+                               bConfig=True, bArm=False, bMeasure=False,
+                               bufferSize=nMemSize)
 
 
     def getTracesDMA(self, hardware_trig=False):
@@ -227,13 +249,12 @@ class Driver(InstrumentDriver.InstrumentWorker):
         nAverage = int(self.getValue('Number of averages'))
         nBuffer = int(self.getValue('Records per Buffer'))
         nMemSize = int(self.getValue('Max buffer size'))
-        # in hardware trig mode, there is no noed to re-configure and arm the card
-        bConfig = not hardware_trig
+        # in hardware trig mode, there is no noed to re-arm the card
         bArm = not hardware_trig
         # get data
         self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(bGetCh1, bGetCh2,
                                          nPostSize, nRecord, nBuffer, nAverage,
-                                         bConfig=bConfig, bArm=bArm, bMeasure=True,
+                                         bConfig=False, bArm=bArm, bMeasure=True,
                                          bufferSize=nMemSize)
 
 

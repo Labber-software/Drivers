@@ -325,7 +325,6 @@ class AlazarTechDigitizer():
         bufferCount = min(bufferCount, buffersPerAcquisition)
         lT.append('Total buffers needed: %d' % buffersPerAcquisition)
         lT.append('Buffer count: %d' % bufferCount)
-#        bufferCount = 10 if (nRecord > 1) else 3
     
         # configure board, if wanted
         if bConfig:
@@ -335,9 +334,15 @@ class AlazarTechDigitizer():
             sample_type = ctypes.c_uint8
             if bytesPerSample > 1:
                 sample_type = ctypes.c_uint16
+            # clear old buffers
+            self.removeBuffersDMA()
+            # create new buffers
             self.buffers = []
             for i in range(bufferCount):
                 self.buffers.append(DMABuffer(sample_type, bytesPerBuffer))
+
+        # arm and start capture, if wanted
+        if bArm:
             # Configure the board to make a Traditional AutoDMA acquisition
             self.AlazarBeforeAsyncRead(channels,
                                   -preTriggerSamples,
@@ -348,15 +353,11 @@ class AlazarTechDigitizer():
             # Post DMA buffers to board
             for buf in self.buffers:
                 self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
-
-        # arm and start capture, if wanted
-        if bArm:
             try:
                 self.AlazarStartCapture()
             except:
                 # make sure buffers release memory if failed
-                for buf in self.buffers:
-                    buf.__exit__()
+                self.removeBuffersDMA()
                 raise
 
         # if not waiting for result, return here
@@ -442,11 +443,7 @@ class AlazarTechDigitizer():
             except:
                 pass
             lT.append('Abort: %.1f ms' % ((time.clock()-t0)*1000))
-            # make sure buffers release memory
-            for buf in self.buffers:
-                buf.__exit__()
-            lT.append('Remove: %.1f ms' % ((time.clock()-t0)*1000))
-        #normalize        
+        # normalize        
         vData[0] /= buffersPerAcquisition
         vData[1] /= buffersPerAcquisition
         # # log timing information
@@ -459,6 +456,15 @@ class AlazarTechDigitizer():
             if len(vData[1])>0:
                 vData[1] = vData[1].reshape((nRecord,samplesPerRecord))[:,:samplesPerRecordValue].flatten()
         return vData
+
+
+    def removeBuffersDMA(self):
+        """Clear and remove DMA buffers, to release memory"""
+        # make sure buffers release memory
+        for buf in self.buffers:
+            buf.__exit__()
+        # remove all
+        self.buffers = []
 
     
     def readTraces(self, Channel):
