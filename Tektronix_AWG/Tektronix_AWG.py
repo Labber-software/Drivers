@@ -56,7 +56,11 @@ class Driver(VISA_Driver):
         # clear old waveforms
         self.lInUse = [False]*self.nCh
         for n in range(self.nCh):
-            self.createWaveformOnTek(n+1, 0, bOnlyClear=True)
+            channel = n+1
+            self.setValue('Ch %d' % channel, [])
+            self.setValue('Ch %d - Marker 1' % channel, [])
+            self.setValue('Ch %d - Marker 2' % channel, [])
+            self.createWaveformOnTek(channel, 0, bOnlyClear=True)
 
 
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
