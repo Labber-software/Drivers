@@ -255,6 +255,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(bGetCh1, bGetCh2,
                                          nPostSize, nRecord, nBuffer, nAverage,
                                          bConfig=False, bArm=bArm, bMeasure=True,
+                                         funcStop=self.isStopped,
                                          bufferSize=nMemSize)
 
 

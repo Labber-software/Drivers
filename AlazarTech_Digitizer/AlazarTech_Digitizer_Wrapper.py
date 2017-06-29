@@ -288,7 +288,10 @@ class AlazarTechDigitizer():
         nRecordTotal = nRecord * nAverage
         if nRecord > 1:
             # if multiple records wanted, set records per buffer to match
-            recordsPerBuffer = nRecord
+            recordsPerBuffer = nRecord 
+            # BUG FIX : avoid odd number of records, if possible
+            if (nRecord % 2) ==1 and (nAverage % 2) == 0:
+                recordsPerBuffer = nRecord * 2
         else:
             # else, use 100 records per buffers
             recordsPerBuffer = nBuffer
@@ -325,6 +328,8 @@ class AlazarTechDigitizer():
         bufferCount = min(bufferCount, buffersPerAcquisition)
         lT.append('Total buffers needed: %d' % buffersPerAcquisition)
         lT.append('Buffer count: %d' % bufferCount)
+        lT.append('Buffer size: %d' % bytesPerBuffer)
+        lT.append('Records per buffer: %d' % recordsPerBuffer)
     
         # configure board, if wanted
         if bConfig:
