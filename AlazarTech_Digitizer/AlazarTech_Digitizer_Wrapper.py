@@ -257,7 +257,7 @@ class AlazarTechDigitizer():
     def readTracesDMA(self, bGetCh1, bGetCh2, nSamples, nRecord, nBuffer, nAverage=1,
                       bConfig=True, bArm=True, bMeasure=True,
                       funcStop=None, funcProgress=None, timeout=None, bufferSize=512,
-                      firstTimeout=None):
+                      firstTimeout=None, maxBuffers=1024):
         """read traces in NPT AutoDMA mode, convert to float, average to single trace"""
         import logging
         lg = logging.getLogger('LabberDriver')
@@ -289,9 +289,6 @@ class AlazarTechDigitizer():
         if nRecord > 1:
             # if multiple records wanted, set records per buffer to match
             recordsPerBuffer = nRecord 
-            # BUG FIX : avoid odd number of records, if possible
-            if (nRecord % 2) ==1 and (nAverage % 2) == 0:
-                recordsPerBuffer = nRecord * 2
         else:
             # else, use 100 records per buffers
             recordsPerBuffer = nBuffer
@@ -318,17 +315,21 @@ class AlazarTechDigitizer():
         samplesPerRecord = preTriggerSamples + postTriggerSamples
         bytesPerRecord = bytesPerSample * samplesPerRecord
         bytesPerBuffer = bytesPerRecord * recordsPerBuffer * channelCount
+        # force buffer size to be integer of 256 * 16 = 4096, not sure why
+        bytesPerBufferMem = int(4096 * np.ceil(bytesPerBuffer/4096.))
+
         recordsPerAcquisition = recordsPerBuffer * buffersPerAcquisition
         # TODO: Select number of DMA buffers to allocate
         MEM_SIZE = int(bufferSize * 1024*1024)
         # force buffer count to be even number, seems faster for allocating
-        maxBufferCount = int(MEM_SIZE//(2*bytesPerBuffer))
+        maxBufferCount = int(MEM_SIZE//(2*bytesPerBufferMem))
         bufferCount = max(1, 2*maxBufferCount)
         # don't allocate more buffers than needed for all data
-        bufferCount = min(bufferCount, buffersPerAcquisition)
+        bufferCount = min(bufferCount, buffersPerAcquisition, maxBuffers)
         lT.append('Total buffers needed: %d' % buffersPerAcquisition)
         lT.append('Buffer count: %d' % bufferCount)
         lT.append('Buffer size: %d' % bytesPerBuffer)
+        lT.append('Buffer size, memory: %d' % bytesPerBufferMem)
         lT.append('Records per buffer: %d' % recordsPerBuffer)
     
         # configure board, if wanted
@@ -344,7 +345,7 @@ class AlazarTechDigitizer():
             # create new buffers
             self.buffers = []
             for i in range(bufferCount):
-                self.buffers.append(DMABuffer(sample_type, bytesPerBuffer))
+                self.buffers.append(DMABuffer(sample_type, bytesPerBufferMem))
 
         # arm and start capture, if wanted
         if bArm:
@@ -388,12 +389,16 @@ class AlazarTechDigitizer():
 
             timeout_ms = int(firstTimeout*1000)
 
+            lg.log(20, str(lT))
+            lT = []
+            # lAvTime = []
+
             while (buffersCompleted < buffersPerAcquisition):
                 # Wait for the buffer at the head of the list of available
                 # buffers to be filled by the board.
                 buf = self.buffers[buffersCompleted % len(self.buffers)]
                 self.AlazarWaitAsyncBufferComplete(buf.addr, timeout_ms=timeout_ms)
-                lT.append('Wait: %.1f ms' % ((time.clock()-t0)*1000))
+                # lT.append('Wait: %.1f ms' % ((time.clock()-t0)*1000))
 
                 # reset timeout time, can be different than first call
                 timeout_ms = int(timeout*1000)
@@ -408,29 +413,38 @@ class AlazarTechDigitizer():
                 if funcProgress is not None:
                     funcProgress(float(buffersCompleted)/float(buffersPerAcquisition))
 
+                # remove extra elements for getting even 256*16 buffer sizes
+                if bytesPerBuffer == bytesPerBufferMem:
+                    buf_truncated = buf.buffer
+                else:
+                    buf_truncated = buf.buffer[:(bytesPerBuffer//bytesPerSample)]
+
                 # reshape, sort and average data
                 if nAverage > 1:
                     if channels == 1:
-                        rs = buf.buffer.reshape((nAvPerBuffer, nPtsOut))
+                        rs = buf_truncated.reshape((nAvPerBuffer, nPtsOut))
                         vData[0] += range1 * (np.mean(rs, 0)  - offset)
                     elif channels == 2:
-                        rs = buf.buffer.reshape((nAvPerBuffer, nPtsOut))
+                        rs = buf_truncated.reshape((nAvPerBuffer, nPtsOut))
                         vData[1] += range2 * (np.mean(rs, 0)  - offset)
                     elif channels == 3:
-                        rs = buf.buffer.reshape((nAvPerBuffer, nPtsOut, 2))
+                        rs = buf_truncated.reshape((nAvPerBuffer, nPtsOut, 2))
                         vData[0] += range1 * (np.mean(rs[:,:,0], 0)  - offset)
                         vData[1] += range2 * (np.mean(rs[:,:,1], 0)  - offset)
                 else:
                     if channels == 1:
-                        vData[0] = range1 * (buf.buffer  - offset)
+                        vData[0] = range1 * (buf_truncated  - offset)
                     elif channels == 2:
-                        vData[1] = range2 * (buf.buffer  - offset)
+                        vData[1] = range2 * (buf_truncated  - offset)
                     elif channels == 3:
-                        rs = buf.buffer.reshape((nPtsOut, 2))
+                        rs = buf_truncated.reshape((nPtsOut, 2))
                         vData[0] = range1 * (rs[:,0]  - offset)
                         vData[1] = range2 * (rs[:,1]  - offset)
 
-                lT.append('Sort/Avg: %.1f ms' % ((time.clock()-t0)*1000))
+                # lT.append('Sort/Avg: %.1f ms' % ((time.clock()-t0)*1000))
+                # lg.log(20, str(lT))
+                # lT = []
+                # lAvTime.append((time.clock()-t0)*1000)
                 #
                 # Sample codes are unsigned by default. As a result:
                 # - 0x00 represents a negative full scale input signal.
@@ -438,8 +452,6 @@ class AlazarTechDigitizer():
                 # - 0xFF represents a positive full scale input signal.
     
                 # Add the buffer to the end of the list of available buffers.
-                lg.log(20, str(lT))
-                lT = []
                 self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
         finally:
             # release resources
@@ -449,6 +461,7 @@ class AlazarTechDigitizer():
                 pass
             lT.append('Abort: %.1f ms' % ((time.clock()-t0)*1000))
         # normalize        
+        # lg.log(20, 'Average: %.1f ms' % np.mean(lAvTime))
         vData[0] /= buffersPerAcquisition
         vData[1] /= buffersPerAcquisition
         # # log timing information
