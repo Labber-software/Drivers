@@ -1,0 +1,701 @@
+#!/usr/bin/env python3
+import numpy as np
+from enum import Enum
+from copy import copy
+
+from pulse import PulseShape, Pulse 
+from predistortion import Predistortion
+from crosstalk import Crosstalk
+from readout import Readout
+
+# add logger, to allow logging to Labber's instrument log 
+import logging
+log = logging.getLogger('LabberDriver')
+
+
+# Maximal number of qubits controllable by this class
+MAX_QUBIT = 9
+
+
+class Gate(Enum):
+    """Define possible qubit gates"""
+    # single-qubit gates
+    Xp = 0
+    Xm = 1
+    X2p = 2
+    X2m = 3
+    Yp = 4
+    Ym = 5
+    Y2m = 6
+    Y2p = 7
+    # two-qubit gates
+    CPh = 8
+
+# define set of one- and two-qubit gates
+ONE_QUBIT_GATES = (Gate.Xp, Gate.Xm, Gate.X2p, Gate.X2m,
+                   Gate.Yp, Gate.Ym, Gate.Y2p, Gate.Y2m,) 
+TWO_QUBIT_GATES = (Gate.CPh,)
+
+
+class Sequence(object):
+    """This class represents a multi-qubit control sequence
+
+    The class supports two ways of defining pulse sequences:
+
+    (1) Use the functions `add_single_pulse` or `add_single_gate` to add pulses 
+        to individual qubit waveforms at arbitrary time positions, or, 
+    
+    (2) Use the function `add_gates` to add a list of pulses to all qubits. The
+        pulses will be separated by a fixed pulse period.
+
+    Attributes
+    ----------
+    n_qubit : int
+        Number of qubits controlled by the sequence.
+
+    period_1qb : float
+        Period for single-qubit gates.
+
+    period_2qb : float
+        Period for two-qubit gates.
+
+    local_xy : bool
+        Define if qubits have local XY control lines.  If False, all control 
+        pulses are added to a single output waveform.
+
+    sample_rate : float
+        Sample rate of output waveforms.
+
+    n_pts : int
+        Length of output waveforms. Note that the resulting waveform may be 
+        different if the waveforms are trimmed.
+
+    first_delay : float
+        Position of first pulse
+
+    trim_to_sequence : bool
+        If True, waveform is trimmed to fit sequence
+
+    trim_start : bool
+        If True, waveform is trimmed at both start and end (default is just end)
+
+    perform_tomography : bool
+        If True, tomography pulses will be added to the end of the qubit xy
+        control waveforms. 
+
+    perform_predistortion : bool
+        If True, the control waveforms will be pre-distorted.
+
+    generate_gate_switch  : bool
+        If True, generate waveform for microwave gate switch
+
+    uniform_gate : bool
+        If True, the gate is open during the entire xy waveform
+
+    gate_delay : float
+        Delay of gate switch wave relative to the I/Q pulse
+
+    gate_overlap : float
+        Extra time before/after I/Q pulse during which the gate switch is open
+
+    minimal_gate_time : float
+        Shortest time the gate switch will stay open/closed.
+
+    generate_readout_trig : bool
+        If True, generate waveform with readout trig at the end of the waveform.
+
+    readout_delay : float
+        Readout trig delay.
+
+    readout_amplitude : float
+        Amplitude of readout trig pulse.
+
+    readout_duration : float
+        Duration of readout trig pulse.
+
+    generate_readout_iq : bool
+        If True, generate complex waveform with multi-qubit I/Q readout signals.
+
+    compensate_crosstalk : bool
+        If True, Z-control waveforms will be compensated for cross-talk.
+
+    """
+
+    def __init__(self, n_qubit=5, period_1qb=30E-9, period_2qb=30E-9,
+                 sample_rate=1.2E9, n_pts=240E3, first_delay=100E-9,
+                 local_xy=True):
+        # define parameters
+        self.n_qubit = n_qubit
+        self.period_1qb = period_1qb
+        self.period_2qb = period_2qb
+        self.local_xy = local_xy
+        # waveform parameter
+        self.sample_rate = sample_rate
+        self.n_pts = n_pts
+        self.first_delay = n_pts
+        self.trim_to_sequence = True
+        self.trim_start = False
+        # parameter for keeping track of current gate pulse time
+        self.time_pulse = 0.0  
+
+        # waveforms
+        self.wave_xy = [np.zeros(0, dtype=np.complex)
+                          for n in range(MAX_QUBIT)]
+        self.wave_z = [np.zeros(0) for n in range(MAX_QUBIT)]
+        self.wave_gate = [np.zeros(0) for n in range(MAX_QUBIT)]
+        # define pulses
+        self.pulses_1qb = [Pulse() for n in range(MAX_QUBIT)]
+        self.pulses_2qb = [Pulse() for n in range(MAX_QUBIT - 1)]
+
+        # tomography
+        self.perform_tomography = False
+
+        # cross-talk object
+        self.compensate_crosstalk = False
+        self.crosstalk = Crosstalk()
+
+        # predistortion objects
+        self.perform_predistortion = False
+        self.predistortions = [Predistortion(n) for n in range(MAX_QUBIT)]
+
+        # gate switch waveform
+        self.generate_gate_switch = False
+        self.uniform_gate = False
+        self.gate_delay = 0.0
+        self.gate_overlap = 20E-9
+        self.minimal_gate_time = 20E-9
+
+        # readout trig settings
+        self.generate_readout_trig = False
+        self.readout_delay = 0.0
+        self.readout_amplitude = 1.0
+        self.readout_duration = 20E-9
+
+        # readout wave object and settings
+        self.generate_readout_iq = False
+        self.readout = Readout(max_qubit=MAX_QUBIT)
+        self.readout_trig = np.array([], dtype=float)
+        self.readout_iq = np.array([], dtype=np.complex)
+
+
+    def init_waveforms(self):
+        """Initialize waveforms according to sequence settings"""
+        # clear waveforms
+        for n in range(self.n_qubit):
+            self.wave_xy[n] = np.zeros(self.n_pts, dtype=np.complex)
+            self.wave_z[n] = np.zeros(self.n_pts, dtype=float)
+            self.wave_gate[n] = np.zeros(self.n_pts, dtype=float)
+
+        # readout trig
+        pts = self.n_pts if self.generate_readout_trig else 0
+        self.readout_trig = np.zeros(pts, dtype=float)
+        # readout i/q waveform
+        pts = self.n_pts if self.generate_readout_iq else 0
+        self.readout_iq = np.zeros(pts, dtype=np.complex)
+
+        # reset gate position counter
+        self.time_pulse = self.first_delay
+
+
+    def generate_sequence(self, config):
+        """Generate sequence by adding gates/pulses to waveforms
+
+        Parameters
+        ----------
+        config : dict
+            Configuration as defined by Labber driver configuration window
+
+        """
+        # this function should be overloaded by specific sequence
+        pass
+
+
+    def calculate_waveforms(self, config):
+        """Calculate waveforms for all qubits
+
+        The function will initialize the waveforms, generate the qubit pulse
+        sequence, create gates and readout pulses, perform pre-distortion,
+        and finally return the qubit control waveforms. 
+
+        Parameters
+        ----------
+        config : dict
+            Configuration as defined by Labber driver configuration window
+
+        Returns
+        -------
+        waveforms : dict with numpy arrays 
+            Dictionary with qubit waveforms. Depending on the sequence 
+            configuration, the dictionary will have the following keys:
+                wave_xy : list of complex numpy arrays
+                    Waveforms for qubit XY control.
+                wave_z : list of numpy arrays
+                    Waveforms for qubit Z control.
+                wave_gate : list of numpy arrays
+                    Waveforms for gating qubit XY pulses.
+                readout_trig : numpy array
+                    Waveform for triggering/gating qubit readout
+                readout_iq : complex numpy array
+                    Waveform for readout IQ control
+
+        """
+        # start by initializing the waveforms
+        self.init_waveforms()
+
+        # generate sequence 
+        self.generate_sequence(config)
+
+        # add tomography
+        self.add_tomography_pulses()
+
+        # I/Q waveform predistortion
+        self.predistort_waveforms()
+
+        # cross-talk compensation
+        self.perform_crosstalk_compensation()
+
+        # read-out signals
+        self.generate_readout()
+
+        # trim waveforms, if wanted
+        self.trim_waveforms()
+
+        # microwave gate switch waveform
+        self.add_microwave_gate()
+
+        # create and return dictionary with waveforms
+        data = dict()
+        data['wave_xy'] = self.wave_xy
+        data['wave_z'] = self.wave_z
+        data['wave_gate'] = self.wave_gate
+        data['readout_trig'] = self.readout_trig 
+        data['readout_iq'] = self.readout_iq
+        return data
+
+
+    def add_single_pulse(self, qubit, pulse, t0, z_pulse=False, 
+                         align_left=False):
+        """Add single pulse to specified qubit waveform
+
+        Parameters
+        ----------
+        qubit : int or numpy array
+            Qubit number, indexed from 0. If a numpy array is given, pulses will
+            be added to the specified waveform instead of the qubit waveform.
+
+        pulse : :obj:`Pulse`
+            Definition of pulse to add.
+
+        t0 : float
+            Pulse position, referenced to center of pulse.
+
+        align_left : bool, optional
+            If True, the pulse position is referenced to the left edge of the 
+            pulse, otherwise to the center. Default is False.
+
+        """
+        # find waveform to add pulse to
+        if isinstance(qubit, np.ndarray):
+            waveform = qubit
+        else:
+            if pulse.z_pulse:
+                waveform = self.wave_z[qubit]
+            else:
+                waveform = self.wave_xy[qubit]
+        # calculate total length of pulse
+        duration = pulse.total_duration()
+        # shift time to mid point if user gave start point
+        if align_left:
+            t0 = t0 + duration / 2
+        # get the range of indices in use
+        indices = np.arange(
+            max(np.round((t0 - duration / 2) * self.sample_rate), 0),
+            min(np.round((t0 + duration / 2) * self.sample_rate), self.n_pts)
+        )
+        indices = np.int0(indices)
+        # return directly if no indices
+        if len(indices) == 0:
+            return
+
+        # calculate time values for the pulse indices
+        t = indices / self.sample_rate
+        # calculate the pulse envelope for the selected indices
+        y = pulse.calculate_envelope(t0, t)
+
+        # proceed depending on Z- or XY gate
+        if pulse.z_pulse or waveform.dtype != np.complex:
+            # Z pulse, add directly to Z waveform
+            waveform[indices] += y
+
+        else:
+            # XY pulse, apply DRAG, if wanted
+            if pulse.use_drag:
+                beta = pulse.drag_coefficient * self.sample_rate
+                y = y + 1j * beta * np.gradient(y)
+
+            # single-sideband mixing, get frequency
+            omega = 2 * np.pi * pulse.frequency
+            # apply SSBM transform
+            data_i = (y.real * np.cos(omega * t - pulse.phase) +
+                      -y.imag * np.cos(omega * t - pulse.phase + np.pi / 2))
+            data_q = (-y.real * np.sin(omega * t - pulse.phase) +
+                      y.imag * np.sin(omega * t - pulse.phase + np.pi / 2))
+
+            # store result
+            waveform[indices] += (data_i + 1j * data_q)
+
+
+    def add_single_gate(self, qubit, gate, t0, align_left=False):
+        """Add single gate to specified qubit waveform
+
+        Parameters
+        ----------
+        qubit : int
+            Qubit number, indexed from 0.
+
+        gate : :enum:`Gate`
+            Definition of gate to add.
+
+        t0 : float
+            Pulse position, referenced to center of pulse.
+
+        align_left : bool, optional
+            If True, the pulse position is referenced to the left edge of the 
+            pulse, otherwise to the center. Default is False.
+
+        """
+        # check if one- or two-qubit gate
+        if gate in ONE_QUBIT_GATES:
+            # get copy of pulse to use
+            pulse = copy(self.pulses_1qb[qubit])
+
+            # scale pulse by 0.5 if pi/2
+            if gate in (Gate.X2p, Gate.Y2p, Gate.X2m, Gate.Y2m):
+                pulse.amplitude *= 0.5
+            # rotate by 90 deg if pulse is in Y
+            if gate in (Gate.Yp, Gate.Y2p, Gate.Ym, Gate.Y2m):
+                pulse.phase += np.pi / 2
+            # negate if negative pulse
+            if gate in (Gate.Xm, Gate.X2m, Gate.Ym, Gate.Y2m):
+                pulse.amplitude = -pulse.amplitude
+
+            # add pulse to waveform
+            self.add_single_pulse(qubit, pulse, t0, align_left=align_left)
+
+        else:
+            # two-qubit gate, get pulse
+            pulse = copy(self.pulses_2qb[qubit])
+            # add pulse to waveform
+            self.add_single_pulse(qubit, pulse, t0, align_left=align_left)
+            # TODO (simon): Update two-qubit pulse to include phase correction,
+            # compensation pulses to neighboring qubits, etc.
+
+
+    def add_gates(self, gates):
+        """Add multiple gates to qubit waveforms
+
+        Add multiple gates to the qubit waveform.  Pulses are added to the end
+        of the sequence, with gate period set by single- and two-qubit gate
+        period parameters.
+
+        Examples
+        --------
+        Add three gates to a two-qubit sequence, first a positive pi-pulse 
+        around X to qubit 1, then a negative pi/2-pulse to qubit 2, finally
+        simultaneous positive pi-pulses to qubits 1 and 2.
+
+        >>> add_gates([[Gate.Xp,  None    ], 
+                       [None,     Gate.Y2m],
+                       [Gate.Xp,  Gate.Xp]])
+
+        Parameters
+        ----------
+        gates : list of list of :enum:`gate`
+            List of lists defining gates to add. The innermost list should
+            have the same length as number of qubits in the sequence.
+
+        """
+        # make sure we have correct input
+        if not isinstance(gates, (list, tuple)):
+            raise Exception('The input must be a list of list with gates')
+        if len(gates) == 0:
+            return
+        if not isinstance(gates[0], (list, tuple)):
+            raise Exception('The input must be a list of list with gates')
+        # add gates sequence to waveforms
+        for gates_qubits in gates:
+            # check if any two-qubit gates
+            two_qubit = np.any([g in TWO_QUBIT_GATES for g in gates_qubits])
+            # pulse period may be different for two-qubi gates
+            period = self.period_2qb if two_qubit else self.period_1qb
+            # go through all qubits
+            for n, g in enumerate(gates_qubits):
+                # ignore if gate is None
+                if g is None:
+                    continue
+                # add gate to specific qubit waveform
+                self.add_single_gate(n, g, t0=self.time_pulse + period/2.0)
+            # after adding all pulses, increment current gate time
+            self.time_pulse += period
+
+
+    def add_tomography_pulses(self):
+        """Add tomography pulses to the end of the qubit xy waveforms
+
+        """
+        if not self.perform_tomography:
+            return
+        # get time for adding tomograph pulse
+        t = self.find_range_of_sequence()[1]
+        # TODO(morten): add code to add tomography pulses
+
+
+    def predistort_waveforms(self):
+        """Add tomography pulses to the end of the qubit xy waveforms
+
+        """
+        if not self.perform_predistortion:
+            return
+        # go through and predistort all waveforms
+        for n in range(self.n_qubit):
+            self.wave_xy = self.predistortions[n].predistort(self.wave_xy)
+
+
+    def perform_crosstalk_compensation(self):
+        """Compensate for Z-control crosstalk
+
+        """
+        if not self.compensate_crosstalk:
+            return
+        self.wave_z = self.crosstalk.compensate(self.wave_z)
+
+
+    def find_range_of_sequence(self):
+        """Find and return time at start and end of gate sequence
+
+        Returns
+        -------
+        times : list
+            List with two elements - Time at start and end of sequence.
+
+        """
+        # disable check based on pulses, always check actual waveforms
+        if False: #self.time_pulse > self.first_delay: 
+            # if pulses have been added with add_gates, get from pulse period
+            t0 = self.first_delay - self.period_1qb
+            t1 = self.time_pulse
+
+        else:
+            # find end by searching for last non-zero element
+            sum_all = np.zeros_like(self.wave_xy[0])
+            for n in range(self.n_qubit):
+                sum_all += np.abs(self.wave_xy[n])
+                sum_all += np.abs(self.wave_z[n])
+            non_zero = np.where(sum_all > 0)[0]
+            # if data is not all zero, add after last pulse
+            if len(non_zero) > 0:
+                t0 = max(0.0, (non_zero[0] - 1) / self.sample_rate)
+                t1 = (non_zero[-1] + 1) / self.sample_rate
+            else:
+                t0 = 0.0
+                t1 = len(sum_all) / self.sample_rate
+        return [t0, t1]
+
+
+    def generate_readout(self):
+        """Create read-out trig and waveform signals
+
+        """
+        # get positon of readout
+        if self.generate_readout_trig or self.generate_readout_trig:
+            t = self.find_range_of_sequence()[1] + self.readout_delay
+        # start with readout trig signal
+        if self.generate_readout_trig:
+            # create pulse object and insert into trig waveform
+            trig = Pulse(amplitude=self.readout_amplitude,
+                         width=0.0,
+                         plateau=self.readout_duration,
+                         shape=PulseShape.SQUARE)
+            self.add_single_pulse(self.readout_trig, trig, t, align_left=True)
+
+        # readout I/Q waveform
+        if self.generate_readout_iq:
+            t = self.time_pulse
+            self.readout_iq = self.readout.create_waveform(self.n_qubit, t)
+
+
+    def add_microwave_gate(self):
+        """Create waveform for gating microwave switch
+
+        """
+        if not self.generate_gate_switch:
+            return
+
+
+    def trim_waveforms(self):
+        """Trim waveforms to match length of sequence
+
+        """
+        if not self.trim_to_sequence:
+            return
+        # find range of sequence
+        (t0, t1) = self.find_range_of_sequence()
+        # don't trim past extent of microwave gate and readout trig, if in use
+        dt_start = 0.0
+        dt_end =  0.0 
+        if self.generate_gate_switch:
+            dt_start = min(0.0, (self.gate_delay - self.gate_overlap))
+            dt_end = max(0.0, (self.gate_delay + self.gate_overlap))
+        if self.generate_readout_trig:
+            # add a few extra points, to ensure read-out trig doesn't end high
+            dt_end = max(dt_end, self.readout_delay + self.readout_duration +
+                         1.0/self.sample_rate)
+        t0 += dt_start
+        t1 += dt_end
+
+        # get indices for start/end
+        i0 = max(0, int(np.floor(t0 * self.sample_rate)))
+        # check if don't trim beginning of waveform
+        if not self.trim_start:
+            i0 = 0
+        i1 = min(self.n_pts, int(np.ceil(t1 * self.sample_rate)))
+
+        # trim waveforms
+        for n in range(self.n_qubit):
+            self.wave_xy[n] = self.wave_xy[n][i0:i1] 
+            self.wave_z[n] = self.wave_z[n][i0:i1]
+            self.wave_gate[n] = self.wave_gate[n][i0:i1]
+        if self.generate_readout_trig:
+            self.readout_trig = self.readout_trig[i0:i1] 
+            # force readout trig to end in zero
+            self.readout_trig[-1] = 0.0
+
+
+    def set_parameters(self, config={}):
+        """Set base parameters using config from from Labber driver
+
+        Parameters
+        ----------
+        config : dict
+            Configuration as defined by Labber driver configuration window
+
+        """
+        # sequence parameters
+        d = dict(One=1, Two=2, Three=3, Four=4, Five=5, Six=6, Seven=7,
+                 Eight=8, Nine=9)
+        self.n_qubit = d[config.get('Number of qubits')]
+        self.period_1qb = config.get('Pulse period, 1-QB')
+        self.period_2qb = config.get('Pulse period, 2-QB')
+        self.local_xy = config.get('Local XY Control')
+
+        # waveform parameters
+        self.sample_rate = config.get('Sample rate')
+        self.n_pts = int(config.get('Number of points'))
+        self.first_delay = config.get('First pulse delay')
+        self.trim_to_sequence = config.get('Trim waveform to sequence')
+        self.trim_start = config.get('Trim both start and end')
+
+        # single-qubit pulses
+        for n, pulse in enumerate(self.pulses_1qb):
+            # pulses are indexed from 1 in Labber
+            m = n + 1
+            # global parameters
+            pulse.shape = PulseShape(config.get('Pulse type'))
+            pulse.truncation_range = config.get('Truncation range')
+            pulse.use_drag = config.get('Use DRAG')
+            # pulse shape
+            if config.get('Uniform pulse shape'):
+                pulse.width = config.get('Width')
+                pulse.plateau = config.get('Plateau')
+            else:
+                pulse.width = config.get('Width #%d' % m)
+                pulse.plateau = config.get('Plateau #%d' % m)
+            # pulse-specific parameters
+            pulse.amplitude = config.get('Amplitude #%d' % m)
+            pulse.frequency = config.get('Frequency #%d' % m)
+            pulse.drag_coefficient = config.get('DRAG scaling #%d' % m)
+
+        # two-qubit pulses
+        for n, pulse in enumerate(self.pulses_2qb):
+            # pulses are indexed from 1 in Labber
+            s = ' #%d%d' % (n + 1, n + 2)
+            # global parameters
+            pulse.shape = PulseShape(config.get('Pulse type, 2QB'))
+            pulse.truncation_range = config.get('Truncation range, 2QB')
+            pulse.z_pulse = True
+            # pulse shape
+            if config.get('Uniform 2QB pulses'):
+                pulse.width = config.get('Width, 2QB')
+                pulse.plateau = config.get('Plateau, 2QB')
+            else:
+                pulse.width = config.get('Width, 2QB' + s)
+                pulse.plateau = config.get('Plateau, 2QB' + s)
+            # pulse-specific parameters
+            pulse.amplitude = config.get('Amplitude, 2QB' + s)
+
+        # tomography
+        self.perform_tomography = config.get('Generate tomography pulse', False)
+
+        # predistortion
+        self.perform_predistortion = config.get('Predistort waveforms', False)
+        # update all predistorting objects
+        for p in self.predistortions:
+            p.set_parameters(config)
+
+        # crosstalk
+        self.compensate_crosstalk = config.get('Compensate cross-talk', False)
+        self.crosstalk.set_parameters(config)
+
+        # gate switch waveform
+        self.generate_gate_switch = config.get('Generate gate')
+        self.uniform_gate = config.get('Uniform gate')
+        self.gate_delay = config.get('Gate delay')
+        self.gate_overlap = config.get('Gate overlap')
+        self.minimal_gate_time = config.get('Minimal gate time')
+
+        # readout, trig settings
+        self.generate_readout_trig = config.get('Generate readout trig')
+        self.readout_delay = config.get('Readout delay')
+        self.readout_amplitude = config.get('Readout trig amplitude')
+        self.readout_duration = config.get('Readout trig duration')
+
+        # readout, wave settings
+        self.generate_readout_iq = config.get('Generate readout wavefrom')
+        self.readout.set_parameters(config)
+
+
+
+class Rabi(Sequence):
+    """Sequence for driving Rabi oscillations in multiple qubits"""
+
+    def generate_sequence(self, config):
+        """Generate sequence by adding gates/pulses to waveforms"""
+        self.add_gates([[Gate.Xp,  None    ], 
+                       [None,     Gate.Y2m],
+                       [Gate.Xp,  Gate.Xp]])
+
+
+
+class CPMG(Sequence):
+    """Sequence for driving Rabi oscillations in multiple qubits"""
+
+    def generate_sequence(self, config):
+        """Generate sequence by adding gates/pulses to waveforms"""
+        pass
+
+
+
+class PulseTrain(Sequence):
+    """Sequence for driving Rabi oscillations in multiple qubits"""
+
+    def generate_sequence(self, config):
+        """Generate sequence by adding gates/pulses to waveforms"""
+        pass
+
+
+
+
+
+if __name__ == '__main__':
+    pass
+    Pulse()
