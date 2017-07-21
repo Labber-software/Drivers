@@ -2,6 +2,11 @@ import ctypes, os
 from ctypes import c_int, c_uint8, c_uint16, c_uint32, c_int32, c_float, c_char_p, c_void_p, c_long, byref, windll
 import numpy as np
 
+# add logger, to allow logging to Labber's instrument log 
+import logging
+log = logging.getLogger('LabberDriver')
+import time
+
 # define constants
 ADMA_NPT = 0x200
 ADMA_EXTERNAL_STARTCAPTURE = 0x1
@@ -259,9 +264,6 @@ class AlazarTechDigitizer():
                       funcStop=None, funcProgress=None, timeout=None, bufferSize=512,
                       firstTimeout=None, maxBuffers=1024):
         """read traces in NPT AutoDMA mode, convert to float, average to single trace"""
-        import logging
-        lg = logging.getLogger('LabberDriver')
-        import time
         t0 = time.clock()
         lT = []
 
@@ -389,9 +391,8 @@ class AlazarTechDigitizer():
 
             timeout_ms = int(firstTimeout*1000)
 
-            lg.log(20, str(lT))
+            log.info(str(lT))
             lT = []
-            # lAvTime = []
 
             while (buffersCompleted < buffersPerAcquisition):
                 # Wait for the buffer at the head of the list of available
@@ -442,9 +443,8 @@ class AlazarTechDigitizer():
                         vData[1] = range2 * (rs[:,1]  - offset)
 
                 # lT.append('Sort/Avg: %.1f ms' % ((time.clock()-t0)*1000))
-                # lg.log(20, str(lT))
+                # log.info(str(lT))
                 # lT = []
-                # lAvTime.append((time.clock()-t0)*1000)
                 #
                 # Sample codes are unsigned by default. As a result:
                 # - 0x00 represents a negative full scale input signal.
@@ -461,12 +461,12 @@ class AlazarTechDigitizer():
                 pass
             lT.append('Abort: %.1f ms' % ((time.clock()-t0)*1000))
         # normalize        
-        # lg.log(20, 'Average: %.1f ms' % np.mean(lAvTime))
+        # log.info('Average: %.1f ms' % np.mean(lAvTime))
         vData[0] /= buffersPerAcquisition
         vData[1] /= buffersPerAcquisition
         # # log timing information
         lT.append('Done: %.1f ms' % ((time.clock()-t0)*1000))
-        lg.log(20, str(lT))
+        log.info(str(lT))
         #return data - requested vector length, not restricted to 128 multiple
         if nPtsOut != (samplesPerRecordValue*nRecord):
             if len(vData[0])>0:
