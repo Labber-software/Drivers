@@ -664,38 +664,6 @@ class Sequence(object):
         self.readout.set_parameters(config)
 
 
-
-class Rabi(Sequence):
-    """Sequence for driving Rabi oscillations in multiple qubits"""
-
-    def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms"""
-        self.add_gates([[Gate.Xp,  None    ], 
-                       [None,     Gate.Y2m],
-                       [Gate.Xp,  Gate.Xp]])
-
-
-
-class CPMG(Sequence):
-    """Sequence for driving Rabi oscillations in multiple qubits"""
-
-    def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms"""
-        pass
-
-
-
-class PulseTrain(Sequence):
-    """Sequence for driving Rabi oscillations in multiple qubits"""
-
-    def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms"""
-        pass
-
-
-
-
-
 if __name__ == '__main__':
     pass
     Pulse()
