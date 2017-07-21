@@ -69,9 +69,15 @@ class Driver(LabberDriver):
             n = int(quant.name[-1]) - 1
             # get correct vector
             if name == 'Trace - I':
-                value = self.values['wave_xy'][n].real
+                if self.getValue('Swap IQ'):
+                    value = self.values['wave_xy'][n].imag
+                else:
+                    value = self.values['wave_xy'][n].real
             elif name == 'Trace - Q':
-                value = self.values['wave_xy'][n].imag
+                if self.getValue('Swap IQ'):
+                    value = self.values['wave_xy'][n].real
+                else:
+                    value = self.values['wave_xy'][n].imag
             elif name == 'Trace - Z':
                 value = self.values['wave_z'][n]
             elif name == 'Trace - G':
@@ -85,7 +91,6 @@ class Driver(LabberDriver):
 
         # return data as dict with sampling information
         dt = 1 / self.sequence.sample_rate
-        self.log(dt)
         value = quant.getTraceDict(value, dt=dt)
         return value
 
