@@ -40,8 +40,6 @@ class CPMG(Sequence):
         edge_to_edge = config['Edge-to-edge pulses']
         t0 = self.first_delay
 
-
-
         # select type of refocusing pi pulse
         gate_pi = Gate.Yp if pi_to_q else Gate.Xp
 
