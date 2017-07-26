@@ -249,6 +249,14 @@ class Sequence(object):
         # add tomography
         self.add_tomography_pulses()
 
+        # collapse all xy pulses to one waveform if no local XY control
+        if not self.local_xy:
+            # sum all waveforms to first one
+            self.wave_xy[0] = np.sum(self.wave_xy[:self.n_qubit], 0)
+            # clear other waveforms
+            for n in range(1, self.n_qubit):
+                self.wave_xy[n][:] = 0.0
+
         # I/Q waveform predistortion
         self.predistort_waveforms()
 
@@ -458,8 +466,9 @@ class Sequence(object):
         if not self.perform_predistortion:
             return
         # go through and predistort all waveforms
-        for n in range(self.n_qubit):
-            self.wave_xy = self.predistortions[n].predistort(self.wave_xy)
+        n_wave = self.n_qubit if self.local_xy else 1
+        for n in range(n_wave):
+            self.wave_xy[n] = self.predistortions[n].predistort(self.wave_xy[n])
 
 
     def perform_crosstalk_compensation(self):
@@ -531,8 +540,9 @@ class Sequence(object):
         """
         if not self.generate_gate_switch:
             return
+        n_wave = self.n_qubit if self.local_xy else 1
         # go through all waveforms
-        for n, wave in enumerate(self.wave_xy[:self.n_qubit]):
+        for n, wave in enumerate(self.wave_xy[:n_wave]):
             if self.uniform_gate:
                 # the uniform gate is all ones
                 gate = np.ones_like(wave)
@@ -637,7 +647,7 @@ class Sequence(object):
         self.n_qubit = d[config.get('Number of qubits')]
         self.period_1qb = config.get('Pulse period, 1-QB')
         self.period_2qb = config.get('Pulse period, 2-QB')
-        self.local_xy = config.get('Local XY Control')
+        self.local_xy = config.get('Local XY control')
 
         # waveform parameters
         self.sample_rate = config.get('Sample rate')
