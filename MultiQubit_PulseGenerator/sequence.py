@@ -530,8 +530,14 @@ class Sequence(object):
 
         # readout I/Q waveform
         if self.generate_readout_iq:
-            t = self.time_pulse
-            self.readout_iq = self.readout.create_waveform(self.n_qubit, t)
+            wave = self.readout.create_waveform(t)
+            # if not matching wave sizes, simply replace initialized waveform 
+            if not self.readout.match_main_size:
+                self.readout_iq = wave
+            else:
+                i0 = int(t * self.sample_rate)
+                i1 = min(len(self.readout_iq), i0 + len(wave))
+                self.readout_iq[i0:i1] = wave[:(i1 - i0)]
 
 
     def add_microwave_gate(self):
@@ -611,6 +617,10 @@ class Sequence(object):
             # add a few extra points, to ensure read-out trig doesn't end high
             dt_end = max(dt_end, self.readout_delay + self.readout_duration +
                          1.0 / self.sample_rate)
+        # same thing for I/Q readout
+        if self.generate_readout_iq and self.readout.match_main_size:
+            dt_end = max(dt_end, self.readout_delay + self.readout.duration +
+                         1.0 / self.sample_rate)
         t0 += dt_start
         t1 += dt_end
 
@@ -630,6 +640,8 @@ class Sequence(object):
             self.readout_trig = self.readout_trig[i0:i1]
             # force readout trig to end in zero
             self.readout_trig[-1] = 0.0
+        if self.generate_readout_iq and self.readout.match_main_size:
+            self.readout_iq = self.readout_iq[i0:i1]
 
 
     def set_parameters(self, config={}):
@@ -721,7 +733,7 @@ class Sequence(object):
         self.readout_duration = config.get('Readout trig duration')
 
         # readout, wave settings
-        self.generate_readout_iq = config.get('Generate readout wavefrom')
+        self.generate_readout_iq = config.get('Generate readout waveform')
         self.readout.set_parameters(config)
 
 
