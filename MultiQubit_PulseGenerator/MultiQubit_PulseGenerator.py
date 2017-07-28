@@ -85,9 +85,10 @@ class Driver(LabberDriver):
 
         elif quant.name == 'Trace - Readout trig':
             value = self.values['readout_trig']
-
-        elif quant.name == 'Trace - Readout IQ':
-            value = self.values['readout_iq']
+        elif quant.name == 'Trace - Readout I':
+            value = self.values['readout_iq'].real
+        elif quant.name == 'Trace - Readout Q':
+            value = self.values['readout_iq'].imag
 
         # return data as dict with sampling information
         dt = 1 / self.sequence.sample_rate
