@@ -20,6 +20,7 @@ MAX_QUBIT = 9
 class Gate(Enum):
     """Define possible qubit gates"""
     # single-qubit gates
+    I = -1
     Xp = 0
     Xm = 1
     X2p = 2
@@ -34,7 +35,8 @@ class Gate(Enum):
 
 # define set of one- and two-qubit gates
 ONE_QUBIT_GATES = (Gate.Xp, Gate.Xm, Gate.X2p, Gate.X2m,
-                   Gate.Yp, Gate.Ym, Gate.Y2p, Gate.Y2m,)
+                   Gate.Yp, Gate.Ym, Gate.Y2p, Gate.Y2m,
+                   Gate.I)
 TWO_QUBIT_GATES = (Gate.CPh,)
 
 
@@ -379,6 +381,8 @@ class Sequence(object):
             # negate if negative pulse
             if gate in (Gate.Xm, Gate.X2m, Gate.Ym, Gate.Y2m):
                 pulse.amplitude = -pulse.amplitude
+            if gate in (Gate.I):
+                pulse.amplitude = 0
 
             # add pulse to waveform
             self.add_single_pulse(qubit, pulse, t0, align_left=align_left)
