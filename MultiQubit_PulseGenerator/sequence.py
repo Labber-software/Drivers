@@ -381,7 +381,7 @@ class Sequence(object):
             # negate if negative pulse
             if gate in (Gate.Xm, Gate.X2m, Gate.Ym, Gate.Y2m):
                 pulse.amplitude = -pulse.amplitude
-            if gate in (Gate.I):
+            if gate is (Gate.I):
                 pulse.amplitude = 0
 
             # add pulse to waveform
