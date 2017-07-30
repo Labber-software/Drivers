@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 from BaseDriver import LabberDriver
 from sequence_builtin import Rabi, CPMG, PulseTrain 
+from sequence_rb import SingleQubit_RB
+
 
 import importlib
 
@@ -30,6 +32,8 @@ class Driver(LabberDriver):
                     self.sequence = CPMG()
                 elif value == 'Pulse train':
                     self.sequence = PulseTrain()
+                elif value == '1QB Randomized Benchmarking':
+                    self.sequence = SingleQubit_RB()
 
         elif quant.name =='Custom python file':
             # for custom python files
