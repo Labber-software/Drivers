@@ -55,7 +55,7 @@ class CPMG(Sequence):
                 self.add_single_gate(n, Gate.Xp, t0)
                 # delay the reaodut by creating a very small pulse
                 small_pulse = copy(pulse)
-                small_pulse.amplitude = 1E-6 * pulse.amplitude 
+                small_pulse.amplitude = 1E-6 * pulse.amplitude
                 self.add_single_pulse(n, small_pulse, t0 + duration)
                 continue
 
@@ -68,12 +68,12 @@ class CPMG(Sequence):
                 time_pi = []
             elif n_pulse == 1:
                 # one pulse, echo experiment
-                time_pi = [t0 + width + 0.5 * duration,]
+                time_pi = [t0 + width + 0.5 * duration, ]
             elif n_pulse > 1:
                 # figure out timing of pi pulses
                 period = duration / n_pulse
-                time_pi = t0 + width + 0.5 * period + \
-                          (period + width) * np.arange(n_pulse)
+                time_pi = (t0 + width + 0.5 * period +
+                           (period + width) * np.arange(n_pulse))
             # add pi pulses, one by one
             for t in time_pi:
                 self.add_single_gate(n, gate_pi, t)
