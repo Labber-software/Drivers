@@ -284,8 +284,7 @@ class Sequence(object):
         return data
 
 
-    def add_single_pulse(self, qubit, pulse, t0, z_pulse=False,
-                         align_left=False):
+    def add_single_pulse(self, qubit, pulse, t0, align_left=False):
         """Add single pulse to specified qubit waveform
 
         Parameters
