@@ -41,7 +41,7 @@ class Readout(object):
 
         Parameters
         ----------
-        t_start : float 
+        t_start : float
             Start time for readout waveform, relative to start of sequence
 
         Returns
@@ -50,6 +50,8 @@ class Readout(object):
             Complex waveforms with I/Q signal for qubit reaodut
 
         """
+        # ignore time stamp
+        t_start = 0.0
         # create time and output waveform
         n_pts = int(self.duration * self.sample_rate)
         t = t_start + np.arange(n_pts, dtype=float) / self.sample_rate
@@ -78,4 +80,3 @@ class Readout(object):
 
 if __name__ == '__main__':
     pass
-
