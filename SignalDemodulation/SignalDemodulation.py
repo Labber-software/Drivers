@@ -9,7 +9,7 @@ class Error(Exception):
 
 class Driver(InstrumentDriver.InstrumentWorker):
     """ This class implements a demodulation driver"""
-    
+
     def performOpen(self, options={}):
         """Perform the operation of opening the instrument connection"""
         pass
@@ -36,13 +36,13 @@ class Driver(InstrumentDriver.InstrumentWorker):
             # calculate I/Q signal here
             value = self.getIQAmplitudes()
         elif quant.name.startswith('Value #'):
-    		index = int(quant.name[-1])
-    		sDemodFreq = 'Mod. frequency #'+str(index)
-    		dFreq = self.getValue(sDemodFreq)
-    		value = np.mean(self.getIQAmplitudes_MultiFreq(dFreq))
-		else:
+            index = int(quant.name[-1])
+            sDemodFreq = 'Mod. frequency #' + str(index)
+            dFreq = self.getValue(sDemodFreq)
+            value = np.mean(self.getIQAmplitudes_MultiFreq(dFreq))
+        else:
             # just return the quantity value
-			value = quant.getValue()
+            value = quant.getValue()
         return value
 
     def getIQAmplitudes(self):
@@ -51,7 +51,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         dFreq = self.getValue('Modulation frequency')
         skipStart = self.getValue('Skip start')
         nSegment = int(self.getValue('Number of segments'))
-		# nSegment = 1
+        # nSegment = 1
         # get input data from dict, with keys {'y': value, 't0': t0, 'dt': dt}
         traceIn = self.getValue('Input data')
         if traceIn is None:
