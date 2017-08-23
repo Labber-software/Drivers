@@ -61,7 +61,26 @@ class PulseTrain(Sequence):
         # add list of gates to sequence 
         self.add_gates(gates)
 
+class CZtest(Sequence):
+    """Sequence for multi-qubit pulse trains, for pulse calibrations"""
 
+    def generate_sequence(self, config):
+        """Generate sequence by adding gates/pulses to waveforms"""
+        # get parameters
+        n_pulse = int(config['# of pulses, CZtest'])
+
+        # create list with gates
+        gates = []        
+        for n in range(n_pulse):
+            # check if alternate pulses
+            gate = Gate.CPh
+            # create list with same gate for all active qubits 
+            gate_qubits = [gate for q in range(self.n_qubit)]
+            # append to list of gates
+            gates.append(gate_qubits)
+
+        # add list of gates to sequence 
+        self.add_gates(gates)
 
 if __name__ == '__main__':
     pass

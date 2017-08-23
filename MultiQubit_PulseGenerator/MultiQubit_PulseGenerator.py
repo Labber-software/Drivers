@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from BaseDriver import LabberDriver
-from sequence_builtin import Rabi, CPMG, PulseTrain 
+from sequence_builtin import Rabi, CPMG, PulseTrain, CZtest
 
 import importlib
 
@@ -30,6 +30,8 @@ class Driver(LabberDriver):
                     self.sequence = CPMG()
                 elif value == 'Pulse train':
                     self.sequence = PulseTrain()
+                elif value == 'CZtest':
+                    self.sequence = CZtest()
 
         elif quant.name =='Custom python file':
             # for custom python files
