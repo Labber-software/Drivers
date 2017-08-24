@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from BaseDriver import LabberDriver
 from sequence_builtin import Rabi, CPMG, PulseTrain, CZgates, CZecho
+from sequence_rb import SingleQubit_RB
 
 import importlib
 
@@ -34,6 +35,8 @@ class Driver(LabberDriver):
                     self.sequence = CZgates()
                 elif value == 'C-phase Echo':
                     self.sequence = CZecho()
+                elif value == '1QB Randomized Benchmarking':
+                    self.sequence = SingleQubit_RB()
 
         elif quant.name =='Custom python file':
             # for custom python files
@@ -89,9 +92,10 @@ class Driver(LabberDriver):
 
         elif quant.name == 'Trace - Readout trig':
             value = self.values['readout_trig']
-
-        elif quant.name == 'Trace - Readout IQ':
-            value = self.values['readout_iq']
+        elif quant.name == 'Trace - Readout I':
+            value = self.values['readout_iq'].real
+        elif quant.name == 'Trace - Readout Q':
+            value = self.values['readout_iq'].imag
 
         # return data as dict with sampling information
         dt = 1 / self.sequence.sample_rate

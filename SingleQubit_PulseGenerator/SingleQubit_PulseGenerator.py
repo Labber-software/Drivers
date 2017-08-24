@@ -402,8 +402,19 @@ class Driver(InstrumentDriver.InstrumentWorker):
                         self.lGate[n][-1] = 0.0
                 if bReadout:
                     self.vReadout = self.vReadout[iFirst:iLast]
-            
-            
+        # add zeros to front of waveform, if wanted
+        if self.getValue('Buffer start to restore size'):
+            vBuf = np.zeros(nPoints - len(self.lI[0]))
+            self.vTime = np.r_[vBuf, self.vTime]
+            for n, (vI, vQ) in enumerate(zip(self.lI, self.lQ)):
+                self.lI[n] = np.r_[vBuf, vI]
+                self.lQ[n] = np.r_[vBuf, vQ]
+                if bGate:
+                    self.lGate[n] = np.r_[vBuf, self.lGate[n]]
+            if bReadout:
+                self.vReadout = np.r_[vBuf, self.vReadout]
+
+
 
     def generateSequence(self, startTime):
         # get config values
