@@ -657,7 +657,7 @@ class Sequence(object):
 
         """
         # sequence parameters
-        d = dict(One=1, Two=2, Three=3, Four=4, Five=5, Six=6, Seven=7,
+        d = dict(Zero=0, One=1, Two=2, Three=3, Four=4, Five=5, Six=6, Seven=7,
                  Eight=8, Nine=9)
         self.n_qubit = d[config.get('Number of qubits')]
         self.period_1qb = config.get('Pulse period, 1-QB')
@@ -697,17 +697,42 @@ class Sequence(object):
             s = ' #%d%d' % (n + 1, n + 2)
             # global parameters
             pulse.shape = PulseShape(config.get('Pulse type, 2QB'))
-            pulse.truncation_range = config.get('Truncation range, 2QB')
             pulse.z_pulse = True
-            # pulse shape
-            if config.get('Uniform 2QB pulses'):
-                pulse.width = config.get('Width, 2QB')
-                pulse.plateau = config.get('Plateau, 2QB')
+            if config.get('Pulse type, 2QB') == 'CZ':
+                pulse.F_Terms = d[config.get('Fourier terms, 2QB')]
+                if config.get('Uniform 2QB pulses'):
+                    pulse.width = config.get('Width, 2QB')
+                else:
+                    pulse.width = config.get('Width, 2QB' + s)
+
+                # Get Fourier values
+                if d[config.get('Fourier terms, 2QB')] == 4 : 
+                    pulse.Lcoeff = np.array([config.get('L1, 2QB' + s),config.get('L2, 2QB' + s),config.get('L3, 2QB' + s),config.get('L4, 2QB' + s)])
+                elif d[config.get('Fourier terms, 2QB')] == 3 :
+                    pulse.Lcoeff = np.array([config.get('L1, 2QB' + s),config.get('L2, 2QB' + s),config.get('L3, 2QB' + s)])
+                elif d[config.get('Fourier terms, 2QB')] == 2 :
+                    pulse.Lcoeff = np.array([config.get('L1, 2QB' + s),config.get('L2, 2QB' + s)])
+                elif d[config.get('Fourier terms, 2QB')] == 1 :
+                    pulse.Lcoeff = np.array([config.get('L1, 2QB' + s)])
+                elif d[config.get('Fourier terms, 2QB')] == 0 :
+                    pulse.Lcoeff = np.array([1])
+
+                pulse.Coupling = config.get('Coupling, 2QB' + s)
+                pulse.Offset = config.get('f11-f20 initial, 2QB' + s)
+                pulse.amplitude = config.get('f11-f20 final, 2QB' + s)
+                pulse.dfdV = config.get('df/dV, 2QB' + s)
+
             else:
-                pulse.width = config.get('Width, 2QB' + s)
-                pulse.plateau = config.get('Plateau, 2QB' + s)
-            # pulse-specific parameters
-            pulse.amplitude = config.get('Amplitude, 2QB' + s)
+                pulse.truncation_range = config.get('Truncation range, 2QB')
+                # pulse shape
+                if config.get('Uniform 2QB pulses'):
+                    pulse.width = config.get('Width, 2QB')
+                    pulse.plateau = config.get('Plateau, 2QB')
+                else:
+                    pulse.width = config.get('Width, 2QB' + s)
+                    pulse.plateau = config.get('Plateau, 2QB' + s)
+                # pulse-specific parameters
+                pulse.amplitude = config.get('Amplitude, 2QB' + s)
 
         # tomography
         self.perform_tomography = config.get('Generate tomography pulse', False)

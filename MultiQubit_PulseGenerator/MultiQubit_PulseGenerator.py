@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 from BaseDriver import LabberDriver
-from sequence_builtin import Rabi, CPMG, PulseTrain 
+from sequence_builtin import Rabi, CPMG, PulseTrain, CZgates, CZecho
 from sequence_rb import SingleQubit_RB
-
 
 import importlib
 
@@ -32,6 +31,10 @@ class Driver(LabberDriver):
                     self.sequence = CPMG()
                 elif value == 'Pulse train':
                     self.sequence = PulseTrain()
+                elif value == 'C-phase Pulses':
+                    self.sequence = CZgates()
+                elif value == 'C-phase Echo':
+                    self.sequence = CZecho()
                 elif value == '1QB Randomized Benchmarking':
                     self.sequence = SingleQubit_RB()
 

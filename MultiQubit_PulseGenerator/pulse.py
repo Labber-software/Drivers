@@ -8,7 +8,7 @@ class PulseShape(Enum):
     GAUSSIAN = 'Gaussian'
     SQUARE = 'Square'
     RAMP = 'Ramp'
-
+    CZ = 'CZ'
 
 class Pulse(object):
     """This class represents a pulse for qubit rotations.
@@ -48,7 +48,7 @@ class Pulse(object):
 
     """
 
-    def __init__(self, amplitude=1.0, width=10E-9, plateau=0.0,
+    def __init__(self,F_Terms=1,Coupling=20E6,Offset=300E6,Lcoeff = np.array([0.3]),dfdV=0.5E9,period_2qb=50E-9, amplitude=0.5, width=10E-9, plateau=0.0,
                  frequency=0.0, phase=0.0, shape=PulseShape.GAUSSIAN,
                  use_drag=False, drag_coefficient=0.0, truncation_range=5.0,
                  z_pulse=False):
@@ -59,11 +59,18 @@ class Pulse(object):
         self.frequency = frequency
         self.phase = phase
         self.shape = shape
-        self.use_drag = use_drag
+        self.use_drag = use_drag    
         self.drag_coefficient = drag_coefficient
         self.truncation_range = truncation_range
         self.z_pulse = z_pulse
-
+        
+        # For 2-qubit gates
+        self.F_Terms = F_Terms
+        self.Coupling = Coupling
+        self.Offset = Offset
+        self.Lcoeff = Lcoeff
+        self.dfdV = dfdV
+        self.period_2qb = period_2qb
 
     def total_duration(self):
         """Calculate total pulse duration"""
@@ -74,6 +81,8 @@ class Pulse(object):
             duration = 2 * self.width + self.plateau
         elif self.shape == PulseShape.GAUSSIAN:
             duration = self.truncation_range * self.width + self.plateau
+        elif self.shape == PulseShape.CZ:
+            duration = self.width
         return duration
 
 
@@ -99,6 +108,8 @@ class Pulse(object):
             values = ((t >= (t0 - (self.width + self.plateau) / 2)) &
                       (t < (t0 + (self.width + self.plateau) / 2)))
 
+            values = values*self.amplitude
+
         elif self.shape == PulseShape.RAMP:
             # rising and falling slopes
             vRise = ((t - (t0 - self.plateau / 2 - self.width)) /
@@ -110,6 +121,8 @@ class Pulse(object):
             vFall[vFall < 0.0] = 0.0
             vFall[vFall > 1.0] = 1.0
             values = vRise * vFall
+
+            values = values*self.amplitude
 
         elif self.shape == PulseShape.GAUSSIAN:
             # width is two t std
@@ -137,9 +150,41 @@ class Pulse(object):
                         (t >= (t0 + self.plateau / 2)) *
                         np.exp(-(t - (t0 + self.plateau / 2))**2 / (2 * std**2))
                     )
+            values = values*self.amplitude
 
-        # scale to correct amplitude
-        values = self.amplitude * values
+        elif self.shape == PulseShape.CZ:
+
+            # Defining initial and final angles
+            n_points = 1000
+            theta_i = np.arctan(self.Coupling/self.Offset)
+            theta_f = np.arctan(self.Coupling/(self.amplitude))
+            n = np.arange(1,self.F_Terms+1,1)
+
+            # Load fourier components and correct for pulse amplitude
+            self.Lcoeff *= (theta_f-theta_i)/(2*np.sum(self.Lcoeff[range(0,self.F_Terms,2)]))
+
+            # Calculate pulse width in tau variable
+            tau = np.linspace(0,1,n_points)
+            theta_tau = np.zeros(n_points)
+            for i in range(n_points) :
+                theta_tau[i] = np.sum(self.Lcoeff*(1 - np.cos(2*np.pi*n*tau[i]))) + theta_i
+            t_tau = np.trapz(np.sin(theta_tau),x=tau)
+            Width_tau = self.width/t_tau
+
+            # Calculating angle and real time as functions of tau
+            tau = np.linspace(0,Width_tau,n_points)
+            t_tau = np.zeros(n_points)
+            for i in range(n_points) :
+                theta_tau[i] = np.sum(self.Lcoeff*(1 - np.cos(2*np.pi*n*tau[i]/Width_tau) )) + theta_i
+                if i > 0 :
+                    t_tau[i] = np.trapz(np.sin(theta_tau[0:i]),x=tau[0:i])
+
+            theta_t = np.ones(len(t))*theta_i
+            for i in range(len(t)):
+                if 0<(t[i]-t0+self.width/2)<self.width:
+                    theta_t[i] = np.interp(t[i]-t0+self.width/2,t_tau,theta_tau)
+            values = (self.Coupling/np.tan(theta_t))/self.dfdV - (self.Coupling/np.tan(theta_i))/self.dfdV
+
         # return pulse envelope
         return values
 
