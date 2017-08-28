@@ -82,7 +82,7 @@ class Pulse(object):
         elif self.shape == PulseShape.GAUSSIAN:
             duration = self.truncation_range * self.width + self.plateau
         elif self.shape == PulseShape.CZ:
-            duration = self.width
+            duration = self.width + self.plateau
         return duration
 
 
@@ -181,8 +181,12 @@ class Pulse(object):
 
             theta_t = np.ones(len(t))*theta_i
             for i in range(len(t)):
-                if 0<(t[i]-t0+self.width/2)<self.width:
-                    theta_t[i] = np.interp(t[i]-t0+self.width/2,t_tau,theta_tau)
+                if 0<(t[i]-t0+self.plateau/2)<self.plateau:
+                    theta_t[i] = theta_f
+                elif 0<(t[i]-t0+self.width/2+self.plateau/2)<(self.width + self.plateau)/2:
+                    theta_t[i] = np.interp(t[i]-t0+self.width/2+self.plateau/2,t_tau,theta_tau)
+                elif 0<(t[i]-t0+self.width/2+self.plateau/2)<(self.width + self.plateau):
+                    theta_t[i] = np.interp(t[i]-t0+self.width/2-self.plateau/2,t_tau,theta_tau)
             values = (self.Coupling/np.tan(theta_t))/self.dfdV - (self.Coupling/np.tan(theta_i))/self.dfdV
 
         # return pulse envelope

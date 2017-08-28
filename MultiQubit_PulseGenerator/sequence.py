@@ -702,8 +702,10 @@ class Sequence(object):
                 pulse.F_Terms = d[config.get('Fourier terms, 2QB')]
                 if config.get('Uniform 2QB pulses'):
                     pulse.width = config.get('Width, 2QB')
+                    pulse.plateau = config.get('Plateau, 2QB')
                 else:
                     pulse.width = config.get('Width, 2QB' + s)
+                    pulse.plateau = config.get('Plateau, 2QB')
 
                 # Get Fourier values
                 if d[config.get('Fourier terms, 2QB')] == 4 : 
@@ -714,8 +716,6 @@ class Sequence(object):
                     pulse.Lcoeff = np.array([config.get('L1, 2QB' + s),config.get('L2, 2QB' + s)])
                 elif d[config.get('Fourier terms, 2QB')] == 1 :
                     pulse.Lcoeff = np.array([config.get('L1, 2QB' + s)])
-                elif d[config.get('Fourier terms, 2QB')] == 0 :
-                    pulse.Lcoeff = np.array([1])
 
                 pulse.Coupling = config.get('Coupling, 2QB' + s)
                 pulse.Offset = config.get('f11-f20 initial, 2QB' + s)
