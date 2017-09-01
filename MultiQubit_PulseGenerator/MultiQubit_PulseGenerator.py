@@ -4,6 +4,7 @@ from sequence_builtin import Rabi, CPMG, PulseTrain, CZgates, CZecho
 from sequence_rb import SingleQubit_RB
 
 import importlib
+import numpy as np
 
 
 class Driver(LabberDriver):
@@ -51,7 +52,20 @@ class Driver(LabberDriver):
 
         """
         # check type of quantity
-        if quant.isVector():
+        if quant.name.startswith('Voltage, QB'):
+            # perform demodulation, check if config is updated
+            if self.isConfigUpdated():
+                # update sequence object with current driver configuation
+                config = self.instrCfg.getValuesDict()
+                self.sequence.set_parameters(config)
+            # get qubit index and waveforms
+            n = int(quant.name.split('Voltage, QB')[1]) - 1
+            signal = self.getValue('Demodulation - Input')
+            ref = self.getValue('Demodulation - Reference')
+            # perform demodulation
+            value = np.mean(self.sequence.readout.demodulate(n, signal, ref))
+
+        elif quant.isVector():
             # traces, check if waveform needs to be re-calculated
             if self.isConfigUpdated():
                 # update sequence object with current driver configuation

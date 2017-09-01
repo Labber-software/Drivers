@@ -2,7 +2,7 @@
 import numpy as np
 
 class Readout(object):
-    """This class is used to generate multi-tone qubit readout pulses
+    """This class is used to generate and demodulate multi-tone qubit readout
 
     """
 
@@ -24,6 +24,11 @@ class Readout(object):
         # self.phases = 2 * np.pi * np.random.rand(max_qubit)
         self.phases = 2 * np.pi * np.array([0.8847060, 0.2043214, 0.9426104,
             0.6947334, 0.8752361, 0.2246747, 0.6503154, 0.7305004, 0.1309068])
+        # demodulation
+        self.demod_skip = 0.0
+        self.demod_length = 1.0E-6
+        self.freq_offset = 0.0
+        self.use_phase_ref = False
 
 
     def set_parameters(self, config={}):
@@ -54,6 +59,11 @@ class Readout(object):
                 linewidth = config.get('Resonator linewidth')
                 self.measured_rise[n] = 1.0 / (2 * np.pi * linewidth)
                 self.target_rise[n] = config.get('Target rise time')
+        # demodulation
+        self.demod_skip = config.get('Demodulation - Skip')
+        self.demod_length = config.get('Demodulation - Length')
+        self.freq_offset = config.get('Demodulation - Frequency offset')
+        self.use_phase_ref = config.get('Use phase reference signal')
 
 
     def create_waveform(self, t_start=0.0):
@@ -105,6 +115,68 @@ class Readout(object):
                                   y.imag * np.sin(omega * t - phi + np.pi / 2))
 
         return waveform
+
+
+    def demodulate(self, n, signal, ref=None):
+        """Calculate complex signal from data and reference
+
+        Parameters
+        ----------
+        n : int
+            Qubit number for which to demodulate
+
+        signal : dict
+            Dictionary with signal data
+
+        ref : dict
+            Dictionary with reference data
+
+        Returns
+        -------
+        values : complex numpy array
+            Complex array matching number of segments in input
+
+        """
+        # get parameters
+        frequency = self.frequencies[n] - self.freq_offset
+        n_segment = 1
+        # get input data from dict, with keys {'y': value, 't0': t0, 'dt': dt}
+        if signal is None:
+            return np.zeros(n_segment, dtype=complex)
+        vY = signal['y']     
+        dt = signal['dt']
+        # avoid exceptions if no time step is given
+        if dt == 0:
+            dt = 1.0
+        # get indices for data trimming
+        n0 = int(round(self.demod_skip / dt))
+        n_total = vY.size
+        length = 1 + int(round(self.demod_length / dt))
+        length = min(length, int(n_total / n_segment) - n0)
+        if length <= 1:
+            return np.zeros(n_segment, dtype=complex)
+
+        # define data to use, put in 2d array of segments
+        vData = np.reshape(vY, (n_segment, int(n_total / n_segment)))
+        # calculate cos/sin vectors, allow segmenting
+        vTime = dt * (n0 + np.arange(length, dtype=float))
+        vCos = np.cos(2 * np.pi * vTime * frequency)
+        vSin = np.sin(2 * np.pi * vTime * frequency)
+        # calc I/Q
+        dI = 2 * np.trapz(vCos * vData[:, n0:n0+length]) / float(length - 1)
+        dQ = 2 * np.trapz(vSin * vData[:, n0:n0+length]) / float(length - 1)
+        values = dI + 1j*dQ
+        if self.use_phase_ref and ref is not None:
+            # skip reference if trace length doesn't match
+            if len(ref['y']) != len(vY):
+                return values
+            vRef = np.reshape(ref['y'], (n_segment, int(n_total/n_segment)))
+            Iref = 2 * np.trapz(vCos * vRef[:, n0:n0+length]) / float(length-1)
+            Qref = 2 * np.trapz(vSin * vRef[:, n0:n0+length]) / float(length-1)
+            # subtract the reference angle
+            dAngleRef = np.arctan2(Qref, Iref)
+            values /= (np.cos(dAngleRef) + 1j*np.sin(dAngleRef))
+        return values
 
 
 
