@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
 
+
 class Readout(object):
     """This class is used to generate and demodulate multi-tone qubit readout
 
@@ -103,7 +104,7 @@ class Readout(object):
             # apply pre-distortion
             if self.predistort:
                 # add inverted exponential
-                y += ((self.measured_rise[n] / self.target_rise[n] - 1) * 
+                y += ((self.measured_rise[n] / self.target_rise[n] - 1) *
                       np.exp(-(t - t[1]) / self.target_rise[n]))
             y[0] = 0.0
             y[-1] = 0.0
