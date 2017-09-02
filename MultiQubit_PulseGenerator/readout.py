@@ -143,7 +143,7 @@ class Readout(object):
         # get input data from dict, with keys {'y': value, 't0': t0, 'dt': dt}
         if signal is None:
             return np.zeros(n_segment, dtype=complex)
-        vY = signal['y']     
+        vY = signal['y']
         dt = signal['dt']
         # avoid exceptions if no time step is given
         if dt == 0:
@@ -163,19 +163,21 @@ class Readout(object):
         vCos = np.cos(2 * np.pi * vTime * frequency)
         vSin = np.sin(2 * np.pi * vTime * frequency)
         # calc I/Q
-        dI = 2 * np.trapz(vCos * vData[:, n0:n0+length]) / float(length - 1)
-        dQ = 2 * np.trapz(vSin * vData[:, n0:n0+length]) / float(length - 1)
-        values = dI + 1j*dQ
+        dI = 2 * np.trapz(vCos * vData[:, n0:n0 + length]) / float(length - 1)
+        dQ = 2 * np.trapz(vSin * vData[:, n0:n0 + length]) / float(length - 1)
+        values = dI + 1j * dQ
         if self.use_phase_ref and ref is not None:
             # skip reference if trace length doesn't match
             if len(ref['y']) != len(vY):
                 return values
-            vRef = np.reshape(ref['y'], (n_segment, int(n_total/n_segment)))
-            Iref = 2 * np.trapz(vCos * vRef[:, n0:n0+length]) / float(length-1)
-            Qref = 2 * np.trapz(vSin * vRef[:, n0:n0+length]) / float(length-1)
+            vRef = np.reshape(ref['y'], (n_segment, int(n_total / n_segment)))
+            Iref = (2 * np.trapz(vCos * vRef[:, n0:n0 + length]) /
+                    float(length - 1))
+            Qref = (2 * np.trapz(vSin * vRef[:, n0:n0 + length]) /
+                    float(length - 1))
             # subtract the reference angle
             dAngleRef = np.arctan2(Qref, Iref)
-            values /= (np.cos(dAngleRef) + 1j*np.sin(dAngleRef))
+            values /= (np.cos(dAngleRef) + 1j * np.sin(dAngleRef))
         return values
 
 
