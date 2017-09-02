@@ -15,6 +15,9 @@ class Driver(LabberDriver):
         # init variables
         self.sequence = None
         self.values = {}
+        # always create a sequence at startup
+        name = self.getValue('Sequence')
+        self.sendValueToOther('Sequence', name)
 
 
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
@@ -22,7 +25,7 @@ class Driver(LabberDriver):
 
         """
         # only do something here if changing the sequence type
-        if quant.name == 'Sequence' and value != 'Custom':
+        if quant.name == 'Sequence':
             # create new sequence if needed
             if (value != quant.getValue()) or (self.sequence is None):
                 # create a new sequence object
@@ -38,6 +41,9 @@ class Driver(LabberDriver):
                     self.sequence = CZecho()
                 elif value == '1QB Randomized Benchmarking':
                     self.sequence = SingleQubit_RB()
+                elif value == 'Custom':
+                    path = self.getValue('Custom Python file')
+                    self.sendValueToOther('Custom Python file', path)
 
         elif quant.name =='Custom python file':
             # for custom python files
