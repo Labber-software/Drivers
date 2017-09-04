@@ -153,17 +153,20 @@ class Pulse(object):
             values = values*self.amplitude
 
         elif self.shape == PulseShape.CZ:
+            # notation and calculations are based on the Paper "Fast adiabatic qubit gates using only σ_z control" PRA 90, 022307 (2014)
 
             # Defining initial and final angles
-            n_points = 1000
-            theta_i = np.arctan(self.Coupling/self.Offset)
-            theta_f = np.arctan(self.Coupling/(self.amplitude))
-            n = np.arange(1,self.F_Terms+1,1)
+            theta_i = np.arctan(self.Coupling/self.Offset) # Initial angle of on the |11>-|02> bloch sphere
+            theta_f = np.arctan(self.Coupling/(self.amplitude)) # Final angle before moving back to initial angle
 
-            # Load fourier components and correct for pulse amplitude
+            # Normalize fouriere coefficients to initial and final angles
             self.Lcoeff *= (theta_f-theta_i)/(2*np.sum(self.Lcoeff[range(0,self.F_Terms,2)]))
 
-            # Calculate pulse width in tau variable
+            # defining helper variabels
+            n = np.arange(1,self.F_Terms+1,1)
+            n_points = 1000 # Number of points in the numerical integration
+
+            # Calculate pulse width in tau variable - See paper for details
             tau = np.linspace(0,1,n_points)
             theta_tau = np.zeros(n_points)
             for i in range(n_points) :
@@ -171,7 +174,7 @@ class Pulse(object):
             t_tau = np.trapz(np.sin(theta_tau),x=tau)
             Width_tau = self.width/t_tau
 
-            # Calculating angle and real time as functions of tau
+            # Calculating angle and time as functions of tau
             tau = np.linspace(0,Width_tau,n_points)
             t_tau = np.zeros(n_points)
             for i in range(n_points) :
@@ -179,6 +182,8 @@ class Pulse(object):
                 if i > 0 :
                     t_tau[i] = np.trapz(np.sin(theta_tau[0:i]),x=tau[0:i])
 
+            # Adding frequency pulse to waveform using 2Q pulse period. Padding waveform with theta_i if pulse width is less than 2Q pulse period. 
+            # Plateau is added as an extra extension of theta_f in the middle of the pulse.
             theta_t = np.ones(len(t))*theta_i
             for i in range(len(t)):
                 if 0<(t[i]-t0+self.plateau/2)<self.plateau:
@@ -187,6 +192,8 @@ class Pulse(object):
                     theta_t[i] = np.interp(t[i]-t0+self.width/2+self.plateau/2,t_tau,theta_tau)
                 elif 0<(t[i]-t0+self.width/2+self.plateau/2)<(self.width + self.plateau):
                     theta_t[i] = np.interp(t[i]-t0+self.width/2-self.plateau/2,t_tau,theta_tau)
+
+            # Going from frequency to voltage assuming a linear dependence. Should be improved in the future.
             values = (self.Coupling/np.tan(theta_t))/self.dfdV - (self.Coupling/np.tan(theta_i))/self.dfdV
 
         # return pulse envelope
