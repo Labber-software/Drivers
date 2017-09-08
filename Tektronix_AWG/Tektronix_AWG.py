@@ -223,12 +223,13 @@ class Driver(VISA_Driver):
             self.writeAndLog(sOutput)
 
 
-    def scaleWaveformToU16(self, vData, dVpp):
+    def scaleWaveformToU16(self, vData, dVpp, ch):
         """Scales the waveform and returns data in a string of U16"""
         # make sure waveform data is within the voltage range 
         if np.sum(vData > dVpp/2) or np.sum(vData < -dVpp/2):
-            raise InstrumentDriver.Error(\
-                  'Waveform contains values that are outside the voltage range')
+            raise InstrumentDriver.Error(
+                ('Waveform for channel %d contains values that are ' % ch) + 
+                'outside the channel voltage range.')
         # clip waveform and store in-place
         np.clip(vData, -dVpp/2., dVpp/2., vData)
         vU16 = np.array(16382 * (vData + dVpp/2.)/dVpp, dtype=np.uint16)
@@ -285,7 +286,7 @@ class Driver(VISA_Driver):
         self.lInUse[n] = True
         # get range and scale to U16
         Vpp = self.getValue('Ch%d - Range' % channel)
-        vU16 = self.scaleWaveformToU16(vData, Vpp)
+        vU16 = self.scaleWaveformToU16(vData, Vpp, channel)
         # check for marker traces
         for m, marker in enumerate([vMark1, vMark2]):
             if len(marker)==len(vU16):
