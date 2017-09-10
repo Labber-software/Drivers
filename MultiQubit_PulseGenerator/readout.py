@@ -112,8 +112,8 @@ class Readout(object):
             # apply SSBM transform
             waveform += a * (y.real * np.cos(omega * t - phi) +
                              -y.imag * np.cos(omega * t - phi + np.pi / 2))
-            waveform += a * 1j * (-y.real * np.sin(omega * t - phi) +
-                                  y.imag * np.sin(omega * t - phi + np.pi / 2))
+            waveform += a * 1j * (y.real * np.sin(omega * t - phi) +
+                                  -y.imag * np.sin(omega * t - phi + np.pi / 2))
 
         return waveform
 
