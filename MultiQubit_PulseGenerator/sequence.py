@@ -348,8 +348,13 @@ class Sequence(object):
             # apply SSBM transform
             data_i = (y.real * np.cos(omega * t - pulse.phase) +
                       -y.imag * np.cos(omega * t - pulse.phase + np.pi / 2))
-            data_q = (-y.real * np.sin(omega * t - pulse.phase) +
-                      y.imag * np.sin(omega * t - pulse.phase + np.pi / 2))
+            data_q = (y.real * np.sin(omega * t - pulse.phase) +
+                      -y.imag * np.sin(omega * t - pulse.phase + np.pi / 2))
+            # # apply SSBM transform
+            # data_i = (-y.real * np.sin(omega * t - pulse.phase) +
+            #           y.imag * np.sin(omega * t - pulse.phase + np.pi / 2))
+            # data_q = (y.real * np.cos(omega * t - pulse.phase) +
+            #           -y.imag * np.cos(omega * t - pulse.phase + np.pi / 2))
 
             # store result
             waveform[indices] += (data_i + 1j * data_q)
