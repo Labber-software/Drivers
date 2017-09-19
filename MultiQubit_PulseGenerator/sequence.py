@@ -272,7 +272,7 @@ class Sequence(object):
         self.trim_waveforms()
 
         # microwave gate switch waveform
-        self.add_microwave_gate()
+        self.add_microwave_gate(config)
 
         # create and return dictionary with waveforms
         data = dict()
@@ -509,7 +509,7 @@ class Sequence(object):
             for n in range(self.n_qubit):
                 sum_all += np.abs(self.wave_xy[n])
                 sum_all += np.abs(self.wave_z[n])
-            non_zero = np.where(sum_all > 0)[0]
+            non_zero = np.where(sum_all > self.readout_noise)[0]
             # if data is not all zero, add after last pulse
             if len(non_zero) > 0:
                 t0 = max(0.0, (non_zero[0] - 1) / self.sample_rate)
@@ -548,7 +548,7 @@ class Sequence(object):
                 self.readout_iq[i0:i1] = wave[:(i1 - i0)]
 
 
-    def add_microwave_gate(self):
+    def add_microwave_gate(self, config):
         """Create waveform for gating microwave switch
 
         """
@@ -566,7 +566,10 @@ class Sequence(object):
                                self.gate_delay) * self.sample_rate):] = 0.0
             else:
                 # non-uniform gate, find non-zero elements
-                gate = np.array(np.abs(wave) > 0.0, dtype=float)
+                if config.get('Predistort waveforms'):
+                    gate = np.array(np.abs(wave) > config.get('Gate - noise floor level'), dtype=float)
+                else:
+                    gate = np.array(np.abs(wave) > 0.0, dtype=float)
                 # fix gate overlap
                 n_overlap = int(np.round(self.gate_overlap * self.sample_rate))
                 diff_gate = np.diff(gate)
@@ -671,6 +674,7 @@ class Sequence(object):
 
         # waveform parameters
         self.sample_rate = config.get('Sample rate')
+        self.readout_noise = config.get('Readout trig - noise floor level')
         self.n_pts = int(config.get('Number of points'))
         self.first_delay = config.get('First pulse delay')
         self.trim_to_sequence = config.get('Trim waveform to sequence')
