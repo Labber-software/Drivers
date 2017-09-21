@@ -24,16 +24,16 @@ class Crosstalk(object):
 
         """
         # check if cross-talk matrix has been updated
-        path = config.get('Cross-talk matrix')
+        path = config.get('Cross-talk (CT) matrix')
         # only reload if file changed
         if path != self.matrix_path:
-            path = config.get('Cross-talk matrix')
+            path = config.get('Cross-talk (CT) matrix')
             self.import_crosstalk_matrix(path)
 
         dTranslate = {'One': int(1), 'Two': int(2), 'Three': int(3), 'Four': int(4), 'Five': int(5)}
         nQBs = dTranslate[config.get('Number of qubits')]
 
-        if config.get('One-to-one QB to Cross-talk matrix element correspondence'):
+        if config.get('1-1 QB <--> Crosstalk matrix'):
             self.Sequence = []
             for QB in range(0, nQBs):
                 self.Sequence.append(QB + 1)
@@ -41,7 +41,7 @@ class Crosstalk(object):
             self.Sequence = []
             if nQBs > 0:
                 for QB in range(0, nQBs):
-                    element = config.get('Element of Cross-talk matrix #%d'%(QB+1))
+                    element = config.get('CT-matrix element #%d'%(QB+1))
                     if element == 'None':
                         continue
                     else:
@@ -98,7 +98,7 @@ class Crosstalk(object):
 
         #new_array = np.dot(mat_voltage_vs_phi0, wav_array)
 
-        new_array = np.einsum('ij,jk->ik', mat_voltage_vs_phi0, wav_array)
+        new_array = np.einsum('ij,jk->ik', mat_voltage_vs_phi0, wav_array) # this is a dot product between the matrix and the waveforms at each timestep
 
         for Corr_index, index in zip(wav_toCorrect, range(0,len(self.Sequence))):
             waveforms[Corr_index] = new_array[index]
