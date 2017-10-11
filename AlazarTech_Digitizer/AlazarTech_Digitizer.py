@@ -206,7 +206,12 @@ class Driver(InstrumentDriver.InstrumentWorker):
         elif self.getValue('Trig source') == 'Channel 2':
             maxLevel = vAmp[self.getValueIndex('Ch2 - Range')]
         elif self.getValue('Trig source') == 'External':
-            maxLevel = 5.0
+            if self.getModel() in ('9373', '9360'):
+                maxLevel = 2.5
+                ExtTrigRange = 3
+            else:
+                maxLevel = 5.0
+                ExtTrigRange = 0
         elif self.getValue('Trig source') == 'Immediate':
             maxLevel = 5.0
             # set timeout to very short with immediate triggering
@@ -221,7 +226,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # config external input, if in use
         if self.getValue('Trig source') == 'External':
             Coupling = int(self.getCmdStringFromValue('Trig coupling'))
-            self.dig.AlazarSetExternalTrigger(Coupling)
+            self.dig.AlazarSetExternalTrigger(Coupling, ExtTrigRange)
         # 
         # set trig delay and timeout
         Delay = int(self.getValue('Trig delay')/self.dt)
