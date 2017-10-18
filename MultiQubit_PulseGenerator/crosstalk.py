@@ -23,6 +23,9 @@ class Crosstalk(object):
             Configuration as defined by Labber driver configuration window
 
         """
+        # return directly if not in use
+        if not config.get('Compensate cross-talk'):
+            return        
         # check if cross-talk matrix has been updated
         path = config.get('Cross-talk (CT) matrix')
         # only reload if file changed
