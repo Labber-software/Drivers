@@ -30,6 +30,7 @@ class Readout(object):
         self.demod_length = 1.0E-6
         self.freq_offset = 0.0
         self.use_phase_ref = False
+        self.iq_ratio = 1.0
 
 
     def set_parameters(self, config={}):
@@ -65,6 +66,7 @@ class Readout(object):
         self.demod_length = config.get('Demodulation - Length')
         self.freq_offset = config.get('Demodulation - Frequency offset')
         self.use_phase_ref = config.get('Use phase reference signal')
+        self.iq_ratio = config.get('Readout I/Q ratio')
 
 
     def create_waveform(self, t_start=0.0):
@@ -114,6 +116,10 @@ class Readout(object):
                              -y.imag * np.cos(omega * t - phi + np.pi / 2))
             waveform += a * 1j * (y.real * np.sin(omega * t - phi) +
                                   -y.imag * np.sin(omega * t - phi + np.pi / 2))
+
+        # apply SSBM transform
+        if self.iq_ratio != 1.0:
+            waveform.real *= self.iq_ratio
 
         return waveform
 
