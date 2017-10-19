@@ -11,7 +11,6 @@
 # transfer functions to a common file in a convenient way.
 
 import numpy as np
-import Labber
 from numpy.fft import ifft, fft, fftshift, ifftshift, fftfreq
 from scipy.interpolate import interp1d
 
@@ -58,6 +57,7 @@ class Predistortion(object):
         # store new path
         self.transfer_path = path
 
+        import Labber
         f = Labber.LogFile(self.transfer_path)
         self.vResponse_freqs, self.vFilteredResponse_FFT_I = f.getTraceXY(y_channel = 0)
         self.vResponse_freqs, self.vFilteredResponse_FFT_Q = f.getTraceXY(y_channel = 1)
