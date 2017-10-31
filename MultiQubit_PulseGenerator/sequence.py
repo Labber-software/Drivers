@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 import numpy as np
-from enum import Enum
 from copy import copy
 
 from pulse import PulseShape, Pulse
 from predistortion import Predistortion
 from crosstalk import Crosstalk
 from readout import Readout
+from gates import Gate, ONE_QUBIT_GATES, TWO_QUBIT_GATES
+from tomography import Tomography
 
 # add logger, to allow logging to Labber's instrument log
 import logging
@@ -15,29 +16,6 @@ log = logging.getLogger('LabberDriver')
 
 # Maximal number of qubits controllable by this class
 MAX_QUBIT = 9
-
-
-class Gate(Enum):
-    """Define possible qubit gates"""
-    # single-qubit gates
-    I = -1
-    Xp = 0
-    Xm = 1
-    X2p = 2
-    X2m = 3
-    Yp = 4
-    Ym = 5
-    Y2m = 6
-    Y2p = 7
-    # two-qubit gates
-    CPh = 8
-
-
-# define set of one- and two-qubit gates
-ONE_QUBIT_GATES = (Gate.Xp, Gate.Xm, Gate.X2p, Gate.X2m,
-                   Gate.Yp, Gate.Ym, Gate.Y2p, Gate.Y2m,
-                   Gate.I)
-TWO_QUBIT_GATES = (Gate.CPh,)
 
 
 class Sequence(object):
@@ -152,6 +130,7 @@ class Sequence(object):
 
         # tomography
         self.perform_tomography = False
+        self.tomography = Tomography()
 
         # cross-talk object
         self.compensate_crosstalk = False
@@ -465,6 +444,7 @@ class Sequence(object):
         # get time for adding tomograph pulse
         t = self.find_range_of_sequence()[1]
         # TODO(morten): add code to add tomography pulses
+        self.tomography.add_pulses(self, t)
 
 
     def predistort_waveforms(self):
@@ -745,6 +725,7 @@ class Sequence(object):
 
         # tomography
         self.perform_tomography = config.get('Generate tomography pulse', False)
+        self.tomography.set_parameters(config)
 
         # predistortion
         self.perform_predistortion = config.get('Predistort waveforms', False)
