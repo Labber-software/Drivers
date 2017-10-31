@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-from sequence import Gate, Sequence
+from sequence import Sequence
+from gates import Gate
 import random as rnd
 import numpy as np
 # add logger, to allow logging to Labber's instrument log 
