@@ -1,4 +1,4 @@
-#Signadyne / Keysight Digitizer
+#Keysight PXI Digitizer
 
-The driver requires the Windows DLL "SD_DLL_009600.dll" and the Python driver module "signadyne.py", which are part of the software package that can be downloaded from the Keysight/Signadyne website.
+The driver requires the Windows DLL "SD1core.dll" and the Python driver module "keysightSD1.py", which are part of the software package that can be downloaded from the Keysight website.
 
