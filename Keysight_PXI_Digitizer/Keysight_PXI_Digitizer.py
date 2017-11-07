@@ -156,7 +156,7 @@ class Driver(LabberDriver):
                 if self.getValue('Trig Mode') == 'Digital trigger':
                     extSource = int(self.getCmdStringFromValue('External Trig Source'))
                     trigBehavior = int(self.getCmdStringFromValue('External Trig Config'))
-                    sync = int(self.getCmdStringFromValue('Trig Sampling Mode'))
+                    sync = int(self.getCmdStringFromValue('Trig Sync Mode'))
                     self.dig.DAQtriggerExternalConfig(nCh, extSource, trigBehavior, sync)
                     self.dig.DAQdigitalTriggerConfig(nCh, extSource, trigBehavior)
                 elif self.getValue('Trig Mode') == 'Analog channel':
