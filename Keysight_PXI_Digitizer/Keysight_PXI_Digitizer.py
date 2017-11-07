@@ -75,10 +75,10 @@ class Driver(LabberDriver):
             ch, name = None, ''
         # proceed depending on command
         if quant.name in ('External Trig Source', 'External Trig Config',
-                          'Trig Sampling Mode'):
+                          'Trig Sync Mode'):
             extSource = int(self.getCmdStringFromValue('External Trig Source'))
             trigBehavior = int(self.getCmdStringFromValue('External Trig Config'))
-            sync = int(self.getCmdStringFromValue('Trig Sampling Mode'))
+            sync = int(self.getCmdStringFromValue('Trig Sync Mode'))
             self.dig.DAQtriggerExternalConfig(0, extSource, trigBehavior, sync)
         elif quant.name in ('Trig I/O', ):
             # get direction and sync from index of comboboxes

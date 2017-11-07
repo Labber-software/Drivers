@@ -93,9 +93,9 @@ class Driver(LabberDriver):
             direction = int(self.getCmdStringFromValue('Trig I/O'))
             self.AWG.triggerIOconfig(direction)
         elif quant.name in ('External Trig Source', 'External Trig Config',
-                            'Trig Sampling Mode') or\
+                            'Trig Sync Mode') or\
                    name in ('External Trig Source', 'External Trig Config'):
-            sync = int(self.getCmdStringFromValue('Trig Sampling Mode'))
+            sync = int(self.getCmdStringFromValue('Trig Sync Mode'))
             for ch in range(self.nCh):
                 # check if separate trigger is used
                 if self.getValue('Ch%d - Separate trigger' % (ch + 1)):
