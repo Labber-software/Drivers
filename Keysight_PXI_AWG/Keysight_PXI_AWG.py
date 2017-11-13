@@ -46,10 +46,24 @@ class Driver(LabberDriver):
             self.nCh = 4
         # keep track of if waveform was updated
         self.lWaveUpdated = [False]*self.nCh
+        # get hardware version - changes numbering of channels
+        hw_version = self.AWG.getHardwareVersion()
+        if hw_version >= 4:
+            # KEYSIGHT - channel numbers start with 1
+            self.ch_index_zero = 1
+        else:
+            # SIGNADYNE - channel numbers start with 0
+            self.ch_index_zero = 0
+        self.log('HW:', hw_version)
         # clear old waveforms
         self.AWG.waveformFlush()
         for ch in range(self.nCh):
-            self.AWG.AWGflush(ch)
+            self.AWG.AWGflush(self.get_hw_ch(ch))
+
+
+    def get_hw_ch(self, n):
+        """Get hardware channel number for channel n. n starts at 0"""
+        return n + self.ch_index_zero
 
 
     def performClose(self, bError=False, options={}):
@@ -58,12 +72,12 @@ class Driver(LabberDriver):
         try:
             # clear old waveforms
             self.AWG.waveformFlush()
-            for ch in range(self.nCh):
-                self.AWG.AWGflush(ch)
-                self.AWG.AWGstop(ch)
+            for n in range(self.nCh):
+                self.AWG.AWGflush(self.get_hw_ch(n))
+                self.AWG.AWGstop(self.get_hw_ch(n))
             # turn off outputs
             for n in range(self.nCh):
-                self.AWG.channelWaveShape(n, -1)
+                self.AWG.channelWaveShape(self.get_hw_ch(n), -1)
             # close instrument
             self.AWG.close()
         except:
@@ -106,7 +120,7 @@ class Driver(LabberDriver):
                     # use default
                     extSource = int(self.getCmdStringFromValue('External Trig Source'))
                     trigBehavior = int(self.getCmdStringFromValue('External Trig Config'))
-                self.AWG.AWGtriggerExternalConfig(ch, extSource, trigBehavior, sync)
+                self.AWG.AWGtriggerExternalConfig(self.get_hw_ch(ch), extSource, trigBehavior, sync)
         # 
         # software trig for all channels
         elif quant.name in ('Trig All',):
@@ -122,26 +136,26 @@ class Driver(LabberDriver):
                     self.lWaveUpdated[ch] = True
             else:
                 func = -1
-                self.AWG.AWGstop(ch)
-            self.AWG.channelWaveShape(ch, func)
+                self.AWG.AWGstop(self.get_hw_ch(ch))
+            self.AWG.channelWaveShape(self.get_hw_ch(ch), func)
         elif name == 'Amplitude':
-            self.AWG.channelAmplitude(ch, value)
+            self.AWG.channelAmplitude(self.get_hw_ch(ch), value)
             # if in AWG mode, update waveform to scale to new range
             if self.getValue('Ch%d - Function' % (ch + 1)) == 'AWG':
                 self.lWaveUpdated[ch] = True
         elif name == 'Frequency':
-            self.AWG.channelFrequency(ch, value)
+            self.AWG.channelFrequency(self.get_hw_ch(ch), value)
         elif name == 'Phase':
-            self.AWG.channelPhase(ch, value)
+            self.AWG.channelPhase(self.get_hw_ch(ch), value)
         elif name == 'Offset':
-            self.AWG.channelOffset(ch, value)
+            self.AWG.channelOffset(self.get_hw_ch(ch), value)
 #        elif name == 'Run mode':
 #            if value:
 #                self.AWG.AWGstart(ch)
 #            else:
 #                self.AWG.AWGstop(ch)
         elif name == 'Trig':
-            self.AWG.AWGtrigger(ch)
+            self.AWG.AWGtrigger(self.get_hw_ch(ch))
         elif name in ('Trig mode', 'Cycles'):
             # mark wavefom as updated
             self.lWaveUpdated[ch] = True
@@ -157,18 +171,18 @@ class Driver(LabberDriver):
                 # find updated channels, turn off output
                 iChMask = 0
                 lCh = []
-                for ch, update in enumerate(self.lWaveUpdated):
+                for n, update in enumerate(self.lWaveUpdated):
                     if update:
-                        iChMask += 2**ch
-                        lCh.append(ch)
-                        self.AWG.AWGstop(ch)
-                        self.AWG.AWGflush(ch)
+                        iChMask += 2**n
+                        lCh.append(n)
+                        self.AWG.AWGstop(self.get_hw_ch(n))
+                        self.AWG.AWGflush(self.get_hw_ch(n))
                 # clear old waveforms
                 self.AWG.waveformFlush()
                 # - todo: implement smarter waveform delete/upload
                 # update waveforms
-                for ch in lCh:
-                    self.sendWaveform(ch)
+                for n in lCh:
+                    self.sendWaveform(self.get_hw_ch(n))
                 # turn on outputs
                 self.AWG.AWGstartMultiple(iChMask)
         return value
@@ -197,7 +211,7 @@ class Driver(LabberDriver):
         dataNorm = data / amp
         dataNorm = np.clip(dataNorm, -1.0, 1.0, out=dataNorm)
         # output waveform
-        self.AWG.AWGfromArray(ch, trigMode, delay, cycles, prescaler, 
+        self.AWG.AWGfromArray(self.get_hw_ch(ch), trigMode, delay, cycles, prescaler, 
                               waveformType, dataNorm)
         
 

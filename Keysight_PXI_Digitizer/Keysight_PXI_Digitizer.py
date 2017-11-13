@@ -21,6 +21,7 @@ class Driver(LabberDriver):
         # create AWG instance
         self.dig = keysightSD1.SD_AIN()
         AWGPart = self.dig.getProductNameBySlot(1, int(self.comCfg.address))
+        self.log('Serial:', self.dig.getSerialNumberBySlot(1, int(self.comCfg.address)))
         if not isinstance(AWGPart, str):
             raise Error('Unit not available')
         # check that model is supported
@@ -46,6 +47,20 @@ class Driver(LabberDriver):
         # create list of sampled data
         self.lTrace = [np.array([])] * self.nCh
         self.dig.openWithSlot(AWGPart, 1, int(self.comCfg.address))
+        # get hardware version - changes numbering of channels
+        hw_version = self.dig.getHardwareVersion()
+        if hw_version >= 4:
+            # KEYSIGHT - channel numbers start with 1
+            self.ch_index_zero = 1
+        else:
+            # SIGNADYNE - channel numbers start with 0
+            self.ch_index_zero = 0
+        self.log('HW:', hw_version)
+
+
+    def get_hw_ch(self, n):
+        """Get hardware channel number for channel n. n starts at 0"""
+        return n + self.ch_index_zero
 
 
     def performClose(self, bError=False, options={}):
@@ -54,7 +69,7 @@ class Driver(LabberDriver):
         try:
             # flush all memory
             for n in range(self.nCh):
-                self.dig.DAQflush(n)
+                self.log('Close ch:', n, self.dig.DAQflush(self.get_hw_ch(n)))
             # close instrument
             self.dig.close()
         except:
@@ -69,7 +84,7 @@ class Driver(LabberDriver):
         quant.setValue(value)
         # check if channel-specific, if so get channel + name
         if quant.name.startswith('Ch') and len(quant.name)>6:
-            ch = int(quant.name[2])
+            ch = int(quant.name[2]) - 1
             name = quant.name[6:]
         else:
             ch, name = None, ''
@@ -89,13 +104,13 @@ class Driver(LabberDriver):
             trigCh = self.getValueIndex('Analog Trig Channel')
             mod = int(self.getCmdStringFromValue('Analog Trig Config'))
             threshold = self.getValue('Trig Threshold')
-            self.dig.channelTriggerConfig(trigCh, mod, threshold)
+            self.dig.channelTriggerConfig(self.get_hw_ch(trigCh), mod, threshold)
         elif name in ('Range', 'Impedance', 'Coupling'):
             # set range, impedance, coupling at once
-            rang = self.getRange(ch - 1)
-            imp = int(self.getCmdStringFromValue('Ch%d - Impedance' % ch))
-            coup = int(self.getCmdStringFromValue('Ch%d - Coupling' % ch))
-            self.dig.channelInputConfig(ch - 1, rang, imp, coup)
+            rang = self.getRange(ch)
+            imp = int(self.getCmdStringFromValue('Ch%d - Impedance' % (ch + 1)))
+            coup = int(self.getCmdStringFromValue('Ch%d - Coupling' % (ch + 1)))
+            self.dig.channelInputConfig(self.get_hw_ch(ch), rang, imp, coup)
         return value
 
         
@@ -104,7 +119,7 @@ class Driver(LabberDriver):
         return the actual value set by the instrument"""
         # check if channel-specific, if so get channel + name
         if quant.name.startswith('Ch') and len(quant.name)>6:
-            ch = int(quant.name[2])
+            ch = int(quant.name[2]) - 1
             name = quant.name[6:]
         else:
             ch, name = None, ''
@@ -114,7 +129,7 @@ class Driver(LabberDriver):
                 # don't arm if in hardware trig mode
                 self.getTraces(bArm=(not self.isHardwareTrig(options)))
             # return correct data
-            value = quant.getTraceDict(self.lTrace[ch - 1], dt=self.dt)
+            value = quant.getTraceDict(self.lTrace[ch], dt=self.dt)
         else:
             # for all others, return local value
             value = quant.getValue()
@@ -152,22 +167,24 @@ class Driver(LabberDriver):
         if bArm:
             # configure trigger for all active channels
             for nCh in lCh:
+                # channel number depens on hardware version
+                ch = self.get_hw_ch(nCh)
                 # extra config for trig mode
                 if self.getValue('Trig Mode') == 'Digital trigger':
                     extSource = int(self.getCmdStringFromValue('External Trig Source'))
                     trigBehavior = int(self.getCmdStringFromValue('External Trig Config'))
                     sync = int(self.getCmdStringFromValue('Trig Sync Mode'))
-                    self.dig.DAQtriggerExternalConfig(nCh, extSource, trigBehavior, sync)
-                    self.dig.DAQdigitalTriggerConfig(nCh, extSource, trigBehavior)
+                    self.dig.DAQtriggerExternalConfig(ch, extSource, trigBehavior, sync)
+                    self.dig.DAQdigitalTriggerConfig(ch, extSource, trigBehavior)
                 elif self.getValue('Trig Mode') == 'Analog channel':
                     digitalTriggerMode= 0
                     digitalTriggerSource = 0
                     trigCh = self.getValueIndex('Analog Trig Channel')
                     analogTriggerMask = 2**trigCh
-                    self.dig.DAQtriggerConfig(nCh, digitalTriggerMode, digitalTriggerSource, analogTriggerMask)
+                    self.dig.DAQtriggerConfig(ch, digitalTriggerMode, digitalTriggerSource, analogTriggerMask)
                 # config daq and trig mode
                 trigMode = int(self.getCmdStringFromValue('Trig Mode'))
-                self.dig.DAQconfig(nCh, nPts, nSeg*nAv, nTrigDelay, trigMode)
+                self.dig.DAQconfig(ch, nPts, nSeg*nAv, nTrigDelay, trigMode)
             #
             # start acquiring data
             self.dig.DAQstartMultiple(iChMask)
@@ -186,23 +203,25 @@ class Driver(LabberDriver):
             # number of cycles for this call, could be fewer for last call
             nCycle = min(nCyclePerCall, nCycleTotal-(n*nCyclePerCall))
             # capture traces one by one
-            for ch in lCh:
+            for nCh in lCh:
+                # channel number depens on hardware version
+                ch = self.get_hw_ch(nCh)
                 data = self.DAQread(self.dig, ch, nPts*nCycle, int(self.timeout_ms/nCall))
                 # average, if wanted
-                scale = (self.getRange(ch)/self.bitRange)
+                scale = (self.getRange(nCh)/self.bitRange)
                 if nAv > 1 and data.size>0:
                     nAvHere = nCycle/nSeg
                     data = data.reshape((int(nAvHere), nPts*nSeg)).mean(0)
                     # adjust scaling to account for summing averages
-                    scale = lScale[ch]*(nAvHere/nAv)
+                    scale = lScale[nCh]*(nAvHere/nAv)
                 else:
                     # use pre-calculated scaling
-                    scale = lScale[ch]
+                    scale = lScale[nCh]
                 # convert to voltage, add to total average
                 if n==0:
-                    self.lTrace[ch] = data*scale
+                    self.lTrace[nCh] = data*scale
                 else:
-                    self.lTrace[ch] += data*scale
+                    self.lTrace[nCh] += data*scale
 #                lT.append('N: %d, Tot %.1f ms' % (n, 1000*(time.clock()-t0)))
 #        # log timing info
 #        self.log(': '.join(lT))
