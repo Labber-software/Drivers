@@ -83,11 +83,9 @@ class Readout(object):
             Complex waveforms with I/Q signal for qubit reaodut
 
         """
-        # ignore time stamp
-        t_start = 0.0
         # create time and output waveform
         n_pts = int(self.duration * self.sample_rate)
-        t = t_start + np.arange(n_pts, dtype=float) / self.sample_rate
+        t = np.arange(n_pts, dtype=float) / self.sample_rate
         waveform = np.zeros_like(t, dtype=complex)
 
         # add readout for all waveforms
@@ -110,6 +108,9 @@ class Readout(object):
                       np.exp(-(t - t[1]) / self.target_rise[n]))
             y[0] = 0.0
             y[-1] = 0.0
+
+            # remove phase drift due to LO-RF difference
+            phi -= 2 * np.pi * self.freq_offset * t_start
 
             # apply SSBM transform
             waveform += a * (y.real * np.cos(omega * t - phi) +
