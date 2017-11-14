@@ -182,7 +182,7 @@ class Driver(LabberDriver):
                 # - todo: implement smarter waveform delete/upload
                 # update waveforms
                 for n in lCh:
-                    self.sendWaveform(self.get_hw_ch(n))
+                    self.sendWaveform(n)
                 # turn on outputs
                 self.AWG.AWGstartMultiple(iChMask)
         return value
@@ -190,7 +190,7 @@ class Driver(LabberDriver):
 
     def sendWaveform(self, ch):
         """Send waveform to AWG channel"""
-        # conversion 
+        # conversion to front panel numbering
         nCh = ch + 1
         # get trigger mode
         trigMode = int(self.getCmdStringFromValue('AWG%d - Trig mode' % nCh))
