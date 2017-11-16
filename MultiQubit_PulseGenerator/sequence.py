@@ -298,10 +298,10 @@ class Sequence(object):
             t0 = t0 + duration / 2
         # get the range of indices in use
         indices = np.arange(
-            max(np.round((t0 - duration / 2) * self.sample_rate), 0),
-            min(np.round((t0 + duration / 2) * self.sample_rate), self.n_pts)
+            max(np.floor((t0 - duration / 2) * self.sample_rate), 0),
+            min(np.ceil((t0 + duration / 2) * self.sample_rate), self.n_pts),
+            dtype=int
         )
-        indices = np.int0(indices)
         # return directly if no indices
         if len(indices) == 0:
             return
@@ -523,7 +523,7 @@ class Sequence(object):
             if not self.readout.match_main_size:
                 self.readout_iq = wave
             else:
-                i0 = int(t * self.sample_rate)
+                i0 = int(round(t * self.sample_rate))
                 i1 = min(len(self.readout_iq), i0 + len(wave))
                 self.readout_iq[i0:i1] = wave[:(i1 - i0)]
 

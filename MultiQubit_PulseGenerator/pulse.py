@@ -105,6 +105,10 @@ class Pulse(object):
         """
         # calculate the actual value for the selected indices
         if self.shape == PulseShape.SQUARE:
+            # reduce risk of rounding errors by putting checks between samples
+            if len(t) > 1:
+                t0 += (t[1] - t[0]) / 2.0
+
             values = ((t >= (t0 - (self.width + self.plateau) / 2)) &
                       (t < (t0 + (self.width + self.plateau) / 2)))
 
