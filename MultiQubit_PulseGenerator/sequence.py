@@ -113,9 +113,10 @@ class Sequence(object):
         # waveform parameter
         self.sample_rate = sample_rate
         self.n_pts = n_pts
-        self.first_delay = n_pts
+        self.first_delay = first_delay
         self.trim_to_sequence = True
         self.trim_start = False
+        self.align_to_end = False
         # parameter for keeping track of current gate pulse time
         self.time_pulse = 0.0
 
@@ -622,17 +623,32 @@ class Sequence(object):
             i0 = 0
         i1 = min(self.n_pts, int(np.ceil(t1 * self.sample_rate)))
 
-        # trim waveforms
-        for n in range(self.n_qubit):
-            self.wave_xy[n] = self.wave_xy[n][i0:i1]
-            self.wave_z[n] = self.wave_z[n][i0:i1]
-            self.wave_gate[n] = self.wave_gate[n][i0:i1]
-        if self.generate_readout_trig:
-            self.readout_trig = self.readout_trig[i0:i1]
-            # force readout trig to end in zero
-            self.readout_trig[-1] = 0.0
-        if self.generate_readout_iq and self.readout.match_main_size:
-            self.readout_iq = self.readout_iq[i0:i1]
+        if self.align_to_end:
+            # align pulses to end of waveform
+            m = self.n_pts - (i1 - i0)
+            for n in range(self.n_qubit):
+                self.wave_xy[n] = np.r_[np.zeros(m), self.wave_xy[n][i0:i1]]
+                self.wave_z[n] = np.r_[np.zeros(m), self.wave_z[n][i0:i1]]
+                self.wave_gate[n] = np.r_[np.zeros(m), self.wave_gate[n][i0:i1]]
+            if self.generate_readout_trig:
+                self.readout_trig = np.r_[np.zeros(m), self.readout_trig[i0:i1]]
+                # force readout trig to end in zero
+                self.readout_trig[-1] = 0.0
+            if self.generate_readout_iq and self.readout.match_main_size:
+                self.readout_iq = np.r_[np.zeros(m), self.readout_iq[i0:i1]]
+
+        else:
+            # trim waveforms
+            for n in range(self.n_qubit):
+                self.wave_xy[n] = self.wave_xy[n][i0:i1]
+                self.wave_z[n] = self.wave_z[n][i0:i1]
+                self.wave_gate[n] = self.wave_gate[n][i0:i1]
+            if self.generate_readout_trig:
+                self.readout_trig = self.readout_trig[i0:i1]
+                # force readout trig to end in zero
+                self.readout_trig[-1] = 0.0
+            if self.generate_readout_iq and self.readout.match_main_size:
+                self.readout_iq = self.readout_iq[i0:i1]
 
 
     def set_parameters(self, config={}):
@@ -659,6 +675,7 @@ class Sequence(object):
         self.first_delay = config.get('First pulse delay')
         self.trim_to_sequence = config.get('Trim waveform to sequence')
         self.trim_start = config.get('Trim both start and end')
+        self.align_to_end = config.get('Align pulses to end of waveform')
 
         # single-qubit pulses
         for n, pulse in enumerate(self.pulses_1qb):
