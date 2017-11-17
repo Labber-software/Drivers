@@ -105,9 +105,7 @@ class Readout(object):
             if self.predistort:
                 # add inverted exponential
                 y += ((self.measured_rise[n] / self.target_rise[n] - 1) *
-                      np.exp(-(t - t[1]) / self.target_rise[n]))
-            y[0] = 0.0
-            y[-1] = 0.0
+                      np.exp(-(t - t[0]) / self.target_rise[n]))
 
             # remove phase drift due to LO-RF difference
             phi -= 2 * np.pi * self.freq_offset * t_start
