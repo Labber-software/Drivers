@@ -508,23 +508,32 @@ class Sequence(object):
         # get positon of readout
         if self.generate_readout_trig or self.generate_readout_iq:
             t = self.find_range_of_sequence()[1] + self.readout_delay
+            i0 = int(round(t * self.sample_rate))
         # start with readout trig signal
         if self.generate_readout_trig:
-            # create pulse object and insert into trig waveform
-            trig = Pulse(amplitude=self.readout_amplitude,
-                         width=0.0,
-                         plateau=self.readout_duration,
-                         shape=PulseShape.SQUARE)
-            self.add_single_pulse(self.readout_trig, trig, t, align_left=True)
+            # create trig waveform directly
+            i1 = min(int(round((t + self.readout_duration) * self.sample_rate)),
+                     len(self.readout_trig) - 1)
+            self.readout_trig[i0:i1] = 1.0
+
+            # # create pulse object and insert into trig waveform
+            # trig = Pulse(amplitude=self.readout_amplitude,
+            #              width=0.0,
+            #              plateau=self.readout_duration,
+            #              shape=PulseShape.SQUARE)
+            # self.add_single_pulse(self.readout_trig, trig, t, align_left=True)
 
         # readout I/Q waveform
         if self.generate_readout_iq:
-            wave = self.readout.create_waveform(t)
-            # if not matching wave sizes, simply replace initialized waveform 
+            # ignore readout timestamp if pulses are aligned to end of waveform
+            if self.align_to_end:
+                wave = self.readout.create_waveform(t_start=0.0)
+            else:
+                wave = self.readout.create_waveform(t_start=t)
+            # if not matching wave sizes, simply replace initialized waveform
             if not self.readout.match_main_size:
                 self.readout_iq = wave
             else:
-                i0 = int(round(t * self.sample_rate))
                 i1 = min(len(self.readout_iq), i0 + len(wave))
                 self.readout_iq[i0:i1] = wave[:(i1 - i0)]
 
@@ -595,7 +604,7 @@ class Sequence(object):
         """Trim waveforms to match length of sequence
 
         """
-        if not self.trim_to_sequence:
+        if not (self.trim_to_sequence or self.align_to_end):
             return
         # find range of sequence
         (t0, t1) = self.find_range_of_sequence()
