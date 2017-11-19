@@ -30,6 +30,7 @@ class Readout(object):
         self.demod_length = 1.0E-6
         self.freq_offset = 0.0
         self.use_phase_ref = False
+        self.iq_ratio = 1.0
 
 
     def set_parameters(self, config={}):
@@ -65,6 +66,7 @@ class Readout(object):
         self.demod_length = config.get('Demodulation - Length')
         self.freq_offset = config.get('Demodulation - Frequency offset')
         self.use_phase_ref = config.get('Use phase reference signal')
+        self.iq_ratio = config.get('Readout I/Q ratio')
 
 
     def create_waveform(self, t_start=0.0):
@@ -81,11 +83,9 @@ class Readout(object):
             Complex waveforms with I/Q signal for qubit reaodut
 
         """
-        # ignore time stamp
-        t_start = 0.0
         # create time and output waveform
         n_pts = int(self.duration * self.sample_rate)
-        t = t_start + np.arange(n_pts, dtype=float) / self.sample_rate
+        t = np.arange(n_pts, dtype=float) / self.sample_rate
         waveform = np.zeros_like(t, dtype=complex)
 
         # add readout for all waveforms
@@ -105,15 +105,20 @@ class Readout(object):
             if self.predistort:
                 # add inverted exponential
                 y += ((self.measured_rise[n] / self.target_rise[n] - 1) *
-                      np.exp(-(t - t[1]) / self.target_rise[n]))
-            y[0] = 0.0
-            y[-1] = 0.0
+                      np.exp(-(t - t[0]) / self.target_rise[n]))
+
+            # remove phase drift due to LO-RF difference
+            phi -= 2 * np.pi * self.freq_offset * t_start
 
             # apply SSBM transform
             waveform += a * (y.real * np.cos(omega * t - phi) +
                              -y.imag * np.cos(omega * t - phi + np.pi / 2))
             waveform += a * 1j * (y.real * np.sin(omega * t - phi) +
                                   -y.imag * np.sin(omega * t - phi + np.pi / 2))
+
+        # apply SSBM transform
+        if self.iq_ratio != 1.0:
+            waveform.real *= self.iq_ratio
 
         return waveform
 

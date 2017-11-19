@@ -6,12 +6,21 @@ from sequence_rb import SingleQubit_RB
 import importlib
 import numpy as np
 
+# dictionary with built-in sequences
+SEQUENCES = {'Rabi': Rabi,
+             'CP/CPMG': CPMG,
+             'Pulse train': PulseTrain,
+             'C-phase Pulses': CZgates,
+             'C-phase Echo': CZecho,
+             '1QB Randomized Benchmarking': SingleQubit_RB,
+             'Custom': None}
+
 
 class Driver(LabberDriver):
-    """ This class implements a multi-qubit pulse generator"""
+    """This class implements a multi-qubit pulse generator."""
 
     def performOpen(self, options={}):
-        """Perform the operation of opening the instrument connection"""
+        """Perform the operation of opening the instrument connection."""
         # init variables
         self.sequence = None
         self.values = {}
@@ -21,32 +30,23 @@ class Driver(LabberDriver):
 
 
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
-        """Perform the Set Value instrument operation
-
-        """
+        """Perform the Set Value instrument operation."""
         # only do something here if changing the sequence type
         if quant.name == 'Sequence':
-            # create new sequence if needed
-            if (value != quant.getValue()) or (self.sequence is None):
+            # create new sequence if sequence type changed
+            new_type = SEQUENCES[value]
+
+            if not isinstance(self.sequence, new_type):
                 # create a new sequence object
-                if value == 'Rabi':
-                    self.sequence = Rabi()
-                elif value == 'CP/CPMG':
-                    self.sequence = CPMG()
-                elif value == 'Pulse train':
-                    self.sequence = PulseTrain()
-                elif value == 'C-phase Pulses':
-                    self.sequence = CZgates()
-                elif value == 'C-phase Echo':
-                    self.sequence = CZecho()
-                elif value == '1QB Randomized Benchmarking':
-                    self.sequence = SingleQubit_RB()
-                elif value == 'Custom':
+                if value == 'Custom':
                     # for custom python files
                     path = self.getValue('Custom Python file')
                     mod = importlib.import_module(path)
                     # the custom sequence class has to be named 'CustomSequence'
                     self.sequence = mod.CustomSequence()
+                else:
+                    # standard built-in sequence
+                    self.sequence = new_type()
 
         elif (quant.name == 'Custom Python file' and
               self.getValue('Sequence') == 'Custom'):

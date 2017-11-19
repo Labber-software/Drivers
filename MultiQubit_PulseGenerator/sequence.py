@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 import numpy as np
-from enum import Enum
 from copy import copy
 
 from pulse import PulseShape, Pulse
 from predistortion import Predistortion
 from crosstalk import Crosstalk
 from readout import Readout
+from gates import Gate, ONE_QUBIT_GATES, TWO_QUBIT_GATES
+from tomography import Tomography
 
 # add logger, to allow logging to Labber's instrument log
 import logging
@@ -15,29 +16,6 @@ log = logging.getLogger('LabberDriver')
 
 # Maximal number of qubits controllable by this class
 MAX_QUBIT = 9
-
-
-class Gate(Enum):
-    """Define possible qubit gates"""
-    # single-qubit gates
-    I = -1
-    Xp = 0
-    Xm = 1
-    X2p = 2
-    X2m = 3
-    Yp = 4
-    Ym = 5
-    Y2m = 6
-    Y2p = 7
-    # two-qubit gates
-    CPh = 8
-
-
-# define set of one- and two-qubit gates
-ONE_QUBIT_GATES = (Gate.Xp, Gate.Xm, Gate.X2p, Gate.X2m,
-                   Gate.Yp, Gate.Ym, Gate.Y2p, Gate.Y2m,
-                   Gate.I)
-TWO_QUBIT_GATES = (Gate.CPh,)
 
 
 class Sequence(object):
@@ -135,9 +113,10 @@ class Sequence(object):
         # waveform parameter
         self.sample_rate = sample_rate
         self.n_pts = n_pts
-        self.first_delay = n_pts
+        self.first_delay = first_delay
         self.trim_to_sequence = True
         self.trim_start = False
+        self.align_to_end = False
         # parameter for keeping track of current gate pulse time
         self.time_pulse = 0.0
 
@@ -152,6 +131,7 @@ class Sequence(object):
 
         # tomography
         self.perform_tomography = False
+        self.tomography = Tomography()
 
         # cross-talk object
         self.compensate_crosstalk = False
@@ -272,7 +252,7 @@ class Sequence(object):
         self.trim_waveforms()
 
         # microwave gate switch waveform
-        self.add_microwave_gate()
+        self.add_microwave_gate(config)
 
         # create and return dictionary with waveforms
         data = dict()
@@ -319,10 +299,10 @@ class Sequence(object):
             t0 = t0 + duration / 2
         # get the range of indices in use
         indices = np.arange(
-            max(np.round((t0 - duration / 2) * self.sample_rate), 0),
-            min(np.round((t0 + duration / 2) * self.sample_rate), self.n_pts)
+            max(np.floor((t0 - duration / 2) * self.sample_rate), 0),
+            min(np.ceil((t0 + duration / 2) * self.sample_rate), self.n_pts),
+            dtype=int
         )
-        indices = np.int0(indices)
         # return directly if no indices
         if len(indices) == 0:
             return
@@ -465,6 +445,7 @@ class Sequence(object):
         # get time for adding tomograph pulse
         t = self.find_range_of_sequence()[1]
         # TODO(morten): add code to add tomography pulses
+        self.tomography.add_pulses(self, t)
 
 
     def predistort_waveforms(self):
@@ -509,7 +490,7 @@ class Sequence(object):
             for n in range(self.n_qubit):
                 sum_all += np.abs(self.wave_xy[n])
                 sum_all += np.abs(self.wave_z[n])
-            non_zero = np.where(sum_all > 0)[0]
+            non_zero = np.where(sum_all > self.readout_noise)[0]
             # if data is not all zero, add after last pulse
             if len(non_zero) > 0:
                 t0 = max(0.0, (non_zero[0] - 1) / self.sample_rate)
@@ -527,28 +508,37 @@ class Sequence(object):
         # get positon of readout
         if self.generate_readout_trig or self.generate_readout_iq:
             t = self.find_range_of_sequence()[1] + self.readout_delay
+            i0 = int(round(t * self.sample_rate))
         # start with readout trig signal
         if self.generate_readout_trig:
-            # create pulse object and insert into trig waveform
-            trig = Pulse(amplitude=self.readout_amplitude,
-                         width=0.0,
-                         plateau=self.readout_duration,
-                         shape=PulseShape.SQUARE)
-            self.add_single_pulse(self.readout_trig, trig, t, align_left=True)
+            # create trig waveform directly
+            i1 = min(int(round((t + self.readout_duration) * self.sample_rate)),
+                     len(self.readout_trig) - 1)
+            self.readout_trig[i0:i1] = 1.0
+
+            # # create pulse object and insert into trig waveform
+            # trig = Pulse(amplitude=self.readout_amplitude,
+            #              width=0.0,
+            #              plateau=self.readout_duration,
+            #              shape=PulseShape.SQUARE)
+            # self.add_single_pulse(self.readout_trig, trig, t, align_left=True)
 
         # readout I/Q waveform
         if self.generate_readout_iq:
-            wave = self.readout.create_waveform(t)
-            # if not matching wave sizes, simply replace initialized waveform 
+            # ignore readout timestamp if pulses are aligned to end of waveform
+            if self.align_to_end:
+                wave = self.readout.create_waveform(t_start=0.0)
+            else:
+                wave = self.readout.create_waveform(t_start=t)
+            # if not matching wave sizes, simply replace initialized waveform
             if not self.readout.match_main_size:
                 self.readout_iq = wave
             else:
-                i0 = int(t * self.sample_rate)
                 i1 = min(len(self.readout_iq), i0 + len(wave))
                 self.readout_iq[i0:i1] = wave[:(i1 - i0)]
 
 
-    def add_microwave_gate(self):
+    def add_microwave_gate(self, config):
         """Create waveform for gating microwave switch
 
         """
@@ -566,7 +556,10 @@ class Sequence(object):
                                self.gate_delay) * self.sample_rate):] = 0.0
             else:
                 # non-uniform gate, find non-zero elements
-                gate = np.array(np.abs(wave) > 0.0, dtype=float)
+                if config.get('Predistort waveforms'):
+                    gate = np.array(np.abs(wave) > config.get('Gate - noise floor level'), dtype=float)
+                else:
+                    gate = np.array(np.abs(wave) > 0.0, dtype=float)
                 # fix gate overlap
                 n_overlap = int(np.round(self.gate_overlap * self.sample_rate))
                 diff_gate = np.diff(gate)
@@ -611,7 +604,7 @@ class Sequence(object):
         """Trim waveforms to match length of sequence
 
         """
-        if not self.trim_to_sequence:
+        if not (self.trim_to_sequence or self.align_to_end):
             return
         # find range of sequence
         (t0, t1) = self.find_range_of_sequence()
@@ -639,17 +632,32 @@ class Sequence(object):
             i0 = 0
         i1 = min(self.n_pts, int(np.ceil(t1 * self.sample_rate)))
 
-        # trim waveforms
-        for n in range(self.n_qubit):
-            self.wave_xy[n] = self.wave_xy[n][i0:i1]
-            self.wave_z[n] = self.wave_z[n][i0:i1]
-            self.wave_gate[n] = self.wave_gate[n][i0:i1]
-        if self.generate_readout_trig:
-            self.readout_trig = self.readout_trig[i0:i1]
-            # force readout trig to end in zero
-            self.readout_trig[-1] = 0.0
-        if self.generate_readout_iq and self.readout.match_main_size:
-            self.readout_iq = self.readout_iq[i0:i1]
+        if self.align_to_end:
+            # align pulses to end of waveform
+            m = self.n_pts - (i1 - i0)
+            for n in range(self.n_qubit):
+                self.wave_xy[n] = np.r_[np.zeros(m), self.wave_xy[n][i0:i1]]
+                self.wave_z[n] = np.r_[np.zeros(m), self.wave_z[n][i0:i1]]
+                self.wave_gate[n] = np.r_[np.zeros(m), self.wave_gate[n][i0:i1]]
+            if self.generate_readout_trig:
+                self.readout_trig = np.r_[np.zeros(m), self.readout_trig[i0:i1]]
+                # force readout trig to end in zero
+                self.readout_trig[-1] = 0.0
+            if self.generate_readout_iq and self.readout.match_main_size:
+                self.readout_iq = np.r_[np.zeros(m), self.readout_iq[i0:i1]]
+
+        else:
+            # trim waveforms
+            for n in range(self.n_qubit):
+                self.wave_xy[n] = self.wave_xy[n][i0:i1]
+                self.wave_z[n] = self.wave_z[n][i0:i1]
+                self.wave_gate[n] = self.wave_gate[n][i0:i1]
+            if self.generate_readout_trig:
+                self.readout_trig = self.readout_trig[i0:i1]
+                # force readout trig to end in zero
+                self.readout_trig[-1] = 0.0
+            if self.generate_readout_iq and self.readout.match_main_size:
+                self.readout_iq = self.readout_iq[i0:i1]
 
 
     def set_parameters(self, config={}):
@@ -671,10 +679,12 @@ class Sequence(object):
 
         # waveform parameters
         self.sample_rate = config.get('Sample rate')
+        self.readout_noise = config.get('Readout trig - noise floor level')
         self.n_pts = int(config.get('Number of points'))
         self.first_delay = config.get('First pulse delay')
         self.trim_to_sequence = config.get('Trim waveform to sequence')
         self.trim_start = config.get('Trim both start and end')
+        self.align_to_end = config.get('Align pulses to end of waveform')
 
         # single-qubit pulses
         for n, pulse in enumerate(self.pulses_1qb):
@@ -741,6 +751,7 @@ class Sequence(object):
 
         # tomography
         self.perform_tomography = config.get('Generate tomography pulse', False)
+        self.tomography.set_parameters(config)
 
         # predistortion
         self.perform_predistortion = config.get('Predistort waveforms', False)
