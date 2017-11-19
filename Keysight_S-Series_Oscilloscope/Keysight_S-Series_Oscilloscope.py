@@ -119,7 +119,20 @@ class Driver(VISA_Driver):
         for channelstr in ('Ch1 - Data', 'Ch2 - Data', 'Ch3 - Data', 'Ch4 - Data'):
             channel = int(channelstr[2])
             self.writeAndLog(':WMEM{}:CLE'.format(channel))
-        bFinished = self.askAndLog(':DIG; *OPC?')
+            
+        # Blocking client. Fast but if a trigger event does not arrive. Labber will spin its wheels until a timeout occurs.   
+        # bFinished = self.askAndLog(':DIG; *OPC?')
+
+        # non-blocking client. 
+        self.write(':SING')
+        Status = int(self.ask(':PDER?'))
+        while Status == 0:
+            self.wait(wait_time = 0.1)
+            Status = int(self.ask(':PDER?'))
+            if self.isStopped():
+                self.writeAndLog('*CLS;:INIT:CONT ON')
+                Status = 1
+                self.log('We exited the loop!', level = 30)
 
 
 if __name__ == '__main__':
