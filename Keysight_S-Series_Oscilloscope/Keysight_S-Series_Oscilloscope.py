@@ -13,7 +13,6 @@ class Driver(VISA_Driver):
     """ This class implements the Keysight N90xx instrument driver"""
     def performOpen(self, options={}):
         VISA_Driver.performOpen(self, options=options)
-        self.acquisitionsPerformed = 0
 
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
         """Perform the Set Value instrument operation. This function should return the actual value set by the instrument"""
@@ -44,24 +43,12 @@ class Driver(VISA_Driver):
         if quant.name in ('Ch1 - Data', 'Ch2 - Data', 'Ch3 - Data', 'Ch4 - Data'):
             # traces, get channel
             channel = int(quant.name[2])
-            if self.isConfigUpdated():
-                self.acquireData()
-                self.acquisitionsPerformed = 0
-
+            
             # check if channel is on
             if self.getValue('Ch%d - Enabled' % channel):
 
-                nTotalAcquisitions = self.nEnabledChannels() # returns with the total number of enabled channels
-
-                # Acquire data *once*. Prevents long averaging scans from happening sequentially for each oscilloscope channel.
-                if self.acquisitionsPerformed == 0:
+                if self.isFirstCall(options):
                     self.acquireData()
-                    if nTotalAcquisitions > 1:
-                        self.acquisitionsPerformed = self.acquisitionsPerformed + 1
-                elif (self.acquisitionsPerformed == (nTotalAcquisitions - 1)):
-                    self.acquisitionsPerformed = 0
-                else:
-                    self.acquisitionsPerformed = self.acquisitionsPerformed + 1
 
                 # the following code obtains the waveforms from memory.
 
@@ -115,11 +102,38 @@ class Driver(VISA_Driver):
         return count
 
     def acquireData(self):
-        self.writeAndLog('*CLS; :SYST:HEAD OFF; :ACQ:MODE RTIME; :ACQ:COMP 100; :WAV:FORM ASC')
+        self.write(':SYST:HEAD OFF; :ACQ:MODE RTIME; :ACQ:COMP 100; :WAV:FORM ASC; :TRIG:SWE AUTO')
         for channelstr in ('Ch1 - Data', 'Ch2 - Data', 'Ch3 - Data', 'Ch4 - Data'):
             channel = int(channelstr[2])
             self.writeAndLog(':WMEM{}:CLE'.format(channel))
-        bFinished = self.askAndLog(':DIG; *OPC?')
+        # Blocking client. Fast but if a trigger event does not arrive. Labber will spin its wheels until a timeout occurs.   
+        # bFinished = self.askAndLog(':DIG; *OPC?')
+
+        #non-blocking client.
+
+        if self.getValue('Averaging'):
+            self.ask(':STOP;*OPC?')
+            self.ask(':TER?') # trigger event register
+            self.write('*CLS; :SING')
+            Status = int(self.ask(':PDER?'))
+            count = 0
+            while (count < self.getValue('Number of averages') or Status == 0):
+                self.wait(wait_time = 0.1)
+                Status = int(self.ask(':PDER?'))
+                count = int(self.ask(':WAV:COUN?'))
+                if self.isStopped():
+                    self.writeAndLog('*CLS')
+                    Status = 1
+            self.ask(':STOP; *OPC?')
+        else:
+            self.write('*CLS; :SING')
+            Status = int(self.ask(':PDER?'))
+            while Status == 0:
+                Status = int(self.ask(':PDER?'))
+                self.wait(wait_time = 0.1)
+                if self.isStopped():
+                    self.writeAndLog('*CLS')
+                    Status = 1
 
 
 if __name__ == '__main__':
