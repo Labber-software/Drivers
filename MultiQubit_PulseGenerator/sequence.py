@@ -514,7 +514,7 @@ class Sequence(object):
             # create trig waveform directly
             i1 = min(int(round((t + self.readout_duration) * self.sample_rate)),
                      len(self.readout_trig) - 1)
-            self.readout_trig[i0:i1] = 1.0
+            self.readout_trig[i0:i1] = self.readout_amplitude
 
             # # create pulse object and insert into trig waveform
             # trig = Pulse(amplitude=self.readout_amplitude,
