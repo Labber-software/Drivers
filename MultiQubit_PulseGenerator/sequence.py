@@ -536,6 +536,9 @@ class Sequence(object):
             else:
                 i1 = min(len(self.readout_iq), i0 + len(wave))
                 self.readout_iq[i0:i1] = wave[:(i1 - i0)]
+            # add IQ offsets
+            self.readout_iq.real += self.i_offset
+            self.readout_iq.imag += self.q_offset
 
 
     def add_microwave_gate(self, config):
@@ -723,7 +726,7 @@ class Sequence(object):
                     pulse.plateau = config.get('Plateau, 2QB')
 
                 # Get Fourier values
-                if d[config.get('Fourier terms, 2QB')] == 4 : 
+                if d[config.get('Fourier terms, 2QB')] == 4 :
                     pulse.Lcoeff = np.array([config.get('L1, 2QB' + s),config.get('L2, 2QB' + s),config.get('L3, 2QB' + s),config.get('L4, 2QB' + s)])
                 elif d[config.get('Fourier terms, 2QB')] == 3 :
                     pulse.Lcoeff = np.array([config.get('L1, 2QB' + s),config.get('L2, 2QB' + s),config.get('L3, 2QB' + s)])
@@ -775,6 +778,9 @@ class Sequence(object):
         self.readout_delay = config.get('Readout delay')
         self.readout_amplitude = config.get('Readout trig amplitude')
         self.readout_duration = config.get('Readout trig duration')
+        self.iq_skew = config.get('Readout IQ skew')
+        self.i_offset = config.get('Readout offset - I')
+        self.q_offset = config.get('Readout offset - Q')
 
         # readout, wave settings
         self.generate_readout_iq = config.get('Generate readout waveform')

@@ -31,6 +31,7 @@ class Readout(object):
         self.freq_offset = 0.0
         self.use_phase_ref = False
         self.iq_ratio = 1.0
+        self.iq_skew = 0
 
 
     def set_parameters(self, config={}):
@@ -67,6 +68,7 @@ class Readout(object):
         self.freq_offset = config.get('Demodulation - Frequency offset')
         self.use_phase_ref = config.get('Use phase reference signal')
         self.iq_ratio = config.get('Readout I/Q ratio')
+        self.iq_skew = config.get('Readout IQ skew') * np.pi / 180
 
 
     def create_waveform(self, t_start=0.0):
@@ -109,12 +111,15 @@ class Readout(object):
 
             # remove phase drift due to LO-RF difference
             phi -= 2 * np.pi * self.freq_offset * t_start
+            # add IQ skew
+            phi_s = self.iq_skew
 
             # apply SSBM transform
             waveform += a * (y.real * np.cos(omega * t - phi) +
                              -y.imag * np.cos(omega * t - phi + np.pi / 2))
-            waveform += a * 1j * (y.real * np.sin(omega * t - phi) +
-                                  -y.imag * np.sin(omega * t - phi + np.pi / 2))
+            waveform += a * 1j * (y.real * np.sin(omega * t - phi + phi_s) +
+                                  -y.imag * np.sin(omega * t - phi + np.pi / 2
+                                                   + phi_s))
 
         # apply SSBM transform
         if self.iq_ratio != 1.0:
