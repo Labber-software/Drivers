@@ -57,6 +57,9 @@ class Predistortion(object):
         # store new path
         self.transfer_path = path
 
+        # return directly if not in use, look for both '' and '.'
+        if self.transfer_path.strip() in ('', '.'):
+            return
         import Labber
         f = Labber.LogFile(self.transfer_path)
         self.vResponse_freqs, self.vFilteredResponse_FFT_I = f.getTraceXY(y_channel = 0)
