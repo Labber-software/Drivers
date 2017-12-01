@@ -690,6 +690,7 @@ class Sequence(object):
             # global parameters
             pulse.shape = PulseShape(config.get('Pulse type'))
             pulse.truncation_range = config.get('Truncation range')
+            pulse.start_at_zero = config.get('Start at zero')
             pulse.use_drag = config.get('Use DRAG')
             # pulse shape
             if config.get('Uniform pulse shape'):
@@ -720,7 +721,7 @@ class Sequence(object):
                     pulse.plateau = config.get('Plateau, 2QB')
 
                 # Get Fourier values
-                if d[config.get('Fourier terms, 2QB')] == 4 : 
+                if d[config.get('Fourier terms, 2QB')] == 4 :
                     pulse.Lcoeff = np.array([config.get('L1, 2QB' + s),config.get('L2, 2QB' + s),config.get('L3, 2QB' + s),config.get('L4, 2QB' + s)])
                 elif d[config.get('Fourier terms, 2QB')] == 3 :
                     pulse.Lcoeff = np.array([config.get('L1, 2QB' + s),config.get('L2, 2QB' + s),config.get('L3, 2QB' + s)])
@@ -736,6 +737,7 @@ class Sequence(object):
 
             else:
                 pulse.truncation_range = config.get('Truncation range, 2QB')
+                pulse.start_at_zero = config.get('Start at zero, 2QB')
                 # pulse shape
                 if config.get('Uniform 2QB pulses'):
                     pulse.width = config.get('Width, 2QB')
