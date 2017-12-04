@@ -19,7 +19,7 @@ class Pulse(object):
         Pulse amplitude.
 
     width : float
-        Pulse rise/fall duration.  The parameter is defined so that the pulse 
+        Pulse rise/fall duration.  The parameter is defined so that the pulse
         gives the same integrated area as a square pulse with the given width.
 
     plateau : float
@@ -43,6 +43,9 @@ class Pulse(object):
     truncation_range : float
         Truncation range, measured in units of the `width` parameter.
 
+    start_at_zero : bool
+        If True, forces the pulse to start at zero amplitude
+
     z_pulse : bool
         If True, the pulse will be used for qubit Z control.
 
@@ -51,7 +54,7 @@ class Pulse(object):
     def __init__(self,F_Terms=1,Coupling=20E6,Offset=300E6,Lcoeff = np.array([0.3]),dfdV=0.5E9,period_2qb=50E-9, amplitude=0.5, width=10E-9, plateau=0.0,
                  frequency=0.0, phase=0.0, shape=PulseShape.GAUSSIAN,
                  use_drag=False, drag_coefficient=0.0, truncation_range=5.0,
-                 z_pulse=False):
+                 z_pulse=False, start_at_zero=False):
         # set variables
         self.amplitude = amplitude
         self.width = width
@@ -59,11 +62,12 @@ class Pulse(object):
         self.frequency = frequency
         self.phase = phase
         self.shape = shape
-        self.use_drag = use_drag    
+        self.use_drag = use_drag
         self.drag_coefficient = drag_coefficient
         self.truncation_range = truncation_range
         self.z_pulse = z_pulse
-        
+        self.start_at_zero = start_at_zero
+
         # For 2-qubit gates
         self.F_Terms = F_Terms
         self.Coupling = Coupling
@@ -155,6 +159,9 @@ class Pulse(object):
                         np.exp(-(t - (t0 + self.plateau / 2))**2 / (2 * std**2))
                     )
             values = values*self.amplitude
+            if self.start_at_zero:
+                values = values - values.min()
+                values = values/values.max()*self.amplitude
 
         elif self.shape == PulseShape.CZ:
             # notation and calculations are based on the Paper "Fast adiabatic qubit gates using only σ_z control" PRA 90, 022307 (2014)
@@ -186,7 +193,7 @@ class Pulse(object):
                 if i > 0 :
                     t_tau[i] = np.trapz(np.sin(theta_tau[0:i]),x=tau[0:i])
 
-            # Adding frequency pulse to waveform using 2Q pulse period. Padding waveform with theta_i if pulse width is less than 2Q pulse period. 
+            # Adding frequency pulse to waveform using 2Q pulse period. Padding waveform with theta_i if pulse width is less than 2Q pulse period.
             # Plateau is added as an extra extension of theta_f in the middle of the pulse.
             theta_t = np.ones(len(t))*theta_i
             for i in range(len(t)):
@@ -206,4 +213,3 @@ class Pulse(object):
 
 if __name__ == '__main__':
     pass
-

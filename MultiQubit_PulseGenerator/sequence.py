@@ -239,9 +239,6 @@ class Sequence(object):
             for n in range(1, self.n_qubit):
                 self.wave_xy[n][:] = 0.0
 
-        # I/Q waveform predistortion
-        self.predistort_waveforms()
-
         # cross-talk compensation
         self.perform_crosstalk_compensation()
 
@@ -253,6 +250,9 @@ class Sequence(object):
 
         # microwave gate switch waveform
         self.add_microwave_gate(config)
+
+        # I/Q waveform predistortion
+        self.predistort_waveforms()
 
         # create and return dictionary with waveforms
         data = dict()
@@ -559,10 +559,7 @@ class Sequence(object):
                                self.gate_delay) * self.sample_rate):] = 0.0
             else:
                 # non-uniform gate, find non-zero elements
-                if config.get('Predistort waveforms'):
-                    gate = np.array(np.abs(wave) > config.get('Gate - noise floor level'), dtype=float)
-                else:
-                    gate = np.array(np.abs(wave) > 0.0, dtype=float)
+                gate = np.array(np.abs(wave) > 0.0, dtype=float)
                 # fix gate overlap
                 n_overlap = int(np.round(self.gate_overlap * self.sample_rate))
                 diff_gate = np.diff(gate)
@@ -682,7 +679,7 @@ class Sequence(object):
 
         # waveform parameters
         self.sample_rate = config.get('Sample rate')
-        self.readout_noise = config.get('Readout trig - noise floor level')
+        self.readout_noise = 0.0
         self.n_pts = int(config.get('Number of points'))
         self.first_delay = config.get('First pulse delay')
         self.trim_to_sequence = config.get('Trim waveform to sequence')
@@ -696,6 +693,7 @@ class Sequence(object):
             # global parameters
             pulse.shape = PulseShape(config.get('Pulse type'))
             pulse.truncation_range = config.get('Truncation range')
+            pulse.start_at_zero = config.get('Start at zero')
             pulse.use_drag = config.get('Use DRAG')
             # pulse shape
             if config.get('Uniform pulse shape'):
@@ -742,6 +740,7 @@ class Sequence(object):
 
             else:
                 pulse.truncation_range = config.get('Truncation range, 2QB')
+                pulse.start_at_zero = config.get('Start at zero, 2QB')
                 # pulse shape
                 if config.get('Uniform 2QB pulses'):
                     pulse.width = config.get('Width, 2QB')
