@@ -67,6 +67,8 @@ class Pulse(object):
         self.truncation_range = truncation_range
         self.z_pulse = z_pulse
         self.start_at_zero = start_at_zero
+        self.iq_ratio = 1.0
+        self.iq_skew = 0.0
 
         # For 2-qubit gates
         self.F_Terms = F_Terms

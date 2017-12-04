@@ -325,16 +325,16 @@ class Sequence(object):
 
             # single-sideband mixing, get frequency
             omega = 2 * np.pi * pulse.frequency
+
             # apply SSBM transform
             data_i = (y.real * np.cos(omega * t - pulse.phase) +
                       -y.imag * np.cos(omega * t - pulse.phase + np.pi / 2))
-            data_q = (y.real * np.sin(omega * t - pulse.phase) +
-                      -y.imag * np.sin(omega * t - pulse.phase + np.pi / 2))
-            # # apply SSBM transform
-            # data_i = (-y.real * np.sin(omega * t - pulse.phase) +
-            #           y.imag * np.sin(omega * t - pulse.phase + np.pi / 2))
-            # data_q = (y.real * np.cos(omega * t - pulse.phase) +
-            #           -y.imag * np.cos(omega * t - pulse.phase + np.pi / 2))
+            data_q = (y.real * np.sin(omega * t - pulse.phase + pulse.iq_skew) +
+                      -y.imag * np.sin(omega * t - pulse.phase + pulse.iq_skew +
+                      np.pi / 2))
+
+            # correct arm imbalance
+            data_q *= pulse.iq_ratio
 
             # store result
             waveform[indices] += (data_i + 1j * data_q)
@@ -706,6 +706,9 @@ class Sequence(object):
             pulse.amplitude = config.get('Amplitude #%d' % m)
             pulse.frequency = config.get('Frequency #%d' % m)
             pulse.drag_coefficient = config.get('DRAG scaling #%d' % m)
+            # iq mixer imperfections
+            pulse.iq_ratio = config.get('IQ ratio #%d' % m, 1.0)
+            pulse.iq_skew = config.get('IQ skew #%d' % m, 0.0) * np.pi / 180
 
         # two-qubit pulses
         for n, pulse in enumerate(self.pulses_2qb):
