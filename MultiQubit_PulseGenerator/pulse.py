@@ -164,7 +164,7 @@ class Pulse(object):
                 values = values/values.max()*self.amplitude
 
         elif self.shape == PulseShape.CZ:
-            # notation and calculations are based on the Paper "Fast adiabatic qubit gates using only σ_z control" PRA 90, 022307 (2014)
+            # notation and calculations are based on the Paper "Fast adiabatic qubit gates using only sigma_z control" PRA 90, 022307 (2014)
 
             # Defining initial and final angles
             theta_i = np.arctan(self.Coupling/self.Offset) # Initial angle of on the |11>-|02> bloch sphere
