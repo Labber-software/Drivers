@@ -3,19 +3,10 @@
 from BaseDriver import LabberDriver
 import datetime
 
-dIndx = {'CH1': 0,
-         'CH2': 1,
-         'CH5': 2,
-         'CH6': 3
-         }
-
 
 class Driver(LabberDriver):
     def performOpen(self, options={}):
-        # List of current pressure values
-        self.lValues = [0.0] * len(dIndx)
-        # List to check if currently stored values have been read
-        self.lUpdated = [False] * len(dIndx)
+        pass
 
     def performGetValue(self, quant, options={}):
         """Perform the Get Value instrument operation"""
