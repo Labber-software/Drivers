@@ -5,6 +5,8 @@ from sequence_rb import SingleQubit_RB
 
 import importlib
 import numpy as np
+import os
+import sys
 
 # dictionary with built-in sequences
 SEQUENCES = {'Rabi': Rabi,
@@ -13,7 +15,7 @@ SEQUENCES = {'Rabi': Rabi,
              'C-phase Pulses': CZgates,
              'C-phase Echo': CZecho,
              '1QB Randomized Benchmarking': SingleQubit_RB,
-             'Custom': None}
+             'Custom': type(None)}
 
 
 class Driver(LabberDriver):
@@ -41,8 +43,12 @@ class Driver(LabberDriver):
                 if value == 'Custom':
                     # for custom python files
                     path = self.getValue('Custom Python file')
-                    mod = importlib.import_module(path)
-                    # the custom sequence class has to be named 'CustomSequence'
+                    (path, modName) = os.path.split(path)
+                    sys.path.append(path)
+                    modName = modName.split('.py')[0]  # strip suffix
+                    mod = importlib.import_module(modName)
+                    # the custom sequence class has to be named
+                    # 'CustomSequence'
                     self.sequence = mod.CustomSequence()
                 else:
                     # standard built-in sequence
@@ -51,7 +57,11 @@ class Driver(LabberDriver):
         elif (quant.name == 'Custom Python file' and
               self.getValue('Sequence') == 'Custom'):
             # for custom python files
-            mod = importlib.import_module(value)
+            path = self.getValue('Custom Python file')
+            (path, modName) = os.path.split(path)
+            modName = modName.split('.py')[0]  # strip suffix
+            sys.path.append(path)
+            mod = importlib.import_module(modName)
             # the custom sequence class has to be named 'CustomSequence'
             self.sequence = mod.CustomSequence()
         return value
