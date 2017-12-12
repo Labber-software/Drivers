@@ -121,8 +121,8 @@ class Driver(VISA_Driver):
         elif quant.name in ('Ch 1', 'Ch 2', 'Ch 3', 'Ch 4'):
             # convert and store new waveform, then mark as need of update
             ch = int(quant.name.split('Ch ')[1])
-            v_amp = self.getValue('Ch%d - Range' % ch)
-            self.data[ch - 1] = self.scaleWaveformToI8(value['y'], v_amp, ch)
+            v_pp = self.getValue('Ch%d - Range' % ch)
+            self.data[ch - 1] = self.scaleWaveformToI8(value['y'], v_pp, ch)
             self.wave_updated = True
 
         elif quant.name in ('Run'):
@@ -296,8 +296,9 @@ class Driver(VISA_Driver):
         self.write_raw(sCmd + sHead + vI8[start:start+length].tobytes())
         
 
-    def scaleWaveformToI8(self, vData, Vamp, ch):
+    def scaleWaveformToI8(self, vData, v_pp, ch):
         """Scales the waveform and returns data in a string of U16"""
+        Vamp = v_pp / 2.0
         # make sure waveform data is within the voltage range 
         truncate = self.getValue('Truncate waveform if out of range')
         if (not truncate) and (np.sum(vData > Vamp) or np.sum(vData < -Vamp)):
