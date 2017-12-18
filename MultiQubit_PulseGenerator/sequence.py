@@ -644,7 +644,10 @@ class Sequence(object):
                 # force readout trig to end in zero
                 self.readout_trig[-1] = 0.0
             if self.generate_readout_iq and self.readout.match_main_size:
-                self.readout_iq = np.r_[np.zeros(m), self.readout_iq[i0:i1]]
+                # Add offsets
+                self.readout_iq = \
+                    np.r_[np.zeros(m) + self.i_offset + 1j*self.q_offset,
+                          self.readout_iq[i0:i1]]
 
         else:
             # trim waveforms
