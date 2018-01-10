@@ -39,14 +39,15 @@ class CPMG(Sequence):
         pi_to_q = config['Add pi pulses to Q']
         duration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
-        t0 = self.first_delay + (self.pulses_1qb[0].width + self.pulses_1qb[0].plateau)*0.5
+        truncation = config['Truncation range']
+        t0 = self.first_delay + (self.pulses_1qb[0].width*2*truncation + self.pulses_1qb[0].plateau)*0.5
         # select type of refocusing pi pulse
         gate_pi = Gate.Yp if pi_to_q else Gate.Xp
 
         # add pulses for all active qubits
         for n, pulse in enumerate(self.pulses_1qb[:self.n_qubit]):
             # get effective pulse durations, for timing purposes
-            width = (pulse.width + pulse.plateau) if edge_to_edge else 0.0
+            width = (2*truncation*pulse.width + pulse.plateau) if edge_to_edge else 0.0
             pulse_total = width * (n_pulse + 1)
 
             # special case for -1 pulses => T1 experiment

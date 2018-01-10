@@ -431,7 +431,7 @@ class Sequence(object):
                 if g is None:
                     continue
                 # add gate to specific qubit waveform
-                self.add_single_gate(n, g, t0=self.time_pulse)
+                self.add_single_gate(n, g, t0=self.time_pulse+period/2)
             # after adding all pulses, increment current gate time
             self.time_pulse += period
 
