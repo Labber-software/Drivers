@@ -33,7 +33,6 @@ class Readout(object):
         self.iq_ratio = 1.0
         self.iq_skew = 0
 
-
     def set_parameters(self, config={}):
         """Set base parameters using config from from Labber driver
 
@@ -46,8 +45,11 @@ class Readout(object):
         # get frequencies and amplitudes
         for n in range(self.max_qubit):
             self.frequencies[n] = config.get('Readout frequency #%d' % (n + 1))
-            # amplitudes are currently same for all
-            self.amplitudes[n] = config.get('Readout amplitude')
+            if config.get('Uniform readout amplitude') is True:
+                self.amplitudes[n] = config.get('Readout amplitude')
+            else:
+                self.amplitudes[n] = config.get('Readout amplitude #%d' % (n + 1))
+
         # get other parameters
         self.duration = config.get('Readout duration')
         self.sample_rate = config.get('Sample rate')
@@ -69,7 +71,6 @@ class Readout(object):
         self.use_phase_ref = config.get('Use phase reference signal')
         self.iq_ratio = config.get('Readout I/Q ratio')
         self.iq_skew = config.get('Readout IQ skew') * np.pi / 180
-
 
     def create_waveform(self, t_start=0.0):
         """Generate readout waveform
@@ -126,7 +127,6 @@ class Readout(object):
             waveform.real *= self.iq_ratio
 
         return waveform
-
 
     def demodulate(self, n, signal, ref=None):
         """Calculate complex signal from data and reference
@@ -190,7 +190,6 @@ class Readout(object):
             dAngleRef = np.arctan2(Qref, Iref)
             values /= (np.cos(dAngleRef) + 1j * np.sin(dAngleRef))
         return values
-
 
 
 if __name__ == '__main__':
