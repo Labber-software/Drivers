@@ -4,6 +4,10 @@ import scipy.linalg as splin
 import time
 import sys
 
+# add logger, to allow logging to Labber's instrument log
+import logging
+log = logging.getLogger('LabberDriver')
+
 MAC = (sys.platform == 'darwin')
 
 if MAC:
@@ -94,7 +98,7 @@ class NoiseCfg():
             vUnique = self.calc1fNoise(dtNoise, nElem)
         elif self.model == NoiseCfg.NOISEWHITE:
             # white noise, return a vector
-            vUnique = np.random.randn(nElem)*np.sqrt(1/dtNoise)
+            vUnique = np.random.randn(nElem) #*np.sqrt(1/dtNoise)
         # create the full-length vector by keeping constant elements
         vNoise = np.reshape(np.outer(vUnique, np.ones(nConst)), nElem*nConst)
         return vNoise[0:nLen]

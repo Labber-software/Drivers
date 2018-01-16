@@ -33,7 +33,6 @@ class Readout(object):
         self.iq_ratio = 1.0
         self.iq_skew = 0
 
-
     def set_parameters(self, config={}):
         """Set base parameters using config from from Labber driver
 
@@ -46,8 +45,11 @@ class Readout(object):
         # get frequencies and amplitudes
         for n in range(self.max_qubit):
             self.frequencies[n] = config.get('Readout frequency #%d' % (n + 1))
-            # amplitudes are currently same for all
-            self.amplitudes[n] = config.get('Readout amplitude')
+            if config.get('Uniform readout amplitude') is True:
+                self.amplitudes[n] = config.get('Readout amplitude')
+            else:
+                self.amplitudes[n] = config.get('Readout amplitude #%d' % (n + 1))
+
         # get other parameters
         self.duration = config.get('Readout duration')
         self.sample_rate = config.get('Sample rate')
@@ -69,7 +71,6 @@ class Readout(object):
         self.use_phase_ref = config.get('Use phase reference signal')
         self.iq_ratio = config.get('Readout I/Q ratio')
         self.iq_skew = config.get('Readout IQ skew') * np.pi / 180
-
 
     def create_waveform(self, t_start=0.0):
         """Generate readout waveform
@@ -126,7 +127,6 @@ class Readout(object):
             waveform.real *= self.iq_ratio
 
         return waveform
-
 
     def demodulate(self, n, signal, ref=None):
         """Calculate complex signal from data and reference
@@ -191,6 +191,77 @@ class Readout(object):
             values /= (np.cos(dAngleRef) + 1j * np.sin(dAngleRef))
         return values
 
+    def demodulate_iq(self, n, signal_i, signal_q, ref=None):
+        """Calculate complex signal from complex data and reference
+
+        Parameters
+        ----------
+        n : int
+            Qubit number for which to demodulate
+
+        signal_i : dict
+            Dictionary with in-phase signal data
+
+        signal_q : dict
+            Dictionary with qudrature signal data
+
+        ref : dict
+            Dictionary with reference data
+
+        Returns
+        -------
+        values : complex numpy array
+            Complex array matching number of segments in input
+
+        """
+        # get parameters
+        frequency = self.frequencies[n] - self.freq_offset
+        n_segment = 1
+        # get input data from dict, with keys {'y': value, 't0': t0, 'dt': dt}
+        if signal_i is None or signal_q is None:
+            return np.zeros(n_segment, dtype=complex)
+        vI = signal_i['y']
+        vQ = signal_q['y']
+        if vI.shape != vQ.shape:
+            raise ValueError('I and Q must have the same shape.')
+
+        dt = signal_i['dt']
+        # avoid exceptions if no time step is given
+        if dt == 0:
+            dt = 1.0
+        # get indices for data trimming
+        n0 = int(round(self.demod_skip / dt))
+        n_total = vI.size
+        length = 1 + int(round(self.demod_length / dt))
+        length = min(length, int(n_total / n_segment) - n0)
+        if length <= 1:
+            return np.zeros(n_segment, dtype=complex)
+
+        # define data to use, put in 2d array of segments
+        vData = np.reshape(vI+1j*vQ, (n_segment, int(n_total / n_segment)))
+        # calculate cos/sin vectors, allow segmenting
+        vTime = dt * (n0 + np.arange(length, dtype=float))
+        vS = np.exp(-2j * np.pi * vTime * frequency)
+
+        # calc I/Q
+        dI = np.trapz((vS*vData[:, n0:n0+length]).real)/float(length-1)
+        dQ = -np.trapz((vS*vData[:, n0:n0+length]).imag)/float(length-1)
+        values = dI + 1j * dQ
+        if self.use_phase_ref and ref is not None:
+            # skip reference if trace length doesn't match
+            if len(ref['y']) != len(vI):
+                return values
+            vRef = np.reshape(ref['y'], (n_segment, int(n_total / n_segment)))
+            vCos = np.cos(2 * np.pi * vTime * frequency)
+            vSin = np.sin(2 * np.pi * vTime * frequency)
+            Iref = (2 * np.trapz(vCos * vRef[:, n0:n0 + length]) /
+                    float(length - 1))
+            Qref = (2 * np.trapz(vSin * vRef[:, n0:n0 + length]) /
+                    float(length - 1))
+            # subtract the reference angle
+            dAngleRef = np.arctan2(Qref, Iref)
+            values /= (np.cos(dAngleRef) + 1j * np.sin(dAngleRef))
+        return values
 
 
 if __name__ == '__main__':

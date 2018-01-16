@@ -83,10 +83,18 @@ class Driver(LabberDriver):
                 self.sequence.set_parameters(config)
             # get qubit index and waveforms
             n = int(quant.name.split('Voltage, QB')[1]) - 1
-            signal = self.getValue('Demodulation - Input')
+            demod_iq = self.getValue('Demodulation - IQ')
+            if demod_iq:
+                signal_i = self.getValue('Demodulation - Input I')
+                signal_q = self.getValue('Demodulation - Input Q')
+            else:
+                signal = self.getValue('Demodulation - Input')
             ref = self.getValue('Demodulation - Reference')
             # perform demodulation
-            value = np.mean(self.sequence.readout.demodulate(n, signal, ref))
+            if demod_iq:
+                value = np.mean(self.sequence.readout.demodulate_iq(n, signal_i, signal_q, ref))
+            else:
+                value = np.mean(self.sequence.readout.demodulate(n, signal, ref))
 
         elif quant.isVector():
             # traces, check if waveform needs to be re-calculated
