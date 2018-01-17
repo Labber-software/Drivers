@@ -57,8 +57,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
                        nRep=int(self.getValue('Number of randomizations')),
                        dDriveFreq=self.getValue('Drive frequency')/1E9,
                        bRelFreq=bool(self.getValue('Drive relative to qubit frequency')),
-                       bRWA=bool(self.getValue('Use rotating frame')),
-                       bRotFrame=bool(self.getValue('Use rotating-wave approximation')))
+                       bRotFrame=bool(self.getValue('Use rotating frame')),
+                       bRWA=bool(self.getValue('Use rotating-wave approximation')))
         # get noise config
         nNoise = int(self.getValueIndex('Noise sources'))
         lNoiseCfg = []

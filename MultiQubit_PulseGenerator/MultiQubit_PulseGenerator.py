@@ -1,39 +1,67 @@
 #!/usr/bin/env python
 from BaseDriver import LabberDriver
-from sequence_builtin import Rabi, CPMG, PulseTrain 
+from sequence_builtin import Rabi, CPMG, PulseTrain, CZgates, CZecho
+from sequence_rb import SingleQubit_RB
 
 import importlib
+import numpy as np
+import os
+import sys
+
+# dictionary with built-in sequences
+SEQUENCES = {'Rabi': Rabi,
+             'CP/CPMG': CPMG,
+             'Pulse train': PulseTrain,
+             'C-phase Pulses': CZgates,
+             'C-phase Echo': CZecho,
+             '1QB Randomized Benchmarking': SingleQubit_RB,
+             'Custom': type(None)}
 
 
 class Driver(LabberDriver):
-    """ This class implements a multi-qubit pulse generator"""
+    """This class implements a multi-qubit pulse generator."""
 
     def performOpen(self, options={}):
-        """Perform the operation of opening the instrument connection"""
+        """Perform the operation of opening the instrument connection."""
         # init variables
         self.sequence = None
         self.values = {}
+        # always create a sequence at startup
+        name = self.getValue('Sequence')
+        self.sendValueToOther('Sequence', name)
 
 
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
-        """Perform the Set Value instrument operation. 
-
-        """
+        """Perform the Set Value instrument operation."""
         # only do something here if changing the sequence type
-        if quant.name == 'Sequence' and value != 'Custom':
-            # create new sequence if needed
-            if (value != quant.getValue()) or (self.sequence is None):
-                # create a new sequence object
-                if value == 'Rabi':
-                    self.sequence = Rabi()
-                elif value == 'CP/CPMG':
-                    self.sequence = CPMG()
-                elif value == 'Pulse train':
-                    self.sequence = PulseTrain()
+        if quant.name == 'Sequence':
+            # create new sequence if sequence type changed
+            new_type = SEQUENCES[value]
 
-        elif quant.name =='Custom python file':
+            if not isinstance(self.sequence, new_type):
+                # create a new sequence object
+                if value == 'Custom':
+                    # for custom python files
+                    path = self.getValue('Custom Python file')
+                    (path, modName) = os.path.split(path)
+                    sys.path.append(path)
+                    modName = modName.split('.py')[0]  # strip suffix
+                    mod = importlib.import_module(modName)
+                    # the custom sequence class has to be named
+                    # 'CustomSequence'
+                    self.sequence = mod.CustomSequence()
+                else:
+                    # standard built-in sequence
+                    self.sequence = new_type()
+
+        elif (quant.name == 'Custom Python file' and
+              self.getValue('Sequence') == 'Custom'):
             # for custom python files
-            mod = importlib.import_module(value)
+            path = self.getValue('Custom Python file')
+            (path, modName) = os.path.split(path)
+            modName = modName.split('.py')[0]  # strip suffix
+            sys.path.append(path)
+            mod = importlib.import_module(modName)
             # the custom sequence class has to be named 'CustomSequence'
             self.sequence = mod.CustomSequence()
         return value
@@ -43,8 +71,32 @@ class Driver(LabberDriver):
         """Perform the Get Value instrument operation
 
         """
+        # ignore if no sequence
+        if self.sequence is None:
+            return quant.getValue()
         # check type of quantity
-        if quant.isVector():
+        if quant.name.startswith('Voltage, QB'):
+            # perform demodulation, check if config is updated
+            if self.isConfigUpdated():
+                # update sequence object with current driver configuation
+                config = self.instrCfg.getValuesDict()
+                self.sequence.set_parameters(config)
+            # get qubit index and waveforms
+            n = int(quant.name.split('Voltage, QB')[1]) - 1
+            demod_iq = self.getValue('Demodulation - IQ')
+            if demod_iq:
+                signal_i = self.getValue('Demodulation - Input I')
+                signal_q = self.getValue('Demodulation - Input Q')
+            else:
+                signal = self.getValue('Demodulation - Input')
+            ref = self.getValue('Demodulation - Reference')
+            # perform demodulation
+            if demod_iq:
+                value = np.mean(self.sequence.readout.demodulate_iq(n, signal_i, signal_q, ref))
+            else:
+                value = np.mean(self.sequence.readout.demodulate(n, signal, ref))
+
+        elif quant.isVector():
             # traces, check if waveform needs to be re-calculated
             if self.isConfigUpdated():
                 # update sequence object with current driver configuation
@@ -63,7 +115,7 @@ class Driver(LabberDriver):
     def getWaveformFromMemory(self, quant):
         """Return data from already calculated waveforms"""
         # check which data to return
-        if quant.name[-1] in ('1','2','3','4','5','6','7','8','9'):
+        if quant.name[-1] in ('1', '2', '3', '4', '5', '6', '7', '8', '9'):
             # get name and number of qubit waveform asked for
             name = quant.name[:-1]
             n = int(quant.name[-1]) - 1
@@ -85,9 +137,10 @@ class Driver(LabberDriver):
 
         elif quant.name == 'Trace - Readout trig':
             value = self.values['readout_trig']
-
-        elif quant.name == 'Trace - Readout IQ':
-            value = self.values['readout_iq']
+        elif quant.name == 'Trace - Readout I':
+            value = self.values['readout_iq'].real
+        elif quant.name == 'Trace - Readout Q':
+            value = self.values['readout_iq'].imag
 
         # return data as dict with sampling information
         dt = 1 / self.sequence.sample_rate

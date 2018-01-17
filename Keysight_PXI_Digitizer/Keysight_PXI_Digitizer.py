@@ -1,13 +1,15 @@
 #!/usr/bin/env python
-from __future__ import division
+import sys
+sys.path.append('C:\Program Files (x86)\Keysight\SD1\Libraries\Python')
 
-import InstrumentDriver
-import signadyne
+from BaseDriver import LabberDriver, Error, IdError
+import keysightSD1
+
 import numpy as np
 
 
-class Driver(InstrumentDriver.InstrumentWorker):
-    """ This class implements a Signadyne file handler"""
+class Driver(LabberDriver):
+    """ This class implements the Keysight PXI digitizer"""
 
     def performOpen(self, options={}):
         """Perform the operation of opening the instrument connection"""
@@ -17,10 +19,11 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # timeout
         self.timeout_ms = int(1000 * self.dComCfg['Timeout'])
         # create AWG instance
-        self.dig = signadyne.SD_AIN()
+        self.dig = keysightSD1.SD_AIN()
         AWGPart = self.dig.getProductNameBySlot(1, int(self.comCfg.address))
+        self.log('Serial:', self.dig.getSerialNumberBySlot(1, int(self.comCfg.address)))
         if not isinstance(AWGPart, str):
-            raise InstrumentDriver.Error('Unit not available')
+            raise Error('Unit not available')
         # check that model is supported
         dOptionCfg = self.dInstrCfg['options']
         for validId, validName in zip(dOptionCfg['model_id'], dOptionCfg['model_str']):
@@ -29,7 +32,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 break
         else:
             # loop fell through, raise ID error
-            raise InstrumentDriver.IdError(AWGPart, dOptionCfg['model_id'])
+            raise IdError(AWGPart, dOptionCfg['model_id'])
         # set model
         self.setModel(validName)
         # sampling rate and number of channles is set by model
@@ -44,6 +47,20 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # create list of sampled data
         self.lTrace = [np.array([])] * self.nCh
         self.dig.openWithSlot(AWGPart, 1, int(self.comCfg.address))
+        # get hardware version - changes numbering of channels
+        hw_version = self.dig.getHardwareVersion()
+        if hw_version >= 4:
+            # KEYSIGHT - channel numbers start with 1
+            self.ch_index_zero = 1
+        else:
+            # SIGNADYNE - channel numbers start with 0
+            self.ch_index_zero = 0
+        self.log('HW:', hw_version)
+
+
+    def get_hw_ch(self, n):
+        """Get hardware channel number for channel n. n starts at 0"""
+        return n + self.ch_index_zero
 
 
     def performClose(self, bError=False, options={}):
@@ -52,7 +69,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         try:
             # flush all memory
             for n in range(self.nCh):
-                self.dig.DAQflush(n)
+                self.log('Close ch:', n, self.dig.DAQflush(self.get_hw_ch(n)))
             # close instrument
             self.dig.close()
         except:
@@ -67,32 +84,33 @@ class Driver(InstrumentDriver.InstrumentWorker):
         quant.setValue(value)
         # check if channel-specific, if so get channel + name
         if quant.name.startswith('Ch') and len(quant.name)>6:
-            ch = int(quant.name[2])
+            ch = int(quant.name[2]) - 1
             name = quant.name[6:]
         else:
             ch, name = None, ''
         # proceed depending on command
-        if quant.name in ('External Trig Source', 'External Trig Config'):
+        if quant.name in ('External Trig Source', 'External Trig Config',
+                          'Trig Sync Mode'):
             extSource = int(self.getCmdStringFromValue('External Trig Source'))
             trigBehavior = int(self.getCmdStringFromValue('External Trig Config'))
-            self.dig.DAQtriggerExternalConfig(0, extSource, trigBehavior)
-        elif quant.name in ('Trig I/O', 'Trig Sampling Mode'):
+            sync = int(self.getCmdStringFromValue('Trig Sync Mode'))
+            self.dig.DAQtriggerExternalConfig(0, extSource, trigBehavior, sync)
+        elif quant.name in ('Trig I/O', ):
             # get direction and sync from index of comboboxes
             direction = int(self.getCmdStringFromValue('Trig I/O'))
-            sync = int(self.getCmdStringFromValue('Trig Sampling Mode'))
-            self.dig.triggerIOconfig(direction, sync)
+            self.dig.triggerIOconfig(direction)
         elif quant.name in ('Analog Trig Channel', 'Analog Trig Config', 'Trig Threshold'):
             # get trig channel
             trigCh = self.getValueIndex('Analog Trig Channel')
             mod = int(self.getCmdStringFromValue('Analog Trig Config'))
             threshold = self.getValue('Trig Threshold')
-            self.dig.channelTriggerConfig(trigCh, mod, threshold)
+            self.dig.channelTriggerConfig(self.get_hw_ch(trigCh), mod, threshold)
         elif name in ('Range', 'Impedance', 'Coupling'):
             # set range, impedance, coupling at once
             rang = self.getRange(ch)
-            imp = int(self.getCmdStringFromValue('Ch%d - Impedance' % ch))
-            coup = int(self.getCmdStringFromValue('Ch%d - Coupling' % ch))
-            self.dig.channelInputConfig(ch, rang, imp, coup)
+            imp = int(self.getCmdStringFromValue('Ch%d - Impedance' % (ch + 1)))
+            coup = int(self.getCmdStringFromValue('Ch%d - Coupling' % (ch + 1)))
+            self.dig.channelInputConfig(self.get_hw_ch(ch), rang, imp, coup)
         return value
 
         
@@ -101,7 +119,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         return the actual value set by the instrument"""
         # check if channel-specific, if so get channel + name
         if quant.name.startswith('Ch') and len(quant.name)>6:
-            ch = int(quant.name[2])
+            ch = int(quant.name[2]) - 1
             name = quant.name[6:]
         else:
             ch, name = None, ''
@@ -136,7 +154,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         lCh = []
         iChMask = 0
         for n in range(self.nCh):
-            if self.getValue('Ch%d - Enabled' % n):
+            if self.getValue('Ch%d - Enabled' % (n + 1)):
                 lCh.append(n)
                 iChMask += 2**n
         # get current settings
@@ -148,14 +166,16 @@ class Driver(InstrumentDriver.InstrumentWorker):
 
         if bArm:
             # configure trigger for all active channels
-            for ch in lCh:
+            for nCh in lCh:
+                # channel number depens on hardware version
+                ch = self.get_hw_ch(nCh)
                 # extra config for trig mode
                 if self.getValue('Trig Mode') == 'Digital trigger':
                     extSource = int(self.getCmdStringFromValue('External Trig Source'))
                     trigBehavior = int(self.getCmdStringFromValue('External Trig Config'))
-                    self.dig.DAQtriggerExternalConfig(ch, extSource, trigBehavior)
-    #                analogTriggerMask = 0
-    #                self.dig.DAQtriggerConfig(ch, trigBehavior, extSource, analogTriggerMask)
+                    sync = int(self.getCmdStringFromValue('Trig Sync Mode'))
+                    self.dig.DAQtriggerExternalConfig(ch, extSource, trigBehavior, sync)
+                    self.dig.DAQdigitalTriggerConfig(ch, extSource, trigBehavior)
                 elif self.getValue('Trig Mode') == 'Analog channel':
                     digitalTriggerMode= 0
                     digitalTriggerSource = 0
@@ -183,31 +203,33 @@ class Driver(InstrumentDriver.InstrumentWorker):
             # number of cycles for this call, could be fewer for last call
             nCycle = min(nCyclePerCall, nCycleTotal-(n*nCyclePerCall))
             # capture traces one by one
-            for ch in lCh:
+            for nCh in lCh:
+                # channel number depens on hardware version
+                ch = self.get_hw_ch(nCh)
                 data = self.DAQread(self.dig, ch, nPts*nCycle, int(self.timeout_ms/nCall))
                 # average, if wanted
-                scale = (self.getRange(ch)/self.bitRange)
+                scale = (self.getRange(nCh)/self.bitRange)
                 if nAv > 1 and data.size>0:
                     nAvHere = nCycle/nSeg
                     data = data.reshape((int(nAvHere), nPts*nSeg)).mean(0)
                     # adjust scaling to account for summing averages
-                    scale = lScale[ch]*(nAvHere/nAv)
+                    scale = lScale[nCh]*(nAvHere/nAv)
                 else:
                     # use pre-calculated scaling
-                    scale = lScale[ch]
+                    scale = lScale[nCh]
                 # convert to voltage, add to total average
                 if n==0:
-                    self.lTrace[ch] = data*scale
+                    self.lTrace[nCh] = data*scale
                 else:
-                    self.lTrace[ch] += data*scale
+                    self.lTrace[nCh] += data*scale
 #                lT.append('N: %d, Tot %.1f ms' % (n, 1000*(time.clock()-t0)))
 #        # log timing info
 #        self.log(': '.join(lT))
 
 
     def getRange(self, ch):
-        """Get channel range, as voltage"""
-        rang = float(self.getCmdStringFromValue('Ch%d - Range' % ch))
+        """Get channel range, as voltage.  Index start at 0"""
+        rang = float(self.getCmdStringFromValue('Ch%d - Range' % (ch + 1)))
         return rang
         
 
@@ -215,17 +237,17 @@ class Driver(InstrumentDriver.InstrumentWorker):
         """Read data diretly to numpy array"""
         if dig._SD_Object__handle > 0:
             if nPoints > 0:
-                data = (signadyne.c_short * nPoints)()
-                nPointsOut = dig._SD_Object__signadyne_dll.SD_AIN_DAQread(dig._SD_Object__handle, nDAQ, data, nPoints, timeOut)
+                data = (keysightSD1.c_short * nPoints)()
+                nPointsOut = dig._SD_Object__core_dll.SD_AIN_DAQread(dig._SD_Object__handle, nDAQ, data, nPoints, timeOut)
                 if nPointsOut > 0:
                     return np.frombuffer(data, dtype=np.int16, count=nPoints)
                 else:
                     return np.array([], dtype=np.int16)
             else:
-                return signadyne.SD_Error.INVALID_VALUE
+                return keysightSD1.SD_Error.INVALID_VALUE
         else:
-            return signadyne.SD_Error.MODULE_NOT_OPENED
+            return keysightSD1.SD_Error.MODULE_NOT_OPENED
 
 
 if __name__ == '__main__':
-	pass
+    pass

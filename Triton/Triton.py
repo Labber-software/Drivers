@@ -6,6 +6,7 @@ import visa
 from InstrumentConfig import InstrumentQuantity
 import numpy as np
 import string
+from builtins import str
 
 __version__ = "0.0.1"
 
@@ -22,7 +23,8 @@ class Driver(VISA_Driver):
         
         #Detect options: (vector) magnet and swicth heater
         detectedOptions = []
-        rate = self.askAndLog('READ:SYS:VRM:RFMX').strip().rsplit(':',1)[1][1:-1].translate(None,string.letters+"/").split()
+        table = str.maketrans(dict.fromkeys(string.ascii_letters+'/'))
+        rate = self.askAndLog('READ:SYS:VRM:RFMX').strip().rsplit(':',1)[1][1:-1].translate(table).split()
         if float(rate[0]) > 0:
             detectedOptions.append("x magnet")
         if float(rate[1]) > 0:
@@ -85,7 +87,8 @@ class Driver(VISA_Driver):
             coordFunc = self.instrCfg.getQuantity('CoordSys')
             if not self.Bresult:
                 vectValue = self.askAndLog(quant.get_cmd).strip()
-                self.Bresult = vectValue.rsplit(':',1)[1][1:-1].translate(None,string.letters).split()
+                table = str.maketrans(dict.fromkeys(string.ascii_letters))
+                self.Bresult = vectValue.rsplit(':',1)[1][1:-1].translate(table).split()
             #Vector results depend on the coordinate system
             value = float('nan')
             if coordFunc.getValue() == 'Cartesian':
@@ -190,11 +193,12 @@ class Driver(VISA_Driver):
         coordFunc = self.instrCfg.getQuantity('CoordSys')
         if self.Bchanged == False:
             self.askAndLog('SET:SYS:VRM:ACTN:HOLD')
-            waitForIdle()
+            self.waitForIdle()
             self.performSetValue(coordFunc, coordFunc.getValue())
             self.performGetValue(coordFunc)
         vectValue = self.askAndLog("READ:SYS:VRM:VSET").strip()
-        a,b,c = vectValue.rsplit(':',1)[1][1:-1].translate(None,string.letters).split()
+        table = str.maketrans(dict.fromkeys(string.ascii_letters))
+        a,b,c = vectValue.rsplit(':',1)[1][1:-1].translate(table).split()
         if coordFunc.getValue() == 'Cartesian':
             if axis == 'Bx':
                 a = value
