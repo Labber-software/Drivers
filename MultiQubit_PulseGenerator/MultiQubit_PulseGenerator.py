@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from BaseDriver import LabberDriver
 from sequence_builtin import Rabi, CPMG, PulseTrain, CZgates, CZecho
-from sequence_rb import SingleQubit_RB
+from sequence_rb import SingleQubit_RB, TwoQubit_RB
 
 import importlib
 import numpy as np
@@ -14,7 +14,8 @@ SEQUENCES = {'Rabi': Rabi,
              'Pulse train': PulseTrain,
              'C-phase Pulses': CZgates,
              'C-phase Echo': CZecho,
-             '1QB Randomized Benchmarking': SingleQubit_RB,
+             '1-QB Randomized Benchmarking': SingleQubit_RB,
+             '2-QB Randomized Benchmarking': TwoQubit_RB,
              'Custom': type(None)}
 
 
