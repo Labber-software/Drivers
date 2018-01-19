@@ -318,7 +318,7 @@ class SingleQubit_RB(Sequence):
         singleQ_gate =np.matrix([[1,0],[0,1]])
         for i in range(len(gate_seq)):
             if (gate_seq[i] == Gate.I):
-                singleQ_gate = np.matmul(np.matrix([[1,-1j],[-1j,1]])/np.sqrt(2), singleQ_gate)
+                pass
             elif (gate_seq[i] == Gate.X2p):
                 singleQ_gate = np.matmul(np.matrix([[1,-1j],[-1j,1]])/np.sqrt(2), singleQ_gate)
             elif (gate_seq[i] == Gate.X2m):
