@@ -329,7 +329,7 @@ class SingleQubit_RB(Sequence):
             elif (gate_seq[i] == Gate.Y2m):
                 singleQ_gate = np.matmul(np.matrix([[1,1],[-1,1]])/np.sqrt(2), singleQ_gate)
             elif (gate_seq[i] == Gate.Xp):
-                singleQ_gate = np.matmul(np.matrix([[0,1],[1,0]]), singleQ_gate)
+                singleQ_gate = np.matmul(np.matrix([[0,-1j],[-1j,0]]), singleQ_gate)
             elif (gate_seq[i] == Gate.Xm):
                 singleQ_gate = np.matmul(np.matrix([[0,1j],[1j,0]]), singleQ_gate)
             elif (gate_seq[i] == Gate.Yp):
@@ -340,20 +340,20 @@ class SingleQubit_RB(Sequence):
 
     def get_recovery_gate(self,gate_seq):
         """get recovery gate"""
-        qubit_state = np.matrix('0; 1') # initial state: ground state
+        qubit_state = np.matrix('1; 0') # initial state: ground state (Following the QC community's convention, )
         qubit_state =  np.matmul(self.evalulate_seq(gate_seq), qubit_state)
         #find recovery gate which makes qubit_state return to the initial state
-        if (np.abs(np.linalg.norm(qubit_state.item((1, 0))) - 1) < 0.1): # ground state -> I 
+        if (np.abs(np.linalg.norm(qubit_state.item((0, 0))) - 1) < 0.1): # ground state -> I 
              recovery_gate = Gate.I
-        elif (np.abs(np.linalg.norm(qubit_state.item((0, 0))) - 1) < 0.1): # excited state -> X Pi
+        elif (np.abs(np.linalg.norm(qubit_state.item((1, 0))) - 1) < 0.1): # excited state -> X Pi
              recovery_gate = Gate.Xp
-        elif (np.linalg.norm(qubit_state.item((0, 0)) / qubit_state.item((1,0)) - 1) < 0.1): # X State  -> Y +Pi/2
+        elif (np.linalg.norm(qubit_state.item((1, 0)) / qubit_state.item((0,0)) + 1) < 0.1): # X State  -> Y +Pi/2
              recovery_gate = Gate.Y2p
-        elif (np.linalg.norm(qubit_state.item((0, 0)) / qubit_state.item((1,0)) + 1) < 0.1): # -X State -> Y -Pi/2
+        elif (np.linalg.norm(qubit_state.item((1, 0)) / qubit_state.item((0,0)) - 1) < 0.1): # -X State -> Y -Pi/2
              recovery_gate = Gate.Y2m
-        elif (np.linalg.norm(qubit_state.item((0, 0)) / qubit_state.item((1,0)) + 1j) < 0.1): # Y State -> X -Pi/2
+        elif (np.linalg.norm(qubit_state.item((1, 0)) / qubit_state.item((0,0)) + 1j) < 0.1): # Y State -> X -Pi/2
              recovery_gate = Gate.X2m
-        elif (np.linalg.norm(qubit_state.item((0, 0)) / qubit_state.item((1,0)) - 1j) < 0.1): # -Y State -> X +Pi/2
+        elif (np.linalg.norm(qubit_state.item((1, 0)) / qubit_state.item((0,0)) - 1j) < 0.1): # -Y State -> X +Pi/2
              recovery_gate = Gate.X2p
         else:
             raise InstrumentDriver.Error('Error in calculating recovery gate. qubit state:' + str(qubit_state))
@@ -450,7 +450,7 @@ class TwoQubit_RB(Sequence):
             elif (gate_seq_1[i] == Gate.Y2m):
                 gate_1 = np.matmul(np.matrix([[1,1],[-1,1]])/np.sqrt(2), gate_1)
             elif (gate_seq_1[i] == Gate.Xp):
-                gate_1 = np.matmul(np.matrix([[0,1],[1,0]]), gate_1)
+                gate_1 = np.matmul(np.matrix([[0,-1j],[-1j,0]]), gate_1)
             elif (gate_seq_1[i] == Gate.Xm):
                 gate_1 = np.matmul(np.matrix([[0,1j],[1j,0]]), gate_1)
             elif (gate_seq_1[i] == Gate.Yp):
@@ -470,7 +470,7 @@ class TwoQubit_RB(Sequence):
             elif (gate_seq_2[i] == Gate.Y2m):
                 gate_2 = np.matmul(np.matrix([[1,1],[-1,1]])/np.sqrt(2), gate_2)
             elif (gate_seq_2[i] == Gate.Xp):
-                gate_2 = np.matmul(np.matrix([[0,1],[1,0]]), gate_2)
+                gate_2 = np.matmul(np.matrix([[0,-1j],[-1j,0]]), gate_2)
             elif (gate_seq_2[i] == Gate.Xm):
                 gate_2 = np.matmul(np.matrix([[0,1j],[1j,0]]), gate_2)
             elif (gate_seq_2[i] == Gate.Yp):
@@ -479,9 +479,8 @@ class TwoQubit_RB(Sequence):
                 gate_2 = np.matmul(np.matrix([[0,1],[-1,0]]), gate_2)
 
             gate_12 = np.kron(gate_1, gate_2)
-            # log.log(msg = 'gate_12: ' + str(gate_12), level =20)
             if (gate_seq_1[i] == Gate.CPh or gate_seq_2[i] == Gate.CPh):
-                gate_12 = np.matmul(np.matrix([[-1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]), gate_12)
+                gate_12 = np.matmul(np.matrix([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,-1]]), gate_12)
 
             twoQ_gate = np.matmul(gate_12, twoQ_gate)
 
@@ -490,7 +489,7 @@ class TwoQubit_RB(Sequence):
 
     def get_recovery_gate(self, gate_seq_1, gate_seq_2):
         """get recovery 2QB gate"""
-        qubit_state = np.matrix('0; 0; 0; 1') # initial state: ground state |00>
+        qubit_state = np.matrix('1; 0; 0; 0') # initial state: ground state |00>
         qubit_state = np.matmul(self.evalulate_seq(gate_seq_1, gate_seq_2), qubit_state) # initial state: ground state |00>
 
         #find recovery gate which makes qubit_state return to the initial state
@@ -500,11 +499,8 @@ class TwoQubit_RB(Sequence):
         # Search recovery gate in two Qubit clifford group
         for i in range(total_num_cliffords):
             add_twoQ_clifford(i, recovery_seq_1, recovery_seq_2)
-            # log.log(msg=str(recovery_seq_1), level =10)
             qubit_final_state = np.matmul(self.evalulate_seq(recovery_seq_1,recovery_seq_2), qubit_state)
             if np.abs(np.abs(qubit_final_state[0]) - 1) < 1e-6: #numerical error threshold: 1e-4
-                # log.log(msg = 'Finding Recovery Gate Success! qubit state: ' + str(qubit_final_state), level =20)
-                # log.log(msg=str(recovery_seq_1), level =10)
                 break
             else:
                 recovery_seq_1 = []
@@ -513,7 +509,6 @@ class TwoQubit_RB(Sequence):
         if (recovery_seq_1 == [] and recovery_seq_2 == []):
             recovery_seq_1 = [None]
             recovery_seq_2 = [None]
-            # log.log(msg = 'Finding Recovery Gate Failed. qubit state: ' + str(qubit_state), level =20)
         return (recovery_seq_1, recovery_seq_2)
 
 if __name__ == '__main__':
