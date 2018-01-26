@@ -6,7 +6,7 @@ Created on Wed Jan 24 2018
 """
 import InstrumentDriver
 import numpy as np
-from QSolver_ForDriver_beta import *
+from QSolver_ForDriver import *
 
 # import logging
 # log = logging.getLogger('LabberDriver')
