@@ -40,9 +40,9 @@ class Driver(InstrumentDriver.InstrumentWorker):
 				self.performSimulation()
 			# get new value
 			if quant.name == 'Eigenenergies unlabel':
-				value = quant.getTraceDict(self.vals_unlabel_show*1E9, dt=1)
+				value = quant.getTraceDict(self.vals_unlabel_show*1E9, x0=0, dx=1)
 			if quant.name == 'Eigenenergies label':
-				value = quant.getTraceDict(self.vals_label_show*1E9, dt=1)
+				value = quant.getTraceDict(self.vals_label_show*1E9, x0=0, dx=1)
 		else:
 			# otherwise, just return current value
 			value = quant.getValue()
