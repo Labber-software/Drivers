@@ -18,10 +18,14 @@ class Driver(LabberDriver):
         self.bitRange = float(2**(self.nBit-1)-1)
         # timeout
         self.timeout_ms = int(1000 * self.dComCfg['Timeout'])
+        # get PXI chassis
+        self.chassis = int(self.dComCfg.get('PXI chassis', 0))
         # create AWG instance
         self.dig = keysightSD1.SD_AIN()
-        AWGPart = self.dig.getProductNameBySlot(1, int(self.comCfg.address))
-        self.log('Serial:', self.dig.getSerialNumberBySlot(1, int(self.comCfg.address)))
+        AWGPart = self.dig.getProductNameBySlot(
+            self.chassis, int(self.comCfg.address))
+        self.log('Serial:', self.dig.getSerialNumberBySlot(
+            self.chassis, int(self.comCfg.address)))
         if not isinstance(AWGPart, str):
             raise Error('Unit not available')
         # check that model is supported
@@ -46,7 +50,7 @@ class Driver(LabberDriver):
             self.nCh = 4
         # create list of sampled data
         self.lTrace = [np.array([])] * self.nCh
-        self.dig.openWithSlot(AWGPart, 1, int(self.comCfg.address))
+        self.dig.openWithSlot(AWGPart, self.chassis, int(self.comCfg.address))
         # get hardware version - changes numbering of channels
         hw_version = self.dig.getHardwareVersion()
         if hw_version >= 4:
