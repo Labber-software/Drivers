@@ -79,6 +79,50 @@ def level_identify(vals, vecs, list_table, list_select):
 
 class Sequence():
 
+	def addPulse(pulseConfig):
+		
+		return
+
+	def timeFunc_Q1_Z(t, args):
+		return
+
+	def timeFunc_Freq_Q1(t, args):
+		return
+
+	def timeFunc_Anh_Q1(t, args):
+		return
+
+	def timeFunc_Freq_Q2(t, args):
+		return
+
+	def timeFunc_Anh_Q2(t, args):
+		return
+
+	def timeFunc_Freq_Q3(t, args):
+		return
+
+	def timeFunc_Anh_Q3(t, args):
+		return
+
+	def timeFunc_g_12(t, args):
+		return
+
+	def timeFunc_g_23(t, args):
+		return
+
+	def timeFunc_g_13(t, args):
+		return	
+
+	def timeFunc_dr_Q1_p(t, args):
+		return
+
+	def timeFunc_dr_Q2_p(t, args):
+		return
+
+	def timeFunc_dr_Q3_p(t, args):
+		return	
+
+
 class Simulation():
 
 	def generateOperators(self):
@@ -161,7 +205,7 @@ class Simulation():
 			[self.H_dr_Q2_p, self.sequence.timeFunc_dr_Q2_p],
 			[self.H_dr_Q3_p, self.sequence.timeFunc_dr_Q3_p]
 			],
-			rho0 = rho0, tlist = self.tlist, c_ops = self.c_ops, args = self.args)#, options = options), store_states=True, c_ops=[], e_ops=[]
+			rho0 = rho0, tlist = self.tlist, c_ops = self.c_ops, args = self)#, options = options), store_states=True, c_ops=[], e_ops=[]
 		return result.states
 
 
