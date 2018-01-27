@@ -79,9 +79,41 @@ def level_identify(vals, vecs, list_table, list_select):
 
 class Sequence():
 
-	def addPulse(pulseConfig):
-		
-		return
+	def UNIT_RAMP(t):
+		return 1-abs(t)
+
+	def UNIT_COS(t):
+		return (1 + np.cos(np.pi*t))/2
+
+	def UNIT_HALFCOS(t):
+		return np.cos(np.pi*t)
+
+	def UNIT_GAUSS(t):
+		return np.exp(-t**2)
+
+
+	def add_rise(t, pulseCfg):
+		return {
+		'ramp': t,
+		'cos': (1-np.cos(np.pi*t))/2,
+		'halfsin': np.sin(np.pi/2*t),
+		'gauss': (np.exp(-((t-1)/0.5)**2) - np.exp(-((1)/0.5)**2)) / (1 - np.exp(-((1)/0.5)**2))
+	}[pulseCfg.RISE_SHAPE]
+
+	def add_pulse(t, pulseCfg):
+		pulseCfg.START = pulseCfg.PLATEAU_START - pulseCfg.RISE
+		pulseCfg.PLATEAU_END = pulseCfg.PLATEAU_START + pulseCfg.PLATEAU
+		pulseCfg.END = pulseCfg.PLATEAU_END + pulseCfg.FALL
+		if t < pulseCfg.START:
+			return 0
+		elif pulseCfg.START <= t < pulseCfg.PLATEAU_START:
+			return add_rise(t, pulseCfg)
+		elif pulseCfg.PLATEAU_START <= t < pulseCfg.PLATEAU_END:
+			return add_plateau(t, pulseCfg)
+		elif pulseCfg.PLATEAU_END <= t < pulseCfg.END:
+			return add_rise(t, pulseCfg)
+		elif t >= pulseCfg.END:
+			return 0
 
 	def timeFunc_Q1_Z(t, args):
 		return
@@ -186,7 +218,7 @@ class Simulation():
 	def generateCollapse_3Q(self):
 		self.c_ops = [np.sqrt(self.Gamma1_Q1) * L_Q1_a,
 					 np.sqrt(self.Gamma1_Q2) * L_Q2_a,
-			 		 np.sqrt(self.Gamma1_Q3) * L_Q3_a]
+					 np.sqrt(self.Gamma1_Q3) * L_Q3_a]
 
 
 	def rhoEvolver_3Q(self, rho0):
