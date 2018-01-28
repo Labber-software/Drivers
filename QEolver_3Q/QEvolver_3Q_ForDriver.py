@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jan 24 2018
-
 @author: Fei Yan
 """
 
@@ -21,7 +19,7 @@ log = logging.getLogger('LabberDriver')
 # RQ = h/(2*e)**2 #quantum resistance
 
 
-
+### basic functions ###
 def Ej_SQUID(flux,Ej_sum,d):
 	# effective Ej of a SQUID
 	return Ej_sum * np.abs(np.cos(np.pi*flux)) * np.sqrt(1+d**2*np.tan(np.pi*flux)**2) #[GHz]
@@ -77,49 +75,103 @@ def level_identify(vals, vecs, list_table, list_select):
 	return vals[v_idx], vecs[:,v_idx]
 
 
-class Sequence():
+### sequence generating fucnctions ###
+# rise/fall generating functions
+def UNIT_RAMP(t):
+	return 1-t
 
-	def UNIT_RAMP(t):
-		return 1-abs(t)
+def UNIT_COS(t):
+	return np.cos(np.pi*t)
 
-	def UNIT_COS(t):
-		return (1 + np.cos(np.pi*t))/2
+# exception for GAUSS/EXP/REVERSEEXP
+def UNIT_GAUSS(t):
+	return np.exp(-t**2)
 
-	def UNIT_HALFCOS(t):
-		return np.cos(np.pi*t)
+def UNIT_EXP(t):
+	return np.exp(-t)
 
-	def UNIT_GAUSS(t):
-		return np.exp(-t**2)
+def UNIT_REVERSEEXP(t):
+	return np.exp(-np.abs(t))
 
-
-	def add_rise(t, pulseCfg):
-		return {
-		'ramp': t,
-		'cos': (1-np.cos(np.pi*t))/2,
-		'halfsin': np.sin(np.pi/2*t),
-		'gauss': (np.exp(-((t-1)/0.5)**2) - np.exp(-((1)/0.5)**2)) / (1 - np.exp(-((1)/0.5)**2))
+#
+def gen_fall(t, pulseCfg):
+	return {
+	'RAMP': UNIT_RAMP(t),
+	'COS': UNIT_COS(t/pulseCfg.STRETCH),
+	'GAUSS': UNIT_GAUSS(t/pulseCfg.STRETCH),
+	'EXP': UNIT_EXP(t/pulseCfg.STRETCH),
+	'EXPFLIP': 1-UNIT_EXP((1-t)/pulseCfg.STRETCH)
 	}[pulseCfg.RISE_SHAPE]
 
-	def add_pulse(t, pulseCfg):
-		pulseCfg.START = pulseCfg.PLATEAU_START - pulseCfg.RISE
-		pulseCfg.PLATEAU_END = pulseCfg.PLATEAU_START + pulseCfg.PLATEAU
-		pulseCfg.END = pulseCfg.PLATEAU_END + pulseCfg.FALL
-		if t < pulseCfg.START:
-			return 0
-		elif pulseCfg.START <= t < pulseCfg.PLATEAU_START:
-			return add_rise(t, pulseCfg)
-		elif pulseCfg.PLATEAU_START <= t < pulseCfg.PLATEAU_END:
-			return add_plateau(t, pulseCfg)
-		elif pulseCfg.PLATEAU_END <= t < pulseCfg.END:
-			return add_rise(t, pulseCfg)
-		elif t >= pulseCfg.END:
-			return 0
+def add_fall(t, pulseCfg):
+	return (gen_fall(t/pulseCfg.FALL, pulseCfg) - gen_fall(1, pulseCfg)) / (gen_fall(0, pulseCfg) - gen_fall(1, pulseCfg))
 
-	def timeFunc_Q1_Z(t, args):
-		return
+def add_rise(t, pulseCfg):
+	return (gen_fall(-t/pulseCfg.RISE, pulseCfg) - gen_fall(1, pulseCfg)) / (gen_fall(0, pulseCfg) - gen_fall(1, pulseCfg))
+
+def add_pulse(t, pulseCfg):
+	# add single pulse
+	pulseCfg.START = pulseCfg.PLATEAU_START - pulseCfg.RISE
+	pulseCfg.PLATEAU_END = pulseCfg.PLATEAU_START + pulseCfg.PLATEAU
+	pulseCfg.END = pulseCfg.PLATEAU_END + pulseCfg.FALL
+	if t < pulseCfg.START:
+		y = 0
+	elif pulseCfg.START <= t < pulseCfg.PLATEAU_START:
+		y = add_rise(t - pulseCfg.PLATEAU_START, pulseCfg)
+	elif pulseCfg.PLATEAU_START <= t < pulseCfg.PLATEAU_END:
+		y = 1
+	elif pulseCfg.PLATEAU_END <= t < pulseCfg.END:
+		y = add_fall(t - pulseCfg.PLATEAU_END, pulseCfg)
+	elif t >= pulseCfg.END:
+		y = 0
+	return y * pulseCfg.AMPLITUDE * np.cos(pulseCfg.FREQUENCY * t + pulseCfg.PHASE)
+
+def add_sequence(t, seqCfg):
+	# add a sequence
+	y = seqCfg.dOffset
+	for n in range(seqCfg.nPulses):
+		y += addPulse(t, seqCfg.lpulseCfg[n])
+	return y
+
+
+class PulseConfiguration():
+
+	def __ini__(self):
+		self.RISE_SHAPE = 'GAUSS'
+		self.PLATEAU_START = 0.0
+		self.RISE = 5.0
+		self.PLATEAU = 0.0
+		self.FALL = 5.0
+		self.STRETCH = 0.5
+		self.AMPLITUDE = 1.0
+		self.FREQUENCY = 5.0
+		self.PHASE = 0.0
+
+
+class Sequence():
+
+	def __ini__(self, sQubit, sType):
+		nPulses = self.getValue(sQubit + ' ' + sType + ' ' + 'Number Pulse')
+		for n in range(nPulses)
+			pulseCfg = PulseConfiguration()
+			pulseCfg.RISE_SHAPE = self.getValue(sQubit + ' ' + sType + ' ' + 'Shape')
+			pulseCfg.PLATEAU_START = self.getValue(sQubit + ' ' + sType + ' ' + 'Plateau Start')
+			pulseCfg.RISE = self.getValue(sQubit + ' ' + sType + ' ' + 'Rise')
+			pulseCfg.PLATEAU = self.getValue(sQubit + ' ' + sType + ' ' + 'Plateau')
+			pulseCfg.FALL = self.getValue(sQubit + ' ' + sType + ' ' + 'Fall')
+			pulseCfg.STRETCH = self.getValue(sQubit + ' ' + sType + ' ' + 'Stretch')
+			pulseCfg.AMPLITUDE = self.getValue(sQubit + ' ' + sType + ' ' + 'Amplitude')
+			pulseCfg.FREQUENCY = self.getValue(sQubit + ' ' + sType + ' ' + 'Frequency')
+			pulseCfg.PHASE = self.getValue(sQubit + ' ' + sType + ' ' + 'Phase')
+
+	def timeFunc_Flux_Q1(t, args):
+		return 
 
 	def timeFunc_Freq_Q1(t, args):
-		return
+		if bDesignParam_Q1:
+			return freq_SQUID(Ej_SQUID(timeFunc_Flux_Q1(t, args),self.dEj_Q1,self.dAsym_Q1), self.dEc_Q1)
+			add_sequence(t, seqCfg_Q1)
+		return 
 
 	def timeFunc_Anh_Q1(t, args):
 		return
@@ -153,6 +205,9 @@ class Sequence():
 
 	def timeFunc_dr_Q3_p(t, args):
 		return	
+class 
+
+
 
 
 class Simulation():
