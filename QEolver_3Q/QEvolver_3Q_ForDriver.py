@@ -128,7 +128,7 @@ def add_pulse(t, pulseCfg):
 
 def add_sequence(t, seqCfg):
 	# add a sequence
-	y = seqCfg.dOffset
+	y = 0
 	for n in range(seqCfg.nPulses):
 		y += addPulse(t, seqCfg.lpulseCfg[n])
 	return y
@@ -136,7 +136,7 @@ def add_sequence(t, seqCfg):
 
 class PulseConfiguration():
 
-	def __ini__(self):
+	def __init__(self):
 		self.RISE_SHAPE = 'GAUSS'
 		self.PLATEAU_START = 0.0
 		self.RISE = 5.0
@@ -150,63 +150,39 @@ class PulseConfiguration():
 
 class Sequence():
 
-	def __ini__(self, sQubit, sType):
-		nPulses = self.getValue(sQubit + ' ' + sType + ' ' + 'Number Pulse')
-		for n in range(nPulses)
+	def __init__(self, sQubit, sType):
+		self.sQubit = sQubit
+		self.sType = sType
+		self.nPulses = self.getValue(sQubit + ' ' + sType + ' Seq:' + 'Pulse Number')
+		self.seqCfg = []
+		for n in range(self.nPulses)
 			pulseCfg = PulseConfiguration()
-			pulseCfg.RISE_SHAPE = self.getValue(sQubit + ' ' + sType + ' ' + 'Shape')
-			pulseCfg.PLATEAU_START = self.getValue(sQubit + ' ' + sType + ' ' + 'Plateau Start')
-			pulseCfg.RISE = self.getValue(sQubit + ' ' + sType + ' ' + 'Rise')
-			pulseCfg.PLATEAU = self.getValue(sQubit + ' ' + sType + ' ' + 'Plateau')
-			pulseCfg.FALL = self.getValue(sQubit + ' ' + sType + ' ' + 'Fall')
-			pulseCfg.STRETCH = self.getValue(sQubit + ' ' + sType + ' ' + 'Stretch')
-			pulseCfg.AMPLITUDE = self.getValue(sQubit + ' ' + sType + ' ' + 'Amplitude')
-			pulseCfg.FREQUENCY = self.getValue(sQubit + ' ' + sType + ' ' + 'Frequency')
-			pulseCfg.PHASE = self.getValue(sQubit + ' ' + sType + ' ' + 'Phase')
+			pulseCfg.RISE_SHAPE = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Shape #%d' %(n+1))
+			pulseCfg.PLATEAU_START = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Plateau Start #%d' %(n+1))
+			pulseCfg.RISE = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Rise #%d' %(n+1))
+			pulseCfg.PLATEAU = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Plateau #%d' %(n+1))
+			pulseCfg.FALL = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Fall #%d' %(n+1))
+			pulseCfg.STRETCH = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Stretch #%d' %(n+1))
+			pulseCfg.AMPLITUDE = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Amplitude #%d' %(n+1))
+			pulseCfg.FREQUENCY = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Frequency #%d' %(n+1))
+			pulseCfg.PHASE = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Phase #%d' %(n+1))
+			self.seqCfg.append(pulseCfg)
 
-	def timeFunc_Flux_Q1(t, args):
-		return 
-
-	def timeFunc_Freq_Q1(t, args):
-		if bDesignParam_Q1:
-			return freq_SQUID(Ej_SQUID(timeFunc_Flux_Q1(t, args),self.dEj_Q1,self.dAsym_Q1), self.dEc_Q1)
-			add_sequence(t, seqCfg_Q1)
-		return 
-
-	def timeFunc_Anh_Q1(t, args):
-		return
-
-	def timeFunc_Freq_Q2(t, args):
-		return
-
-	def timeFunc_Anh_Q2(t, args):
-		return
-
-	def timeFunc_Freq_Q3(t, args):
-		return
-
-	def timeFunc_Anh_Q3(t, args):
-		return
-
-	def timeFunc_g_12(t, args):
-		return
-
-	def timeFunc_g_23(t, args):
-		return
-
-	def timeFunc_g_13(t, args):
-		return	
-
-	def timeFunc_dr_Q1_p(t, args):
-		return
-
-	def timeFunc_dr_Q2_p(t, args):
-		return
-
-	def timeFunc_dr_Q3_p(t, args):
-		return	
-class 
-
+	def timeFunc(self, t):
+		self.bDesignParam = self.getValue(self.sQubit + ' ' + 'Use Design Parameter')
+		if self.bDesignParam:
+			self.dEj = self.getValue(self.sQubit + ' ' + 'Ej')
+			self.dEc = self.getValue(self.sQubit + ' ' + 'Ec')
+			self.dAsym = self.getValue(self.sQubit + ' ' + 'Asym')
+			self.dFlux = self.getValue(self.sQubit + ' ' + 'Flux')
+			self.timeFlux = add_sequence(t, self.seqCfg) + self.dFlux
+			self.timeEj = Ej_SQUID(self.timeFlux, self.dEj_Q1, self.dAsym_Q1)
+			return freq_SQUID(self.timeEj, self.dEc)
+		elif self.sType == ['Frequency', 'Anharmonicity']:
+			self.dOffset = self.getValue(self.sQubit + ' ' + self.sType)
+		else:
+			self.dOffset = 0
+		return add_sequence(t, self.seqCfg) + self.dOffset
 
 
 
@@ -276,21 +252,65 @@ class Simulation():
 					 np.sqrt(self.Gamma1_Q3) * L_Q3_a]
 
 
+	def generateCoefficient(self):
+		self.seq_Q1_Freq = Sequence('Q1','Frequency')
+		self.seq_Q1_Anh = Sequence('Q1','Anh')
+		self.seq_Q2_Freq = Sequence('Q2','Frequency')
+		self.seq_Q2_Anh = Sequence('Q2','Anh')		
+		self.seq_Q3_Freq = Sequence('Q3','Frequency')
+		self.seq_Q3_Anh = Sequence('Q3','Anh')
+
+	def	timeFunc_Q1_Freq(t):
+		self.seq_Q1_Freq = Sequence('Q1','Frequency')
+		return self.seq_Q1_Freq.timeFunc(t)
+
+	def	timeFunc_Q1_Anh(t):
+		self.seq_Q1_Anh = Sequence('Q1','Anh')
+		return self.seq_Q1_Anh.timeFunc(t)
+
+	def	timeFunc_Q2_Freq(t):
+		self.seq_Q2_Freq = Sequence('Q2','Frequency')
+		return self.seq_Q2_Freq.timeFunc(t)
+
+	def	timeFunc_Q2_Anh(t):
+		self.seq_Q2_Anh = Sequence('Q2','Anh')
+		return self.seq_Q2_Anh.timeFunc(t)
+
+	def	timeFunc_Q3_Freq(t):
+		self.seq_Q3_Freq = Sequence('Q3','Frequency')
+		return self.seq_Q3_Freq.timeFunc(t)
+
+	def	timeFunc_Q3_Anh(t):
+		self.seq_Q3_Anh = Sequence('Q3','Anh')
+		return self.seq_Q3_Anh.timeFunc(t)
+
+	def	timeFunc_g_12(t):
+		return 0.5 * self.c12 * np.sqrt(self.timeFunc_Q1_Freq(t) * self.timeFunc_Q2_Freq(t))
+
+	def	timeFunc_g_23(t):
+		return 0.5 * self.c23 * np.sqrt(self.timeFunc_Q2_Freq(t) * self.timeFunc_Q3_Freq(t))
+
+	def	timeFunc_g_12(t):
+		return 0.5 * (self.c12 * self.c23 + self.c13) * np.sqrt(self.timeFunc_Q1_Freq(t) * self.timeFunc_Q3_Freq(t))
+
+
+
+
 	def rhoEvolver_3Q(self, rho0):
 		#
 		result = mesolve(H=[
-			[self.H_Q1_aa, self.sequence.timeFunc_Freq_Q1],
-			[self.H_Q1_aaaa, self.sequence.timeFunc_Anh_Q1],
-			[self.H_Q2_aa, self.sequence.timeFunc_Freq_Q2],
-			[self.H_Q2_aaaa, self.sequence.timeFunc_Anh_Q2],
-			[self.H_Q3_aa, self.sequence.timeFunc_Freq_Q3],
-			[self.H_Q3_aaaa, self.sequence.timeFunc_Anh_Q3],
-			[self.H_12_pp, self.sequence.timeFunc_g_12],
-			[self.H_23_pp, self.sequence.timeFunc_g_23],
-			[self.H_13_pp, self.sequence.timeFunc_g_13],
-			[self.H_dr_Q1_p, self.sequence.timeFunc_dr_Q1_p],
-			[self.H_dr_Q2_p, self.sequence.timeFunc_dr_Q2_p],
-			[self.H_dr_Q3_p, self.sequence.timeFunc_dr_Q3_p]
+			[2*np.pi*self.H_Q1_aa, self.sequence.timeFunc_Freq_Q1],
+			[2*np.pi*self.H_Q1_aaaa, self.sequence.timeFunc_Anh_Q1],
+			[2*np.pi*self.H_Q2_aa, self.sequence.timeFunc_Freq_Q2],
+			[2*np.pi*self.H_Q2_aaaa, self.sequence.timeFunc_Anh_Q2],
+			[2*np.pi*self.H_Q3_aa, self.sequence.timeFunc_Freq_Q3],
+			[2*np.pi*self.H_Q3_aaaa, self.sequence.timeFunc_Anh_Q3],
+			[2*np.pi*self.H_12_pp, self.sequence.timeFunc_g_12],
+			[2*np.pi*self.H_23_pp, self.sequence.timeFunc_g_23],
+			[2*np.pi*self.H_13_pp, self.sequence.timeFunc_g_13],
+			[2*np.pi*self.H_dr_Q1_p, self.sequence.timeFunc_dr_Q1_p],
+			[2*np.pi*self.H_dr_Q2_p, self.sequence.timeFunc_dr_Q2_p],
+			[2*np.pi*self.H_dr_Q3_p, self.sequence.timeFunc_dr_Q3_p]
 			],
 			rho0 = rho0, tlist = self.tlist, c_ops = self.c_ops, args = self)#, options = options), store_states=True, c_ops=[], e_ops=[]
 		return result.states
