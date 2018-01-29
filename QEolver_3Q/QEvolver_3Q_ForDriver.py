@@ -211,22 +211,21 @@ class SequenceConfiguration():
 			pulseCfg.PHASE = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Phase #%d' %(n+1))
 			self.lpulseCfg.append(pulseCfg)
 
-	def timeFunc(self, t):
-		self.bDesignParam = self.getValue(self.sQubit + ' ' + 'Use Design Parameter')
-		if self.bDesignParam:
-			self.dEj = self.getValue(self.sQubit + ' ' + 'Ej')
-			self.dEc = self.getValue(self.sQubit + ' ' + 'Ec')
-			self.dAsym = self.getValue(self.sQubit + ' ' + 'Asym')
-			self.dFlux = self.getValue(self.sQubit + ' ' + 'Flux')
-			self.timeFlux = add_sequence(t, self.seqCfg) + self.dFlux
-			self.timeEj = Ej_SQUID(self.timeFlux, self.dEj_Q1, self.dAsym_Q1)
-			return freq_SQUID(self.timeEj, self.dEc)
-		elif self.sSeqType == ['Frequency', 'Anharmonicity']:
-			self.dOffset = self.getValue(self.sQubit + ' ' + self.sSeqType)
-		else:
-			self.dOffset = 0
-		return add_sequence(t, self.seqCfg) + self.dOffset
-
+	# def timeFunc(self, t):
+	# 	self.bDesignParam = self.getValue(self.sQubit + ' ' + 'Use Design Parameter')
+	# 	if self.bDesignParam:
+	# 		self.dEj = self.getValue(self.sQubit + ' ' + 'Ej')
+	# 		self.dEc = self.getValue(self.sQubit + ' ' + 'Ec')
+	# 		self.dAsym = self.getValue(self.sQubit + ' ' + 'Asym')
+	# 		self.dFlux = self.getValue(self.sQubit + ' ' + 'Flux')
+	# 		self.timeFlux = add_sequence(t, self.seqCfg) + self.dFlux
+	# 		self.timeEj = Ej_SQUID(self.timeFlux, self.dEj_Q1, self.dAsym_Q1)
+	# 		return freq_SQUID(self.timeEj, self.dEc)
+	# 	elif self.sSeqType == ['Frequency', 'Anharmonicity']:
+	# 		self.dOffset = self.getValue(self.sQubit + ' ' + self.sSeqType)
+	# 	else:
+	# 		self.dOffset = 0
+	# 	return add_sequence(t, self.seqCfg) + self.dOffset
 
 
 class Simulation():

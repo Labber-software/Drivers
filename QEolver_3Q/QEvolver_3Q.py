@@ -73,6 +73,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		self.qubitsim = Simulation()
 		self.qubitsim.generateHamiltonian_3Q_cap()
 		vals, vecs = eigensolve(self.qubitsim.H_sys)
+		
+		self.rho0 = 
 		qubitsim.list_label_select = ["000","100","010","001","110","101","011","200","020","002"]
 		qubitsim.generateHamiltonian_3Q_cap()
 		
