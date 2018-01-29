@@ -134,7 +134,50 @@ def add_sequence(t, seqCfg):
 	return y
 
 
-class PulseConfiguration(Object):
+
+# class QubitConfiguration(Object):
+
+# 	def __init__(self):
+# 		self.UseDesignParam = 0
+# 		self.QubitType = '2-JJ'
+# 		self.Freq = 4.0
+# 		self.Anh = -0.3
+# 		self.Ej = 10.0
+# 		self.Ec = 0.2
+# 		self.Asym = 0.0
+# 		self.Flux = 0.0
+# 		self.PHASE = 0.0
+
+
+class QubitConfiguration():
+
+	def __init__(self, sQubit):
+		self.sQubit = sQubit
+		self.UseDesignParam = bool(self.getValue(self.sQubit + ' Use Design Parameter'))
+		self.QubitType = self.getValue(self.sQubit + ' Type')
+		self.Freq = self.getValue(self.sQubit + ' Frequency')/1E9
+		self.Anh = self.getValue(self.sQubit + ' Anh')/1E9
+		self.Ej = self.getValue(self.sQubit + ' Ej')/1E9
+		self.Ec = self.getValue(self.sQubit + ' Ec')/1E9
+		self.Asym = self.getValue(self.sQubit + ' Asymmetry')
+		self.Flux = self.getValue(self.sQubit + ' Flux Bias')
+
+
+class CapacitanceConfiguration():
+
+	def __init__(self):
+		self.dC1 = self.getValue('Capacitance 1')*1E15
+		self.dC2 = self.getValue('Capacitance 2')*1E15
+		self.dC3 = self.getValue('Capacitance 3')*1E15
+		self.dC12 = self.getValue('Capacitance 12')*1E15
+		self.dC23 = self.getValue('Capacitance 23')*1E15
+		self.dC13 = self.getValue('Capacitance 13')*1E15
+		self.r12 = self.dC12 / np.sqrt(self.dC1 * self.dC2)
+		self.r23 = self.dC23 / np.sqrt(self.dC2 * self.dC3)
+		self.r13 = self.r12 * self.r23 + self.dC13 / np.sqrt(self.dC1 * self.dC3)
+
+
+class PulseConfiguration():
 
 	def __init__(self):
 		self.RISE_SHAPE = 'GAUSS'
@@ -148,25 +191,25 @@ class PulseConfiguration(Object):
 		self.PHASE = 0.0
 
 
-class Sequence():
+class SequenceConfiguration():
 
-	def __init__(self, sQubit, sType):
+	def __init__(self, sQubit, sSeqType):
 		self.sQubit = sQubit
-		self.sType = sType
-		self.nPulses = self.getValue(sQubit + ' ' + sType + ' Seq:' + 'Pulse Number')
-		self.seqCfg = []
+		self.sSeqType = sSeqType
+		self.nPulses = self.getValue(sQubit + ' ' + sSeqType + ' Seq: ' + 'Pulse Number')
+		self.lpulseCfg = []
 		for n in range(self.nPulses)
 			pulseCfg = PulseConfiguration()
-			pulseCfg.RISE_SHAPE = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Shape #%d' %(n+1))
-			pulseCfg.PLATEAU_START = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Plateau Start #%d' %(n+1))
-			pulseCfg.RISE = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Rise #%d' %(n+1))
-			pulseCfg.PLATEAU = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Plateau #%d' %(n+1))
-			pulseCfg.FALL = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Fall #%d' %(n+1))
-			pulseCfg.STRETCH = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Stretch #%d' %(n+1))
-			pulseCfg.AMPLITUDE = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Amplitude #%d' %(n+1))
-			pulseCfg.FREQUENCY = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Frequency #%d' %(n+1))
-			pulseCfg.PHASE = self.getValue(self.sQubit + ' ' + self.sType + ' Seq:' + 'Phase #%d' %(n+1))
-			self.seqCfg.append(pulseCfg)
+			pulseCfg.RISE_SHAPE = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Shape #%d' %(n+1))
+			pulseCfg.PLATEAU_START = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Plateau Start #%d' %(n+1))
+			pulseCfg.RISE = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Rise #%d' %(n+1))
+			pulseCfg.PLATEAU = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Plateau #%d' %(n+1))
+			pulseCfg.FALL = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Fall #%d' %(n+1))
+			pulseCfg.STRETCH = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Stretch #%d' %(n+1))
+			pulseCfg.AMPLITUDE = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Amplitude #%d' %(n+1))
+			pulseCfg.FREQUENCY = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Frequency #%d' %(n+1))
+			pulseCfg.PHASE = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Phase #%d' %(n+1))
+			self.lpulseCfg.append(pulseCfg)
 
 	def timeFunc(self, t):
 		self.bDesignParam = self.getValue(self.sQubit + ' ' + 'Use Design Parameter')
@@ -178,8 +221,8 @@ class Sequence():
 			self.timeFlux = add_sequence(t, self.seqCfg) + self.dFlux
 			self.timeEj = Ej_SQUID(self.timeFlux, self.dEj_Q1, self.dAsym_Q1)
 			return freq_SQUID(self.timeEj, self.dEc)
-		elif self.sType == ['Frequency', 'Anharmonicity']:
-			self.dOffset = self.getValue(self.sQubit + ' ' + self.sType)
+		elif self.sSeqType == ['Frequency', 'Anharmonicity']:
+			self.dOffset = self.getValue(self.sQubit + ' ' + self.sSeqType)
 		else:
 			self.dOffset = 0
 		return add_sequence(t, self.seqCfg) + self.dOffset
@@ -190,91 +233,53 @@ class Simulation():
 
 	def __init__(self):
 		# init with some default settings
-		self.nQubit = 3
-		self.nTrunc = 4
+		self.nQubit = int(self.getValue('Number of Qubits')),
+		self.nTrunc = int(self.getValue('Degree of Trunction'))
+		self.dTimeStart = self.getValue('Time Start')
+		self.dTimeEnd = self.getValue('Time End')
+		self.nTimeList = int(self.getValue('Number of Samples'))
+		self.tlist = np.linspace(self.dTimeStart, self.dTimeEnd, self.nTimeList)		
 		# self.nShow = 4
-		self.bDesignParam_Q1 = bool(self.getValue('Q1 Use Design Parameter'))
-		self.bDesignParam_Q2 = bool(self.getValue('Q2 Use Design Parameter'))
-		self.bDesignParam_Q3 = bool(self.getValue('Q3 Use Design Parameter'))
-		self.sQubitType_Q1 = self.getValue('Q1 Type'),
-		self.sQubitType_Q2 = self.getValue('Q2 Type'),
-		self.sQubitType_Q3 = self.getValue('Q3 Type'),
-		# frequencies [GHz]
-		self.dFreq_Q1 = self.getValue('Q1 Frequency')/1E9
-		self.dFreq_Q2 = self.getValue('Q2 Frequency')/1E9
-		self.dFreq_Q3 = self.getValue('Q3 Frequency')/1E9
-		self.dAnh_Q1 = self.getValue('Q1 Anharmonicity')/1E9
-		self.dAnh_Q2 = self.getValue('Q2 Anharmonicity')/1E9
-		self.dAnh_Q3 = self.getValue('Q3 Anharmonicity')/1E9
-		# capacitances [fF]
-		self.dC1 = self.getValue('Capacitance 1')*1E15
-		self.dC2 = self.getValue('Capacitance 1')*1E15
-		self.dC3 = self.getValue('Capacitance 1')*1E15
-		self.dC12 = self.getValue('Capacitance 12')*1E15
-		self.dC23 = self.getValue('Capacitance 23')*1E15
-		self.dC13 = self.getValue('Capacitance 13')*1E15
-		# inductances [nH]
+		self.qubitCfg_Q1 = QubitConfiguration('Q1')
+		self.qubitCfg_Q2 = QubitConfiguration('Q2')
+		self.qubitCfg_Q3 = QubitConfiguration('Q3')
 		#
-		# designer parameter set
-		# josephson energy [GHz]
-		self.dEj_Q1 = self.getValue('Q1 Ej')/1E9
-		self.dEj_Q2 = self.getValue('Q2 Ej')/1E9
-		self.dEj_Q3 = self.getValue('Q3 Ej')/1E9
-		# charging energy [GHz]
-		self.dEc_Q1 = self.getValue('Q1 Ec')/1E9
-		self.dEc_Q2 = self.getValue('Q2 Ec')/1E9
-		self.dEc_Q3 = self.getValue('Q3 Ec')/1E9
-		# SQUID asymmetry |A1-A2|/(A1+A2)
-		self.dAsym_Q1 = self.getValue('Q1 Asymmetry')
-		self.dAsym_Q2 = self.getValue('Q2 Asymmetry')
-		self.dAsym_Q3 = self.getValue('Q3 Asymmetry')
-		# flux bias [Phi0]
-		self.dFlux_Q1 = self.getValue('Q1 Flux Bias')
-		self.dFlux_Q2 = self.getValue('Q2 Flux Bias')
-		self.dFlux_Q3 = self.getValue('Q3 Flux Bias')
-		# #
-		# # calculate partial coupling coefficients (approximate)
-		# self.c12 = self.dC12 / np.sqrt(self.dC1 * self.dC2)
-		# self.c23 = self.dC23 / np.sqrt(self.dC2 * self.dC3)
-		# self.c13 = self.dC13 / np.sqrt(self.dC1 * self.dC3)
-		# #
-		# if simCfg is not None:
-		# 	# update simulation options
-		# 	self.updateSimCfg(simCfg)
-		self.seqCfg_Q1_Freq = Sequence('Q1','Frequency')
-		self.seqCfg_Q1_Anh = Sequence('Q1','Anh')
-		self.seqCfg_Q2_Freq = Sequence('Q2','Frequency')
-		self.seqCfg_Q2_Anh = Sequence('Q2','Anh')
-		self.seqCfg_Q3_Freq = Sequence('Q3','Frequency')
-		self.seqCfg_Q3_Anh = Sequence('Q3','Anh')
-		self.seqCfg_Q1_DriveP = Sequence('Q1','P-Drive')
-		self.seqCfg_Q2_DriveP = Sequence('Q2','P-Drive')
-		self.seqCfg_Q3_DriveP = Sequence('Q3','P-Drive')
+		self.capCfg = CapacitanceConfiguration()
+		#
+		self.seqCfg_Q1_Freq = SequenceConfiguration('Q1','Frequency')
+		self.seqCfg_Q1_Anh = SequenceConfiguration('Q1','Anh')
+		self.seqCfg_Q2_Freq = SequenceConfiguration('Q2','Frequency')
+		self.seqCfg_Q2_Anh = SequenceConfiguration('Q2','Anh')
+		self.seqCfg_Q3_Freq = SequenceConfiguration('Q3','Frequency')
+		self.seqCfg_Q3_Anh = SequenceConfiguration('Q3','Anh')
+		self.seqCfg_Q1_DriveP = SequenceConfiguration('Q1','P-Drive')
+		self.seqCfg_Q2_DriveP = SequenceConfiguration('Q2','P-Drive')
+		self.seqCfg_Q3_DriveP = SequenceConfiguration('Q3','P-Drive')
 
 
+	# def updateSimCfg(self, simCfg):
+	# 	# update simulation options
+	# 	for key, value in simCfg.items():
+	# 		if hasattr(self, key):
+	# 			setattr(self, key, value)
+	# 	# update capacitance coupling coefficient
+	# 	self.c12 = self.dC12 / np.sqrt(self.dC1 * self.dC2)
+	# 	self.c23 = self.dC23 / np.sqrt(self.dC2 * self.dC3)
+	# 	self.c13 = self.dC13 / np.sqrt(self.dC1 * self.dC3)
+	# 	# update frequencies if using designer parameter set
+	# 	if self.bDesignParam_Q1:
+	# 		if self.sQubitType_Q1 == '2-JJ':
+	# 			setattr(self, 'dFreq_Q1', freq_SQUID(Ej_SQUID(self.dFlux_Q1,self.dEj_Q1,self.dAsym_Q1), self.dEc_Q1))
+	# 			setattr(self, 'dAnh_Q1', -self.dEc_Q1)
+	# 	if self.bDesignParam_Q2:
+	# 		if self.sQubitType_Q2 == '2-JJ':
+	# 			setattr(self, 'dFreq_Q2', freq_SQUID(Ej_SQUID(self.dFlux_Q2,self.dEj_Q2,self.dAsym_Q2), self.dEc_Q2))
+	# 			setattr(self, 'dAnh_Q2', -self.dEc_Q2)
+	# 	if self.bDesignParam_Q3:
+	# 		if self.sQubitType_Q3 == '2-JJ':
+	# 			setattr(self, 'dFreq_Q3', freq_SQUID(Ej_SQUID(self.dFlux_Q3,self.dEj_Q3,self.dAsym_Q3), self.dEc_Q3))
+	# 			setattr(self, 'dAnh_Q3', -self.dEc_Q3)
 
-	def updateSimCfg(self, simCfg):
-		# update simulation options
-		for key, value in simCfg.items():
-			if hasattr(self, key):
-				setattr(self, key, value)
-		# update capacitance coupling coefficient
-		self.c12 = self.dC12 / np.sqrt(self.dC1 * self.dC2)
-		self.c23 = self.dC23 / np.sqrt(self.dC2 * self.dC3)
-		self.c13 = self.dC13 / np.sqrt(self.dC1 * self.dC3)
-		# update frequencies if using designer parameter set
-		if self.bDesignParam_Q1:
-			if self.sQubitType_Q1 == '2-JJ':
-				setattr(self, 'dFreq_Q1', freq_SQUID(Ej_SQUID(self.dFlux_Q1,self.dEj_Q1,self.dAsym_Q1), self.dEc_Q1))
-				setattr(self, 'dAnh_Q1', -self.dEc_Q1)
-		if self.bDesignParam_Q2:
-			if self.sQubitType_Q2 == '2-JJ':
-				setattr(self, 'dFreq_Q2', freq_SQUID(Ej_SQUID(self.dFlux_Q2,self.dEj_Q2,self.dAsym_Q2), self.dEc_Q2))
-				setattr(self, 'dAnh_Q2', -self.dEc_Q2)
-		if self.bDesignParam_Q3:
-			if self.sQubitType_Q3 == '2-JJ':
-				setattr(self, 'dFreq_Q3', freq_SQUID(Ej_SQUID(self.dFlux_Q3,self.dEj_Q3,self.dAsym_Q3), self.dEc_Q3))
-				setattr(self, 'dAnh_Q3', -self.dEc_Q3)
 
 	def generateOperators(self):
 		# generate basic operators. matrix truncated at nTrunc 
@@ -286,9 +291,11 @@ class Simulation():
 		aaaa = a.dag() * a.dag() * a * a
 		return {'I':I, 'a':a, 'x':x, 'p':p, 'aa':aa, 'aaaa':aaaa}
 
+
 	def generateSubHamiltonian_3Q(self):
 		# generate partial Hamiltonian in 3-qubit system
 		OP = self.generateOperators()
+		self.OP = OP
 		# self Hamiltonian operators
 		self.H_Q1_aa = Qflatten(tensor(OP['aa'], OP['I'], OP['I']))
 		self.H_Q1_aaaa = Qflatten(tensor(OP['aaaa'], OP['I'], OP['I']))
@@ -320,18 +327,28 @@ class Simulation():
 		# construct 3-qubit Hamiltonian
 		self.generateSubHamiltonian_3Q()
 		# self Hamiltonian
-		self.H_Q1 = self.dFreq_Q1 * self.H_Q1_aa + self.dAnh_Q1/2 * self.H_Q1_aaaa
-		self.H_Q2 = self.dFreq_Q2 * self.H_Q2_aa + self.dAnh_Q2/2 * self.H_Q2_aaaa
-		self.H_Q3 = self.dFreq_Q3 * self.H_Q3_aa + self.dAnh_Q3/2 * self.H_Q3_aaaa
+		self.H_Q1 = self.qubitCfg_Q1.Freq * self.H_Q1_aa + self.qubitCfg_Q1.Anh/2 * self.H_Q1_aaaa
+		self.H_Q2 = self.qubitCfg_Q2.Freq * self.H_Q2_aa + self.qubitCfg_Q2.Anh/2 * self.H_Q2_aaaa
+		self.H_Q3 = self.qubitCfg_Q3.Freq * self.H_Q3_aa + self.qubitCfg_Q3.Anh/2 * self.H_Q3_aaaa
 		# coupling Hamiltonian
-		self.g12_pp = 0.5 * self.c12 * np.sqrt(self.dFreq_Q1 * self.dFreq_Q2)
+		self.g12_pp = 0.5 * self.capCfg.r12 * np.sqrt(self.qubitCfg_Q1.Freq * self.qubitCfg_Q2.Freq)
 		self.H_12 = self.g12_pp * self.H_g12_pp
-		self.g23_pp = 0.5 * self.c23 * np.sqrt(self.dFreq_Q2 * self.dFreq_Q3)
+		self.g23_pp = 0.5 * self.capCfg.r23 * np.sqrt(self.qubitCfg_Q2.Freq * self.qubitCfg_Q3.Freq)
 		self.H_23 = self.g23_pp * self.H_g23_pp
-		self.g13_pp = 0.5 * (self.c12 * self.c23 + self.c13) * np.sqrt(self.dFreq_Q1 * self.dFreq_Q3)
+		self.g13_pp = 0.5 * self.capCfg.r13 * np.sqrt(self.qubitCfg_Q1.Freq * self.qubitCfg_Q3.Freq)
 		self.H_13 = self.g13_pp * self.H_g13_pp
 		# system Hamiltonian
 		self.H_sys = self.H_Q1 + self.H_Q2 + self.H_Q3 + self.H_12 + self.H_23 + self.H_13
+
+
+	def generateLabel_3Q(self):
+		# generate 3-qubit number state label list
+		list_label_gen = [str(n) for n in range(16)]
+		self.list_label_table = []
+		for k1 in np.arange(self.nTrunc):
+			for k2 in np.arange(self.nTrunc):
+				for k3 in np.arange(self.nTrunc):
+					self.list_label_table.append(list_label_gen[k1] + list_label_gen[k2] + list_label_gen[k3])
 
 
 	def generateCollapse_3Q(self):
@@ -341,53 +358,65 @@ class Simulation():
 
 
 	### generate coefficient ###
-	def	timeFunc_Q1_Freq(t):
-		self.seq_Q1_Freq = Sequence('Q1','Frequency')
-		return self.seq_Q1_Freq.timeFunc(t)
+	def	timeFunc_Q1_Freq(self,t):
+		return add_sequence(t, self.seqCfg_Q1_Freq) + self.qubitCfg_Q1.Freq
 
-	def	timeFunc_Q1_Anh(t):
-		self.seq_Q1_Anh = Sequence('Q1','Anh')
-		return self.seq_Q1_Anh.timeFunc(t)
+	def	timeFunc_Q1_Anh(self,t):
+		return add_sequence(t, self.seqCfg_Q1_Anh) + self.qubitCfg_Q1.Anh
 
-	def	timeFunc_Q2_Freq(t):
-		self.seq_Q2_Freq = Sequence('Q2','Frequency')
-		return self.seq_Q2_Freq.timeFunc(t)
+	def	timeFunc_Q2_Freq(self,t):
+		return add_sequence(t, self.seqCfg_Q2_Freq) + self.qubitCfg_Q2.Freq
 
-	def	timeFunc_Q2_Anh(t):
-		self.seq_Q2_Anh = Sequence('Q2','Anh')
-		return self.seq_Q2_Anh.timeFunc(t)
+	def	timeFunc_Q2_Anh(self,t):
+		return add_sequence(t, self.seqCfg_Q2_Anh) + self.qubitCfg_Q2.Anh
 
-	def	timeFunc_Q3_Freq(t):
-		self.seq_Q3_Freq = Sequence('Q3','Frequency')
-		return self.seq_Q3_Freq.timeFunc(t)
+	def	timeFunc_Q3_Freq(self,t):
+		return add_sequence(t, self.seqCfg_Q3_Freq) + self.qubitCfg_Q3.Freq
 
-	def	timeFunc_Q3_Anh(t):
-		self.seq_Q3_Anh = Sequence('Q3','Anh')
-		return self.seq_Q3_Anh.timeFunc(t)
+	def	timeFunc_Q3_Anh(self,t):
+		return add_sequence(t, self.seqCfg_Q3_Anh) + self.qubitCfg_Q3.Anh
 
-	def	timeFunc_g12_pp(t):
-		return 0.5 * self.c12 * np.sqrt(self.timeFunc_Q1_Freq(t) * self.timeFunc_Q2_Freq(t))
+	def	timeFunc_g12_pp(self,t):
+		return 0.5 * self.capCfg.r12 * np.sqrt(self.timeFunc_Q1_Freq(t) * self.timeFunc_Q2_Freq(t))
 
-	def	timeFunc_g23_pp(t):
-		return 0.5 * self.c23 * np.sqrt(self.timeFunc_Q2_Freq(t) * self.timeFunc_Q3_Freq(t))
+	def	timeFunc_g23_pp(self,t):
+		return 0.5 * self.capCfg.r23 * np.sqrt(self.timeFunc_Q2_Freq(t) * self.timeFunc_Q3_Freq(t))
 
-	def	timeFunc_g13_pp(t):
-		return 0.5 * (self.c12 * self.c23 + self.c13) * np.sqrt(self.timeFunc_Q1_Freq(t) * self.timeFunc_Q3_Freq(t))
+	def	timeFunc_g13_pp(self,t):
+		return 0.5 * self.capCfg.r13 * np.sqrt(self.timeFunc_Q1_Freq(t) * self.timeFunc_Q3_Freq(t))
 
-	def	timeFunc_Q1_DriveP(t):
-		self.seq_Q1_DriveP = Sequence('Q1','P-Drive')
-		return self.seq_Q1_DriveP.timeFunc(t)
+	def	timeFunc_Q1_DriveP(self,t):
+		return add_sequence(t, self.seqCfg_Q1_DriveP)
 
-	def	timeFunc_Q2_DriveP(t):
-		self.seq_Q2_DriveP = Sequence('Q2','P-Drive')
-		return self.seq_Q2_DriveP.timeFunc(t)
+	def	timeFunc_Q2_DriveP(self,t):
+		return add_sequence(t, self.seqCfg_Q2_DriveP)
 
-	def	timeFunc_Q3_DriveP(t):
-		self.seq_Q3_DriveP = Sequence('Q3','P-Drive')
-		return self.seq_Q3_DriveP.timeFunc(t)
+	def	timeFunc_Q3_DriveP(self,t):
+		return add_sequence(t, self.seqCfg_Q3_DriveP)
 
+	def generateSeqOutput(self):
+		#
+		self.v_Q1_Freq = np.zeros_like(self.tlist)
+		self.v_Q1_Anh = np.zeros_like(self.tlist)
+		self.v_Q2_Freq = np.zeros_like(self.tlist)
+		self.v_Q2_Anh = np.zeros_like(self.tlist)
+		self.v_Q3_Freq = np.zeros_like(self.tlist)
+		self.v_Q3_Anh = np.zeros_like(self.tlist)
+		self.v_Q1_DriveP = np.zeros_like(self.tlist)
+		self.v_Q2_DriveP = np.zeros_like(self.tlist)
+		self.v_Q3_DriveP = np.zeros_like(self.tlist)
+		for k, t in enumerate(self.tlist):
+			self.v_Q1_Freq[k] = self.timeFunc_Q1_Freq(t)
+			self.v_Q1_Anh[k] = self.timeFunc_Q1_Anh(t)
+			self.v_Q2_Freq[k] = self.timeFunc_Q2_Freq(t)
+			self.v_Q2_Anh[k] = self.timeFunc_Q2_Anh(t)
+			self.v_Q3_Freq[k] = self.timeFunc_Q3_Freq(t)
+			self.v_Q3_Anh[k] = self.timeFunc_Q3_Anh(t)
+			self.v_Q1_DriveP[k] = self.timeFunc_Q1_DriveP(t)
+			self.v_Q2_DriveP[k] = self.timeFunc_Q2_DriveP(t)
+			self.v_Q3_DriveP[k] = self.timeFunc_Q3_DriveP(t)
 
-	def rhoEvolver_3Q(self, rho0):
+	def rhoEvolver_3Q(self):
 		#
 		result = mesolve(H=[
 			[2*np.pi*self.H_Q1_aa, self.timeFunc_Freq_Q1],
@@ -403,8 +432,9 @@ class Simulation():
 			[2*np.pi*self.H_Q2_dr_p, self.timeFunc_Q2_DriveP],
 			[2*np.pi*self.H_Q3_dr_p, self.timeFunc_Q2_DriveP]
 			],
-			rho0 = rho0, tlist = self.tlist, c_ops = self.c_ops, args = self)#, options = options), store_states=True, c_ops=[], e_ops=[]
+			rho0 = self.rho0, tlist = self.tlist, c_ops = self.c_ops, args = [])#, options = options), store_states=True, c_ops=[], e_ops=[]
 		return result.states
+
 
 
 	def simulateEvolution_3Q(rho_input_rot):
@@ -432,219 +462,6 @@ class Simulation():
 		print("elapsed:", timeit_end - timeit_start)
 		rho_output_rot = U(H_idle,t_end).dag() * result_rhos[-1] * U(H_idle,t_end)
 		return rho_output_rot  #times, states, p_states
-
-class MultiQubitHamiltonian():
-
-	def __init__(self):
-		# init with some default settings
-		self.nQubit = 3
-		self.nTrunc = 4
-		self.nShow = 4
-		self.bDesignParam_Q1 = False
-		self.bDesignParam_Q2 = False
-		self.bDesignParam_Q3 = False
-		self.sQubitType_Q1 = '2-JJ'
-		self.sQubitType_Q2 = '2-JJ'
-		self.sQubitType_Q3 = '2-JJ'
-		# frequencies [GHz]
-		self.dFreq_Q1 = 4.0
-		self.dFreq_Q2 = 4.0
-		self.dFreq_Q3 = 4.0
-		self.dAnh_Q1 = -0.3
-		self.dAnh_Q2 = -0.3
-		self.dAnh_Q3 = -0.3
-		# capacitances [fF]
-		self.dC1 = 80.0
-		self.dC2 = 80.0
-		self.dC3 = 80.0
-		self.dC12 = 1.0
-		self.dC23 = 1.0
-		self.dC13 = 0.02
-		# inductances [nH]
-		#
-		# designer parameter set
-		# josephson energy [GHz]
-		self.dEj_Q1 = 10.0
-		self.dEj_Q2 = 10.0
-		self.dEj_Q3 = 10.0
-		# charging energy [GHz]
-		self.dEc_Q1 = 0.2
-		self.dEc_Q2 = 0.2
-		self.dEc_Q3 = 0.2
-		# SQUID asymmetry |A1-A2|/(A1+A2)
-		self.dAsym_Q1 = 0.0
-		self.dAsym_Q2 = 0.0
-		self.dAsym_Q3 = 0.0
-		# flux bias [Phi0]
-		self.dFlux_Q1 = 0.0
-		self.dFlux_Q2 = 0.0
-		self.dFlux_Q3 = 0.0
-		# #
-		# # calculate partial coupling coefficients (approximate)
-		# self.c12 = self.dC12 / np.sqrt(self.dC1 * self.dC2)
-		# self.c23 = self.dC23 / np.sqrt(self.dC2 * self.dC3)
-		# self.c13 = self.dC13 / np.sqrt(self.dC1 * self.dC3)
-		# #
-		# if simCfg is not None:
-		# 	# update simulation options
-		# 	self.updateSimCfg(simCfg)
-
-
-	def updateSimCfg(self, simCfg):
-		# update simulation options
-		for key, value in simCfg.items():
-			if hasattr(self, key):
-				setattr(self, key, value)
-		# update capacitance coupling coefficient
-		self.c12 = self.dC12 / np.sqrt(self.dC1 * self.dC2)
-		self.c23 = self.dC23 / np.sqrt(self.dC2 * self.dC3)
-		self.c13 = self.dC13 / np.sqrt(self.dC1 * self.dC3)
-		# update frequencies if using designer parameter set
-		if self.bDesignParam_Q1:
-			if self.sQubitType_Q1 == '2-JJ':
-				setattr(self, 'dFreq_Q1', freq_SQUID(Ej_SQUID(self.dFlux_Q1,self.dEj_Q1,self.dAsym_Q1), self.dEc_Q1))
-				setattr(self, 'dAnh_Q1', -self.dEc_Q1)
-		if self.bDesignParam_Q2:
-			if self.sQubitType_Q2 == '2-JJ':
-				setattr(self, 'dFreq_Q2', freq_SQUID(Ej_SQUID(self.dFlux_Q2,self.dEj_Q2,self.dAsym_Q2), self.dEc_Q2))
-				setattr(self, 'dAnh_Q2', -self.dEc_Q2)
-		if self.bDesignParam_Q3:
-			if self.sQubitType_Q3 == '2-JJ':
-				setattr(self, 'dFreq_Q3', freq_SQUID(Ej_SQUID(self.dFlux_Q3,self.dEj_Q3,self.dAsym_Q3), self.dEc_Q3))
-				setattr(self, 'dAnh_Q3', -self.dEc_Q3)
-
-
-	def generateOperators(self):
-		# generate basic operators. matrix truncated at nTrunc 
-		I = qeye(self.nTrunc)
-		a = destroy(self.nTrunc)
-		x = a + a.dag()
-		p = -1j*(a - a.dag())
-		aa = a.dag() * a
-		aaaa = a.dag() * a.dag() * a * a
-		return {'I':I, 'a':a, 'x':x, 'p':p, 'aa':aa, 'aaaa':aaaa}
-
-
-	def generateSubHamiltonian_1Q(self):
-		# generate partial Hamiltonian in 3-qubit system
-		OP = self.generateOperators()
-		# self Hamiltonian operators
-		self.H_Q1_aa = Qflatten(tensor(OP['aa']))
-		self.H_Q1_aaaa = Qflatten(tensor(OP['aaaa']))
-		# drive Hamiltonian operators
-		self.H_dr_Q1_x = Qflatten(tensor(OP['x']))
-		self.H_dr_Q1_p = Qflatten(tensor(OP['p']))
-
-
-	def generateHamiltonian_1Q_cap(self):
-		# construct 3-qubit Hamiltonian
-		self.generateSubHamiltonian_1Q()
-		# self Hamiltonian
-		self.H_Q1 = self.dFreq_Q1 * self.H_Q1_aa + self.dAnh_Q1/2 * self.H_Q1_aaaa
-		# system Hamiltonian
-		self.H_sys = self.H_Q1 + self.H_Q2 + self.H_12
-
-
-	def generateLabel_1Q(self):
-		# generate 3-qubit number state label list
-		list_label_gen = ["0","1","2","3","4","5","6","7"]
-		self.list_label_table = []
-		for k1 in np.arange(self.nTrunc):
-			self.list_label_table.append(list_label_gen[k1])
-
-
-	def generateSubHamiltonian_2Q(self):
-		# generate partial Hamiltonian in 3-qubit system
-		OP = self.generateOperators()
-		# self Hamiltonian operators
-		self.H_Q1_aa = Qflatten(tensor(OP['aa'], OP['I']))
-		self.H_Q1_aaaa = Qflatten(tensor(OP['aaaa'], OP['I']))
-		self.H_Q2_aa = Qflatten(tensor(OP['I'], OP['aa']))
-		self.H_Q2_aaaa = Qflatten(tensor(OP['I'], OP['aaaa']))
-		# coupling Hamiltonian operators
-		self.H_12_xx = Qflatten(tensor(OP['x'], OP['x']))#
-		self.H_12_pp = Qflatten(tensor(OP['p'], OP['p']))
-		# drive Hamiltonian operators
-		self.H_dr_Q1_x = Qflatten(tensor(OP['x'], OP['I']))
-		self.H_dr_Q2_x = Qflatten(tensor(OP['I'], OP['x']))
-		self.H_dr_Q1_p = Qflatten(tensor(OP['p'], OP['I']))
-		self.H_dr_Q2_p = Qflatten(tensor(OP['I'], OP['p']))
-
-
-	def generateHamiltonian_2Q_cap(self):
-		# construct 3-qubit Hamiltonian
-		self.generateSubHamiltonian_2Q()
-		# self Hamiltonian
-		self.H_Q1 = self.dFreq_Q1 * self.H_Q1_aa + self.dAnh_Q1/2 * self.H_Q1_aaaa
-		self.H_Q2 = self.dFreq_Q2 * self.H_Q2_aa + self.dAnh_Q2/2 * self.H_Q2_aaaa
-		# coupling Hamiltonian
-		self.g_12 = 0.5 * self.c12 * np.sqrt(self.dFreq_Q1 * self.dFreq_Q2)
-		self.H_12 = self.g_12 * self.H_12_pp
-		# system Hamiltonian
-		self.H_sys = self.H_Q1 + self.H_Q2 + self.H_12
-
-
-	def generateLabel_2Q(self):
-		# generate 3-qubit number state label list
-		list_label_gen = ["0","1","2","3","4","5","6","7"]
-		self.list_label_table = []
-		for k1 in np.arange(self.nTrunc):
-			for k2 in np.arange(self.nTrunc):
-				self.list_label_table.append(list_label_gen[k1] + list_label_gen[k2])
-
-
-	def generateSubHamiltonian_3Q(self):
-		# generate partial Hamiltonian in 3-qubit system
-		OP = self.generateOperators()
-		# self Hamiltonian operators
-		self.H_Q1_aa = Qflatten(tensor(OP['aa'], OP['I'], OP['I']))
-		self.H_Q1_aaaa = Qflatten(tensor(OP['aaaa'], OP['I'], OP['I']))
-		self.H_Q2_aa = Qflatten(tensor(OP['I'], OP['aa'], OP['I']))
-		self.H_Q2_aaaa = Qflatten(tensor(OP['I'], OP['aaaa'], OP['I']))
-		self.H_Q3_aa = Qflatten(tensor(OP['I'], OP['I'], OP['aa']))
-		self.H_Q3_aaaa = Qflatten(tensor(OP['I'], OP['I'], OP['aaaa']))
-		# coupling Hamiltonian operators
-		self.H_12_xx = Qflatten(tensor(OP['x'], OP['x'], OP['I']))
-		self.H_23_xx = Qflatten(tensor(OP['I'], OP['x'], OP['x']))
-		self.H_13_xx = Qflatten(tensor(OP['x'], OP['I'], OP['x']))		#
-		self.H_12_pp = Qflatten(tensor(OP['p'], OP['p'], OP['I']))
-		self.H_23_pp = Qflatten(tensor(OP['I'], OP['p'], OP['p']))
-		self.H_13_pp = Qflatten(tensor(OP['p'], OP['I'], OP['p']))
-		# drive Hamiltonian operators
-		self.H_dr_Q1_x = Qflatten(tensor(OP['x'], OP['I'], OP['I']))
-		self.H_dr_Q2_x = Qflatten(tensor(OP['I'], OP['x'], OP['I']))
-		self.H_dr_Q3_x = Qflatten(tensor(OP['I'], OP['I'], OP['x']))
-		self.H_dr_Q1_p = Qflatten(tensor(OP['p'], OP['I'], OP['I']))
-		self.H_dr_Q2_p = Qflatten(tensor(OP['I'], OP['p'], OP['I']))
-		self.H_dr_Q3_p = Qflatten(tensor(OP['I'], OP['I'], OP['p']))
-
-
-	def generateHamiltonian_3Q_cap(self):
-		# construct 3-qubit Hamiltonian
-		self.generateSubHamiltonian_3Q()
-		# self Hamiltonian
-		self.H_Q1 = self.dFreq_Q1 * self.H_Q1_aa + self.dAnh_Q1/2 * self.H_Q1_aaaa
-		self.H_Q2 = self.dFreq_Q2 * self.H_Q2_aa + self.dAnh_Q2/2 * self.H_Q2_aaaa
-		self.H_Q3 = self.dFreq_Q3 * self.H_Q3_aa + self.dAnh_Q3/2 * self.H_Q3_aaaa
-		# coupling Hamiltonian
-		self.g_12 = 0.5 * self.c12 * np.sqrt(self.dFreq_Q1 * self.dFreq_Q2)
-		self.H_12 = self.g_12 * self.H_12_pp
-		self.g_23 = 0.5 * self.c23 * np.sqrt(self.dFreq_Q2 * self.dFreq_Q3)
-		self.H_23 = self.g_23 * self.H_23_pp
-		self.g_13 = 0.5 * (self.c12 * self.c23 + self.c13) * np.sqrt(self.dFreq_Q1 * self.dFreq_Q3)
-		self.H_13 = self.g_13 * self.H_13_pp
-		# system Hamiltonian
-		self.H_sys = self.H_Q1 + self.H_Q2 + self.H_Q3 + self.H_12 + self.H_23 + self.H_13
-
-
-	def generateLabel_3Q(self):
-		# generate 3-qubit number state label list
-		list_label_gen = ["0","1","2","3","4","5","6","7"]
-		self.list_label_table = []
-		for k1 in np.arange(self.nTrunc):
-			for k2 in np.arange(self.nTrunc):
-				for k3 in np.arange(self.nTrunc):
-					self.list_label_table.append(list_label_gen[k1] + list_label_gen[k2] + list_label_gen[k3])
 
 
 

@@ -17,7 +17,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 	def performOpen(self, options={}):
 		"""Perform the operation of opening the instrument connection"""
 		# init variables
-		self.multiqubit = MultiQubitHamiltonian()
+		# self.qubitsim = Simulation()
 		# self.vPolarization = np.zeros((4,))
 		# self.lTrace = [np.array([], dtype=float) for n in range(4)]
 
@@ -31,9 +31,15 @@ class Driver(InstrumentDriver.InstrumentWorker):
 
 	def performGetValue(self, quant, options={}):
 		"""Perform the Get Value instrument operation"""
-		# dElevels = {'Eigenenergies unlabel': 0, 'Eigenenergies label': 1}
+		# lSeqOutput = ['Seq: Q1 Frequency', 'Seq: Q1 Anharmonicity', 'Seq: Q2 Frequency', 'Seq: Q2 Anharmonicity', 'Seq: Q3 Frequency', 'Seq: Q3 Anharmonicity', 'Seq: Q1 P-Drive', 'Seq: Q2 P-Drive', 'Seq: Q3 P-Drive'] 
+		lSeqOutput = ['Seq: Q1 Frequency', 'Seq: Q2 Frequency', 'Seq: Q3 Frequency', 'Seq: Q1 P-Drive', 'Seq: Q2 P-Drive', 'Seq: Q3 P-Drive'] 
 		# dPolarization = {'Polarization - X': 0, 'Polarization - Y': 1, 'Polarization - Z': 2, '3rd Level Population': 3}
 		# check type of quantity
+		if quant.name in lSeqOutput:
+			if self.isConfigUpdated():
+				self.performInitialization()
+			if quant.name == 'Eigenenergies unlabel':
+
 		if quant.name in list({'Eigenenergies unlabel'}) + list({'Eigenenergies label'}):
 			# output data, check if simulation needs to be performed
 			if self.isConfigUpdated():
@@ -49,45 +55,40 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		return value
 
 
+	def performInitialization(self):
+		self.qubitsim = Simulation()
+		self.qubitsim.generateSeqOutput()
+		qubitsim.generateHamiltonian_3Q_cap()	
+
+	def performInitialization(self):
+		qubitsim = Simulation()
+		qubitsim.generateHamiltonian_3Q_cap()	
+
 	def performSimulation(self):
 		"""Perform simulation"""
-		# get config values
-		Config = dict(
-					nQubit = int(self.getValue('Number of Qubits')),
-					nTrunc = int(self.getValue('Degree of Trunction')),
-					nShow = int(self.getValue('Max Number of Display')),
-					bDesignParam_Q1 = bool(self.getValue('Q1 Use Design Parameter')),
-					bDesignParam_Q2 = bool(self.getValue('Q2 Use Design Parameter')),
-					bDesignParam_Q3 = bool(self.getValue('Q3 Use Design Parameter')),
-					sQubitType_Q1 = self.getValue('Q1 Type'),
-					sQubitType_Q2 = self.getValue('Q2 Type'),
-					sQubitType_Q3 = self.getValue('Q3 Type'),
-					dFreq_Q1 = self.getValue('Q1 Frequency')/1E9,
-					dFreq_Q2 = self.getValue('Q2 Frequency')/1E9,
-					dFreq_Q3 = self.getValue('Q3 Frequency')/1E9,
-					dAnh_Q1 = self.getValue('Q1 Anharmonicity')/1E9,
-					dAnh_Q2 = self.getValue('Q2 Anharmonicity')/1E9,
-					dAnh_Q3 = self.getValue('Q3 Anharmonicity')/1E9,
-					dC1 = self.getValue('Capacitance 1')*1E15,
-					dC2 = self.getValue('Capacitance 2')*1E15,
-					dC3 = self.getValue('Capacitance 3')*1E15,
-					dC12 = self.getValue('Capacitance 12')*1E15,
-					dC23 = self.getValue('Capacitance 23')*1E15,
-					dC13 = self.getValue('Capacitance 13')*1E15,
-					dEj_Q1 = self.getValue('Q1 Ej')/1E9,
-					dEj_Q2 = self.getValue('Q2 Ej')/1E9,
-					dEj_Q3 = self.getValue('Q3 Ej')/1E9,					
-					dEc_Q1 = self.getValue('Q1 Ec')/1E9,
-					dEc_Q2 = self.getValue('Q2 Ec')/1E9,
-					dEc_Q3 = self.getValue('Q3 Ec')/1E9,
-					dAsym_Q1 = self.getValue('Q1 Asymmetry'),
-					dAsym_Q2 = self.getValue('Q2 Asymmetry'),
-					dAsym_Q3 = self.getValue('Q3 Asymmetry'),
-					dFlux_Q1 = self.getValue('Q1 Flux Bias'),
-					dFlux_Q2 = self.getValue('Q2 Flux Bias'),
-					dFlux_Q3 = self.getValue('Q3 Flux Bias'))
-		# update config
-		self.multiqubit.updateSimCfg(Config)
+
+		qubitsim = Simulation()
+		qubitsim.generateHamiltonian_3Q_cap()
+		eigensolve(qubitsim.H_sys)
+		qubitsim.list_label_select = ["000","100","010","001","110","101","011","200","020","002"]
+		qubitsim.generateHamiltonian_3Q_cap()
+		
+
+			self.multiqubit.generateLabel_3Q()
+			self.multiqubit.list_label_select = ["000","100","010","001","110","101","011","200","020","002"]
+			self.multiqubit.generateHamiltonian_3Q_cap()
+
+					vals, vecs = ch.getEnergyLevels(H_idle.full(), opt_sparse = False)
+vals_select, vecs_select = level_sort(vals, vecs, label_select, list_label_table)
+
+
+		qubitsim.rho0 = 
+		qubitsim.tlist = 
+		qubitsim.generateCollapse_3Q()
+		self.tlist = np.linspace(self.dTimeStart, self.dTimeEnd, self.nTimeList)
+		self.rho_input_lab = T(rho_input_rot, U(self.H_sys, t_start))
+		self.sequence = Sequence()
+		qubitsim.rhoEvolver_3Q()
 		if self.multiqubit.nQubit == 1:
 			self.multiqubit.generateLabel_1Q()
 			self.multiqubit.list_label_select = ["0","1","2","3"]
