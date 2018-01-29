@@ -25,7 +25,7 @@ def Ej_SQUID(flux,Ej_sum,d):
 	return Ej_sum * np.abs(np.cos(np.pi*flux)) * np.sqrt(1+d**2*np.tan(np.pi*flux)**2) #[GHz]
 
 def freq_SQUID(Ej, Ec):
-	return np.sqrt(8 * Ej *Ec) - Ec
+	return np.sqrt(8 * Ej * Ec) - Ec
 
 def freq_LC(L,C):
 	# frequency of LC oscillator
@@ -134,7 +134,7 @@ def add_sequence(t, seqCfg):
 	return y
 
 
-class PulseConfiguration():
+class PulseConfiguration(Object):
 
 	def __init__(self):
 		self.RISE_SHAPE = 'GAUSS'
@@ -188,6 +188,94 @@ class Sequence():
 
 class Simulation():
 
+	def __init__(self):
+		# init with some default settings
+		self.nQubit = 3
+		self.nTrunc = 4
+		# self.nShow = 4
+		self.bDesignParam_Q1 = bool(self.getValue('Q1 Use Design Parameter'))
+		self.bDesignParam_Q2 = bool(self.getValue('Q2 Use Design Parameter'))
+		self.bDesignParam_Q3 = bool(self.getValue('Q3 Use Design Parameter'))
+		self.sQubitType_Q1 = self.getValue('Q1 Type'),
+		self.sQubitType_Q2 = self.getValue('Q2 Type'),
+		self.sQubitType_Q3 = self.getValue('Q3 Type'),
+		# frequencies [GHz]
+		self.dFreq_Q1 = self.getValue('Q1 Frequency')/1E9
+		self.dFreq_Q2 = self.getValue('Q2 Frequency')/1E9
+		self.dFreq_Q3 = self.getValue('Q3 Frequency')/1E9
+		self.dAnh_Q1 = self.getValue('Q1 Anharmonicity')/1E9
+		self.dAnh_Q2 = self.getValue('Q2 Anharmonicity')/1E9
+		self.dAnh_Q3 = self.getValue('Q3 Anharmonicity')/1E9
+		# capacitances [fF]
+		self.dC1 = self.getValue('Capacitance 1')*1E15
+		self.dC2 = self.getValue('Capacitance 1')*1E15
+		self.dC3 = self.getValue('Capacitance 1')*1E15
+		self.dC12 = self.getValue('Capacitance 12')*1E15
+		self.dC23 = self.getValue('Capacitance 23')*1E15
+		self.dC13 = self.getValue('Capacitance 13')*1E15
+		# inductances [nH]
+		#
+		# designer parameter set
+		# josephson energy [GHz]
+		self.dEj_Q1 = self.getValue('Q1 Ej')/1E9
+		self.dEj_Q2 = self.getValue('Q2 Ej')/1E9
+		self.dEj_Q3 = self.getValue('Q3 Ej')/1E9
+		# charging energy [GHz]
+		self.dEc_Q1 = self.getValue('Q1 Ec')/1E9
+		self.dEc_Q2 = self.getValue('Q2 Ec')/1E9
+		self.dEc_Q3 = self.getValue('Q3 Ec')/1E9
+		# SQUID asymmetry |A1-A2|/(A1+A2)
+		self.dAsym_Q1 = self.getValue('Q1 Asymmetry')
+		self.dAsym_Q2 = self.getValue('Q2 Asymmetry')
+		self.dAsym_Q3 = self.getValue('Q3 Asymmetry')
+		# flux bias [Phi0]
+		self.dFlux_Q1 = self.getValue('Q1 Flux Bias')
+		self.dFlux_Q2 = self.getValue('Q2 Flux Bias')
+		self.dFlux_Q3 = self.getValue('Q3 Flux Bias')
+		# #
+		# # calculate partial coupling coefficients (approximate)
+		# self.c12 = self.dC12 / np.sqrt(self.dC1 * self.dC2)
+		# self.c23 = self.dC23 / np.sqrt(self.dC2 * self.dC3)
+		# self.c13 = self.dC13 / np.sqrt(self.dC1 * self.dC3)
+		# #
+		# if simCfg is not None:
+		# 	# update simulation options
+		# 	self.updateSimCfg(simCfg)
+		self.seqCfg_Q1_Freq = Sequence('Q1','Frequency')
+		self.seqCfg_Q1_Anh = Sequence('Q1','Anh')
+		self.seqCfg_Q2_Freq = Sequence('Q2','Frequency')
+		self.seqCfg_Q2_Anh = Sequence('Q2','Anh')
+		self.seqCfg_Q3_Freq = Sequence('Q3','Frequency')
+		self.seqCfg_Q3_Anh = Sequence('Q3','Anh')
+		self.seqCfg_Q1_DriveP = Sequence('Q1','P-Drive')
+		self.seqCfg_Q2_DriveP = Sequence('Q2','P-Drive')
+		self.seqCfg_Q3_DriveP = Sequence('Q3','P-Drive')
+
+
+
+	def updateSimCfg(self, simCfg):
+		# update simulation options
+		for key, value in simCfg.items():
+			if hasattr(self, key):
+				setattr(self, key, value)
+		# update capacitance coupling coefficient
+		self.c12 = self.dC12 / np.sqrt(self.dC1 * self.dC2)
+		self.c23 = self.dC23 / np.sqrt(self.dC2 * self.dC3)
+		self.c13 = self.dC13 / np.sqrt(self.dC1 * self.dC3)
+		# update frequencies if using designer parameter set
+		if self.bDesignParam_Q1:
+			if self.sQubitType_Q1 == '2-JJ':
+				setattr(self, 'dFreq_Q1', freq_SQUID(Ej_SQUID(self.dFlux_Q1,self.dEj_Q1,self.dAsym_Q1), self.dEc_Q1))
+				setattr(self, 'dAnh_Q1', -self.dEc_Q1)
+		if self.bDesignParam_Q2:
+			if self.sQubitType_Q2 == '2-JJ':
+				setattr(self, 'dFreq_Q2', freq_SQUID(Ej_SQUID(self.dFlux_Q2,self.dEj_Q2,self.dAsym_Q2), self.dEc_Q2))
+				setattr(self, 'dAnh_Q2', -self.dEc_Q2)
+		if self.bDesignParam_Q3:
+			if self.sQubitType_Q3 == '2-JJ':
+				setattr(self, 'dFreq_Q3', freq_SQUID(Ej_SQUID(self.dFlux_Q3,self.dEj_Q3,self.dAsym_Q3), self.dEc_Q3))
+				setattr(self, 'dAnh_Q3', -self.dEc_Q3)
+
 	def generateOperators(self):
 		# generate basic operators. matrix truncated at nTrunc 
 		I = qeye(self.nTrunc)
@@ -209,19 +297,19 @@ class Simulation():
 		self.H_Q3_aa = Qflatten(tensor(OP['I'], OP['I'], OP['aa']))
 		self.H_Q3_aaaa = Qflatten(tensor(OP['I'], OP['I'], OP['aaaa']))
 		# coupling Hamiltonian operators
-		self.H_12_xx = Qflatten(tensor(OP['x'], OP['x'], OP['I']))
-		self.H_23_xx = Qflatten(tensor(OP['I'], OP['x'], OP['x']))
-		self.H_13_xx = Qflatten(tensor(OP['x'], OP['I'], OP['x']))		#
-		self.H_12_pp = Qflatten(tensor(OP['p'], OP['p'], OP['I']))
-		self.H_23_pp = Qflatten(tensor(OP['I'], OP['p'], OP['p']))
-		self.H_13_pp = Qflatten(tensor(OP['p'], OP['I'], OP['p']))
+		self.H_g12_xx = Qflatten(tensor(OP['x'], OP['x'], OP['I']))
+		self.H_g23_xx = Qflatten(tensor(OP['I'], OP['x'], OP['x']))
+		self.H_g13_xx = Qflatten(tensor(OP['x'], OP['I'], OP['x']))		#
+		self.H_g12_pp = Qflatten(tensor(OP['p'], OP['p'], OP['I']))
+		self.H_g23_pp = Qflatten(tensor(OP['I'], OP['p'], OP['p']))
+		self.H_g13_pp = Qflatten(tensor(OP['p'], OP['I'], OP['p']))
 		# drive Hamiltonian operators
-		self.H_dr_Q1_x = Qflatten(tensor(OP['x'], OP['I'], OP['I']))
-		self.H_dr_Q2_x = Qflatten(tensor(OP['I'], OP['x'], OP['I']))
-		self.H_dr_Q3_x = Qflatten(tensor(OP['I'], OP['I'], OP['x']))
-		self.H_dr_Q1_p = Qflatten(tensor(OP['p'], OP['I'], OP['I']))
-		self.H_dr_Q2_p = Qflatten(tensor(OP['I'], OP['p'], OP['I']))
-		self.H_dr_Q3_p = Qflatten(tensor(OP['I'], OP['I'], OP['p']))
+		self.H_Q1_dr_x = Qflatten(tensor(OP['x'], OP['I'], OP['I']))
+		self.H_Q2_dr_x = Qflatten(tensor(OP['I'], OP['x'], OP['I']))
+		self.H_Q3_dr_x = Qflatten(tensor(OP['I'], OP['I'], OP['x']))
+		self.H_Q1_dr_p = Qflatten(tensor(OP['p'], OP['I'], OP['I']))
+		self.H_Q2_dr_p = Qflatten(tensor(OP['I'], OP['p'], OP['I']))
+		self.H_Q3_dr_p = Qflatten(tensor(OP['I'], OP['I'], OP['p']))
 		# collapse operators
 		self.L_Q1_a = Qflatten(tensor(OP['a'], OP['I'], OP['I']))
 		self.L_Q2_a = Qflatten(tensor(OP['I'], OP['a'], OP['I']))
@@ -236,12 +324,12 @@ class Simulation():
 		self.H_Q2 = self.dFreq_Q2 * self.H_Q2_aa + self.dAnh_Q2/2 * self.H_Q2_aaaa
 		self.H_Q3 = self.dFreq_Q3 * self.H_Q3_aa + self.dAnh_Q3/2 * self.H_Q3_aaaa
 		# coupling Hamiltonian
-		self.g_12 = 0.5 * self.c12 * np.sqrt(self.dFreq_Q1 * self.dFreq_Q2)
-		self.H_12 = self.g_12 * self.H_12_pp
-		self.g_23 = 0.5 * self.c23 * np.sqrt(self.dFreq_Q2 * self.dFreq_Q3)
-		self.H_23 = self.g_23 * self.H_23_pp
-		self.g_13 = 0.5 * (self.c12 * self.c23 + self.c13) * np.sqrt(self.dFreq_Q1 * self.dFreq_Q3)
-		self.H_13 = self.g_13 * self.H_13_pp
+		self.g12_pp = 0.5 * self.c12 * np.sqrt(self.dFreq_Q1 * self.dFreq_Q2)
+		self.H_12 = self.g12_pp * self.H_g12_pp
+		self.g23_pp = 0.5 * self.c23 * np.sqrt(self.dFreq_Q2 * self.dFreq_Q3)
+		self.H_23 = self.g23_pp * self.H_g23_pp
+		self.g13_pp = 0.5 * (self.c12 * self.c23 + self.c13) * np.sqrt(self.dFreq_Q1 * self.dFreq_Q3)
+		self.H_13 = self.g13_pp * self.H_g13_pp
 		# system Hamiltonian
 		self.H_sys = self.H_Q1 + self.H_Q2 + self.H_Q3 + self.H_12 + self.H_23 + self.H_13
 
@@ -252,14 +340,7 @@ class Simulation():
 					 np.sqrt(self.Gamma1_Q3) * L_Q3_a]
 
 
-	def generateCoefficient(self):
-		self.seq_Q1_Freq = Sequence('Q1','Frequency')
-		self.seq_Q1_Anh = Sequence('Q1','Anh')
-		self.seq_Q2_Freq = Sequence('Q2','Frequency')
-		self.seq_Q2_Anh = Sequence('Q2','Anh')		
-		self.seq_Q3_Freq = Sequence('Q3','Frequency')
-		self.seq_Q3_Anh = Sequence('Q3','Anh')
-
+	### generate coefficient ###
 	def	timeFunc_Q1_Freq(t):
 		self.seq_Q1_Freq = Sequence('Q1','Frequency')
 		return self.seq_Q1_Freq.timeFunc(t)
@@ -284,33 +365,43 @@ class Simulation():
 		self.seq_Q3_Anh = Sequence('Q3','Anh')
 		return self.seq_Q3_Anh.timeFunc(t)
 
-	def	timeFunc_g_12(t):
+	def	timeFunc_g12_pp(t):
 		return 0.5 * self.c12 * np.sqrt(self.timeFunc_Q1_Freq(t) * self.timeFunc_Q2_Freq(t))
 
-	def	timeFunc_g_23(t):
+	def	timeFunc_g23_pp(t):
 		return 0.5 * self.c23 * np.sqrt(self.timeFunc_Q2_Freq(t) * self.timeFunc_Q3_Freq(t))
 
-	def	timeFunc_g_12(t):
+	def	timeFunc_g13_pp(t):
 		return 0.5 * (self.c12 * self.c23 + self.c13) * np.sqrt(self.timeFunc_Q1_Freq(t) * self.timeFunc_Q3_Freq(t))
 
+	def	timeFunc_Q1_DriveP(t):
+		self.seq_Q1_DriveP = Sequence('Q1','P-Drive')
+		return self.seq_Q1_DriveP.timeFunc(t)
 
+	def	timeFunc_Q2_DriveP(t):
+		self.seq_Q2_DriveP = Sequence('Q2','P-Drive')
+		return self.seq_Q2_DriveP.timeFunc(t)
+
+	def	timeFunc_Q3_DriveP(t):
+		self.seq_Q3_DriveP = Sequence('Q3','P-Drive')
+		return self.seq_Q3_DriveP.timeFunc(t)
 
 
 	def rhoEvolver_3Q(self, rho0):
 		#
 		result = mesolve(H=[
-			[2*np.pi*self.H_Q1_aa, self.sequence.timeFunc_Freq_Q1],
-			[2*np.pi*self.H_Q1_aaaa, self.sequence.timeFunc_Anh_Q1],
-			[2*np.pi*self.H_Q2_aa, self.sequence.timeFunc_Freq_Q2],
-			[2*np.pi*self.H_Q2_aaaa, self.sequence.timeFunc_Anh_Q2],
-			[2*np.pi*self.H_Q3_aa, self.sequence.timeFunc_Freq_Q3],
-			[2*np.pi*self.H_Q3_aaaa, self.sequence.timeFunc_Anh_Q3],
-			[2*np.pi*self.H_12_pp, self.sequence.timeFunc_g_12],
-			[2*np.pi*self.H_23_pp, self.sequence.timeFunc_g_23],
-			[2*np.pi*self.H_13_pp, self.sequence.timeFunc_g_13],
-			[2*np.pi*self.H_dr_Q1_p, self.sequence.timeFunc_dr_Q1_p],
-			[2*np.pi*self.H_dr_Q2_p, self.sequence.timeFunc_dr_Q2_p],
-			[2*np.pi*self.H_dr_Q3_p, self.sequence.timeFunc_dr_Q3_p]
+			[2*np.pi*self.H_Q1_aa, self.timeFunc_Freq_Q1],
+			[2*np.pi*self.H_Q1_aaaa, self.timeFunc_Anh_Q1],
+			[2*np.pi*self.H_Q2_aa, self.timeFunc_Freq_Q2],
+			[2*np.pi*self.H_Q2_aaaa, self.timeFunc_Anh_Q2],
+			[2*np.pi*self.H_Q3_aa, self.timeFunc_Freq_Q3],
+			[2*np.pi*self.H_Q3_aaaa, self.timeFunc_Anh_Q3],
+			[2*np.pi*self.H_g12_pp, self.timeFunc_g12_pp],
+			[2*np.pi*self.H_g23_pp, self.timeFunc_g23_pp],
+			[2*np.pi*self.H_g13_pp, self.timeFunc_g13_pp],
+			[2*np.pi*self.H_Q1_dr_p, self.timeFunc_Q1_DriveP],
+			[2*np.pi*self.H_Q2_dr_p, self.timeFunc_Q2_DriveP],
+			[2*np.pi*self.H_Q3_dr_p, self.timeFunc_Q2_DriveP]
 			],
 			rho0 = rho0, tlist = self.tlist, c_ops = self.c_ops, args = self)#, options = options), store_states=True, c_ops=[], e_ops=[]
 		return result.states
