@@ -17,7 +17,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 	def performOpen(self, options={}):
 		"""Perform the operation of opening the instrument connection"""
 		# init variables
-		# self.qubitsim = Simulation()
+		self.qubitsim = Simulation()
 		# self.vPolarization = np.zeros((4,))
 		# self.lTrace = [np.array([], dtype=float) for n in range(4)]
 
@@ -33,16 +33,29 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		"""Perform the Get Value instrument operation"""
 		# lSeqOutput = ['Seq: Q1 Frequency', 'Seq: Q1 Anharmonicity', 'Seq: Q2 Frequency', 'Seq: Q2 Anharmonicity', 'Seq: Q3 Frequency', 'Seq: Q3 Anharmonicity', 'Seq: Q1 P-Drive', 'Seq: Q2 P-Drive', 'Seq: Q3 P-Drive'] 
 		lSeqOutput = ['Seq: Q1 Frequency', 'Seq: Q2 Frequency', 'Seq: Q3 Frequency', 'Seq: Q1 P-Drive', 'Seq: Q2 P-Drive', 'Seq: Q3 P-Drive'] 
+		lStateOutput = []
 		# dPolarization = {'Polarization - X': 0, 'Polarization - Y': 1, 'Polarization - Z': 2, '3rd Level Population': 3}
 		# check type of quantity
-		if quant.name in lSeqOutput:
+		if quant.name in lStateOutput:
 			if self.isConfigUpdated():
-				self.performInitialization()
-			if quant.name == 'Eigenenergies unlabel':
+				self.qubitsim = Simulation()
+				self.qubitsim.generateSeqOutput()
+			d0 = self.qubitsim.tlist[0]
+			dt = self.qubitsim.tlist[1] - self.qubitsim.tlist[0]
+			value = {
+			'Seq: Q1 Frequency': quant.getTraceDict(self.qubitsim.v_Q1_Freq*1E9, t0=t0, dt=dt),
+			'Seq: Q2 Frequency': quant.getTraceDict(self.qubitsim.v_Q2_Freq*1E9, t0=t0, dt=dt),
+			'Seq: Q3 Frequency': quant.getTraceDict(self.qubitsim.v_Q3_Freq*1E9, t0=t0, dt=dt),
+			'Seq: Q1 P-Drive': quant.getTraceDict(self.qubitsim.v_Q1_DriveP*1E9, t0=t0, dt=dt),
+			'Seq: Q2 P-Drive': quant.getTraceDict(self.qubitsim.v_Q2_DriveP*1E9, t0=t0, dt=dt),
+			'Seq: Q3 P-Drive': quant.getTraceDict(self.qubitsim.v_Q3_DriveP*1E9, t0=t0, dt=dt)
+			}[quant.name]
+
 
 		if quant.name in list({'Eigenenergies unlabel'}) + list({'Eigenenergies label'}):
 			# output data, check if simulation needs to be performed
 			if self.isConfigUpdated():
+				self.performInitialization()
 				self.performSimulation()
 			# get new value
 			if quant.name == 'Eigenenergies unlabel':
@@ -54,22 +67,12 @@ class Driver(InstrumentDriver.InstrumentWorker):
 			value = quant.getValue()
 		return value
 
-
-	def performInitialization(self):
-		self.qubitsim = Simulation()
-		self.qubitsim.generateSeqOutput()
-		qubitsim.generateHamiltonian_3Q_cap()	
-
-	def performInitialization(self):
-		qubitsim = Simulation()
-		qubitsim.generateHamiltonian_3Q_cap()	
-
+		
 	def performSimulation(self):
 		"""Perform simulation"""
-
-		qubitsim = Simulation()
-		qubitsim.generateHamiltonian_3Q_cap()
-		eigensolve(qubitsim.H_sys)
+		self.qubitsim = Simulation()
+		self.qubitsim.generateHamiltonian_3Q_cap()
+		vals, vecs = eigensolve(self.qubitsim.H_sys)
 		qubitsim.list_label_select = ["000","100","010","001","110","101","011","200","020","002"]
 		qubitsim.generateHamiltonian_3Q_cap()
 		
