@@ -42,7 +42,7 @@ def U(H,t):
 	H = Qobj(H)
 	return Qobj(-1j * H * t).expm()
 
-def T(A, U, *args, **kwargs):
+def T(A, U):
 	A = Qobj(A)
 	U = Qobj(U)
 	return U * A * U.dag()
@@ -227,6 +227,11 @@ class SequenceConfiguration():
 	# 		self.dOffset = 0
 	# 	return add_sequence(t, self.seqCfg) + self.dOffset
 
+# class QubitState():
+
+# 	def __init__(self):
+
+
 
 class Simulation():
 
@@ -237,7 +242,8 @@ class Simulation():
 		self.dTimeStart = self.getValue('Time Start')
 		self.dTimeEnd = self.getValue('Time End')
 		self.nTimeList = int(self.getValue('Number of Samples'))
-		self.tlist = np.linspace(self.dTimeStart, self.dTimeEnd, self.nTimeList)		
+		self.tlist = np.linspace(self.dTimeStart, self.dTimeEnd, self.nTimeList)
+		self.dt = self.tlist[1] - self.tlist[0]	
 		# self.nShow = 4
 		self.qubitCfg_Q1 = QubitConfiguration('Q1')
 		self.qubitCfg_Q2 = QubitConfiguration('Q2')
@@ -255,6 +261,12 @@ class Simulation():
 		self.seqCfg_Q2_DriveP = SequenceConfiguration('Q2','P-Drive')
 		self.seqCfg_Q3_DriveP = SequenceConfiguration('Q3','P-Drive')
 
+		self.a00 = self.getValue('|0,0>')
+		self.a01 = self.getValue('|0,1>')
+		self.a10 = self.getValue('|1,0>')
+		self.a11 = self.getValue('|1,1>')
+		self.psi_input_logic = Qobj(np.array([self.a00,self.a01,self.a10,self.a11])).unit()
+		self.rho_input_logic = self.psi_input_logic * self.psi_input_logic.dag()
 
 	# def updateSimCfg(self, simCfg):
 	# 	# update simulation options
@@ -415,9 +427,20 @@ class Simulation():
 			self.v_Q2_DriveP[k] = self.timeFunc_Q2_DriveP(t)
 			self.v_Q3_DriveP[k] = self.timeFunc_Q3_DriveP(t)
 
+
+	def generateInitialState(self):
+		#
+		self.generateLabel_3Q()
+		self.list_label_sub = ["000","001","100","101"]
+		self.vals_idle, self.vecs_idle = eigensolve(self.H_sys)
+		self.vals_idle_sub, vecs_idle_sub = level_identify(self.vals_idle, self.vecs_idle, self.list_label_table, self.list_label_sub)
+		self.U_sub = Qobj(self.vecs_sub)
+		self.rho_input_rot = T(self.rho_input_logic, self.U_sub)
+		self.rho0 = T(self.rho_input_rot, U(self.H_sys, self.tlist[0]))
+
 	def rhoEvolver_3Q(self):
 		#
-		result = mesolve(H=[
+		self.result = mesolve(H=[
 			[2*np.pi*self.H_Q1_aa, self.timeFunc_Freq_Q1],
 			[2*np.pi*self.H_Q1_aaaa, self.timeFunc_Anh_Q1],
 			[2*np.pi*self.H_Q2_aa, self.timeFunc_Freq_Q2],
@@ -432,36 +455,26 @@ class Simulation():
 			[2*np.pi*self.H_Q3_dr_p, self.timeFunc_Q2_DriveP]
 			],
 			rho0 = self.rho0, tlist = self.tlist, c_ops = self.c_ops, args = [])#, options = options), store_states=True, c_ops=[], e_ops=[]
-		return result.states
+		# return result.states
 
 
-
-	def simulateEvolution_3Q(rho_input_rot):
+	def generateObservables(self):
+		list_pauli_label = ['I','X','Y','Z']
+		list_pauli = [qeye(2), sigmax(), sigmay(), sigmaz()]
+		self.dict_pauli = {}
+		self.dict_tomo = {}
+		for k1 in range(4):
+			for k2 in range(4):
+				key = list_pauli_label[k1] + list_pauli_label[k2]
+				self.dict_pauli[key] = Qflatten(tensor(list_pauli[k1],list_pauli[k2]))
+				self.dict_tomo[key] = []
 		#
-		self.generateHamiltonian_3Q_cap()
-		self.generateCollapse_3Q()
-		self.tlist = np.linspace(self.dTimeStart, self.dTimeEnd, self.nTimeList)
-		self.rho_input_lab = T(rho_input_rot, U(self.H_sys, t_start))
-		self.sequence = Sequence()
-		self.rhoEvolver_3Q(rho0)
-		#
-		t_start = 0.0
-		t_end = args['t_shift_start'] + args['t_shift_rise'] + args['t_shift_plateau'] + args['t_shift_fall']
-		
-		rho_input_lab = U(H_idle,t_start) * rho_input_rot * U(H_idle,t_start).dag()
-		result_rhos = sim_PRESS(rho_input_lab, times, args, c_ops)
-		# states = np.zeros((n_states,n_times), dtype=complex)
-		# p_states = np.zeros((n_states,n_times))
-		# for i_t,time in enumerate(times):
-		# 	state_lab = result_rhos[i_t]
-		# 	state_rot = U(H_idle,time).dag() * state_lab
-		# 	for i_s in np.arange(n_states):
-		# 		states[i_s,i_t] = state_rot.overlap(Qobj(vecs_select[:,i_s]))
-		# 		p_states[i_s,i_t] = np.abs(states[i_s,i_t])**2
-		print("elapsed:", timeit_end - timeit_start)
-		rho_output_rot = U(H_idle,t_end).dag() * result_rhos[-1] * U(H_idle,t_end)
-		return rho_output_rot  #times, states, p_states
-
+		for k, t in enumerate(self.tlist):
+			rho_lab = self.results.states[k]
+			rho_rot = T(rho_lab, U(self.H_sys, t).dag())
+			rho_logic = T(rho_rot, U_sub.dag())
+			for key, op in self.dict_pauli.items():
+				self.dict_tomo[key].append((op * rho_logic).tr())
 
 
 class Noise():
