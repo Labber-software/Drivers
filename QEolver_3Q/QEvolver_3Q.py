@@ -16,6 +16,9 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		"""Perform the operation of opening the instrument connection"""
 		# init variables
 		self.qubitsim = Simulation()
+		self.bShowFrequency = bool(self.getValue('Show Frequency'))
+		self.bShowDrive = bool(self.getValue('Show Drive'))
+		self.bShowMeasurement = bool(self.getValue('Show Measurement'))
 		# self.vPolarization = np.zeros((4,))
 		# self.lTrace = [np.array([], dtype=float) for n in range(4)]
 
@@ -29,34 +32,31 @@ class Driver(InstrumentDriver.InstrumentWorker):
 
 	def performGetValue(self, quant, options={}):
 		"""Perform the Get Value instrument operation"""
-		# lSeqOutput = ['Seq: Q1 Frequency', 'Seq: Q1 Anharmonicity', 'Seq: Q2 Frequency', 'Seq: Q2 Anharmonicity', 'Seq: Q3 Frequency', 'Seq: Q3 Anharmonicity', 'Seq: Q1 P-Drive', 'Seq: Q2 P-Drive', 'Seq: Q3 P-Drive'] 
-		lSeqOutput = ['Seq: Q1 Frequency', 'Seq: Q2 Frequency', 'Seq: Q3 Frequency', 'Seq: Q1 P-Drive', 'Seq: Q2 P-Drive', 'Seq: Q3 P-Drive'] 
-		lStateOutput = ['ZI','IZ','ZZ']
-		# dPolarization = {'Polarization - X': 0, 'Polarization - Y': 1, 'Polarization - Z': 2, '3rd Level Population': 3}
+		strT = 'Time Series: '
+		lFreqOutput = [strT + s for s in ['Q1 Frequency', 'Q2 Frequency', 'Q3 Frequency']]
+		lDriveOutput = [strT + s for s in ['Q1 DriveP', 'Q2 DriveP', 'Q3 DriveP']]
+		#
+		list_pauli_label = ['I','X','Y','Z']
+		lpauli2 = []
+		for k1 in range(4):
+			for k2 in range(4):
+				lpauli2.append(list_pauli_label[k1] + list_pauli_label[k2])
+		lStateOutput = [strT + s for s in lpauli2]
+		#
 		# check type of quantity
-		if quant.name in lStateOutput:
+		if quant.name in lFreqOutput:
 			if self.isConfigUpdated():
 				self.qubitsim = Simulation()
 				self.qubitsim.generateSeqOutput()
-			d0 = self.qubitsim.tlist[0]
-			dt = self.qubitsim.dt
-			value = {
-			'Seq: Q1 Frequency': quant.getTraceDict(self.qubitsim.v_Q1_Freq*1E9, t0=t0, dt=dt),
-			'Seq: Q2 Frequency': quant.getTraceDict(self.qubitsim.v_Q2_Freq*1E9, t0=t0, dt=dt),
-			'Seq: Q3 Frequency': quant.getTraceDict(self.qubitsim.v_Q3_Freq*1E9, t0=t0, dt=dt),
-			'Seq: Q1 P-Drive': quant.getTraceDict(self.qubitsim.v_Q1_DriveP*1E9, t0=t0, dt=dt),
-			'Seq: Q2 P-Drive': quant.getTraceDict(self.qubitsim.v_Q2_DriveP*1E9, t0=t0, dt=dt),
-			'Seq: Q3 P-Drive': quant.getTraceDict(self.qubitsim.v_Q3_DriveP*1E9, t0=t0, dt=dt)
-			}[quant.name]
+			# get new value
+			value = quant.getTraceDict(self.qubitsim.dict_seq[quant.name]*1E9, t0=self.qubitsim.tlist[0]*1E-9, dt=self.qubitsim.dt*1E-9)
 		#
 		if quant.name in lStateOutput:
 			# output data, check if simulation needs to be performed
 			if self.isConfigUpdated():
 				self.performSimulation()
-			d0 = self.qubitsim.tlist[0]
-			dt = self.qubitsim.dt
 			# get new value
-			value = quant.getTraceDict(self.qubitsim.dict_tomo[quant.name], t0=t0, dt=dt)
+			value = quant.getTraceDict(self.qubitsim.dict_tomo[quant.name], t0=self.qubitsim.tlist[0]*1E-9, dt=self.qubitsim.dt*1E-9)
 		else:
 			# otherwise, just return current value
 			value = quant.getValue()

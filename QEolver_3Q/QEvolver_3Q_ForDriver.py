@@ -196,19 +196,19 @@ class SequenceConfiguration():
 	def __init__(self, sQubit, sSeqType):
 		self.sQubit = sQubit
 		self.sSeqType = sSeqType
-		self.nPulses = self.getValue(sQubit + ' ' + sSeqType + ' Seq: ' + 'Pulse Number')
+		self.nPulses = int(self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Pulse Number'))
 		self.lpulseCfg = []
 		for n in range(self.nPulses)
 			pulseCfg = PulseConfiguration()
-			pulseCfg.RISE_SHAPE = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Shape #%d' %(n+1))
-			pulseCfg.PLATEAU_START = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Plateau Start #%d' %(n+1))
-			pulseCfg.RISE = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Rise #%d' %(n+1))
-			pulseCfg.PLATEAU = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Plateau #%d' %(n+1))
-			pulseCfg.FALL = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Fall #%d' %(n+1))
-			pulseCfg.STRETCH = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Stretch #%d' %(n+1))
-			pulseCfg.AMPLITUDE = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Amplitude #%d' %(n+1))
-			pulseCfg.FREQUENCY = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Frequency #%d' %(n+1))
-			pulseCfg.PHASE = self.getValue(self.sQubit + ' ' + self.sSeqType + ' Seq: ' + 'Phase #%d' %(n+1))
+			pulseCfg.RISE_SHAPE = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Shape #%d' %(n+1))
+			pulseCfg.PLATEAU_START = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Plateau Start #%d' %(n+1))
+			pulseCfg.RISE = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Rise #%d' %(n+1))
+			pulseCfg.PLATEAU = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Plateau #%d' %(n+1))
+			pulseCfg.FALL = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Fall #%d' %(n+1))
+			pulseCfg.STRETCH = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Stretch #%d' %(n+1))
+			pulseCfg.AMPLITUDE = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Amplitude #%d' %(n+1))
+			pulseCfg.FREQUENCY = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Frequency #%d' %(n+1))
+			pulseCfg.PHASE = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Phase #%d' %(n+1))
 			self.lpulseCfg.append(pulseCfg)
 
 	# def timeFunc(self, t):
@@ -251,6 +251,7 @@ class Simulation():
 		#
 		self.capCfg = CapacitanceConfiguration()
 		#
+		self.lSeq = ['Q1 Frequency', 'Q1 Anharmonicity', 'Q2 Frequency', 'Q2 Anharmonicity', 'Q3 Frequency', 'Q3 Anharmonicity', 'Q1 DriveP', 'Q2 DriveP', 'Q3 DriveP']
 		self.seqCfg_Q1_Freq = SequenceConfiguration('Q1','Frequency')
 		self.seqCfg_Q1_Anh = SequenceConfiguration('Q1','Anh')
 		self.seqCfg_Q2_Freq = SequenceConfiguration('Q2','Frequency')
@@ -261,12 +262,13 @@ class Simulation():
 		self.seqCfg_Q2_DriveP = SequenceConfiguration('Q2','DriveP')
 		self.seqCfg_Q3_DriveP = SequenceConfiguration('Q3','DriveP')
 
-		self.a00 = self.getValue('|0,0>')
-		self.a01 = self.getValue('|0,1>')
-		self.a10 = self.getValue('|1,0>')
-		self.a11 = self.getValue('|1,1>')
+		self.a00 = self.getValue('a00')
+		self.a01 = self.getValue('a01')
+		self.a10 = self.getValue('a10')
+		self.a11 = self.getValue('a11')
 		self.psi_input_logic = Qobj(np.array([self.a00,self.a01,self.a10,self.a11])).unit()
 		self.rho_input_logic = self.psi_input_logic * self.psi_input_logic.dag()
+
 
 	# def updateSimCfg(self, simCfg):
 	# 	# update simulation options
@@ -407,25 +409,17 @@ class Simulation():
 
 	def generateSeqOutput(self):
 		#
-		self.v_Q1_Freq = np.zeros_like(self.tlist)
-		self.v_Q1_Anh = np.zeros_like(self.tlist)
-		self.v_Q2_Freq = np.zeros_like(self.tlist)
-		self.v_Q2_Anh = np.zeros_like(self.tlist)
-		self.v_Q3_Freq = np.zeros_like(self.tlist)
-		self.v_Q3_Anh = np.zeros_like(self.tlist)
-		self.v_Q1_DriveP = np.zeros_like(self.tlist)
-		self.v_Q2_DriveP = np.zeros_like(self.tlist)
-		self.v_Q3_DriveP = np.zeros_like(self.tlist)
+		strT = 'Time Series: '
+		self.dict_seq = {strT + s : [] for s in self.lSeq}
 		for k, t in enumerate(self.tlist):
-			self.v_Q1_Freq[k] = self.timeFunc_Q1_Freq(t)
-			self.v_Q1_Anh[k] = self.timeFunc_Q1_Anh(t)
-			self.v_Q2_Freq[k] = self.timeFunc_Q2_Freq(t)
-			self.v_Q2_Anh[k] = self.timeFunc_Q2_Anh(t)
-			self.v_Q3_Freq[k] = self.timeFunc_Q3_Freq(t)
-			self.v_Q3_Anh[k] = self.timeFunc_Q3_Anh(t)
-			self.v_Q1_DriveP[k] = self.timeFunc_Q1_DriveP(t)
-			self.v_Q2_DriveP[k] = self.timeFunc_Q2_DriveP(t)
-			self.v_Q3_DriveP[k] = self.timeFunc_Q3_DriveP(t)
+			self.dict_seq[strT + 'Q1 Frequency'].append(self.timeFunc_Q1_Freq(t))
+			self.dict_seq[strT + 'Q1 Anharmonicity'].append(self.timeFunc_Q1_Anh(t))
+			self.dict_seq[strT + 'Q2 Frequency'].append(self.timeFunc_Q2_Freq(t))
+			self.dict_seq[strT + 'Q2 Anharmonicity'].append(self.timeFunc_Q2_Anh(t))
+			self.dict_seq[strT + 'Q3 Frequency'].append(self.timeFunc_Q3_Freq(t))
+			self.dict_seq[strT + 'Q3 Anharmonicity'].append(self.timeFunc_Q3_Anh(t))
+			self.dict_seq[strT + 'Q2 DriveP'].append(self.timeFunc_Q2_DriveP(t))
+			self.dict_seq[strT + 'Q3 DriveP'].append(self.timeFunc_Q3_DriveP(t))
 
 
 	def generateInitialState(self):
@@ -459,6 +453,7 @@ class Simulation():
 
 
 	def generateObservables(self):
+		strT = 'Time Series: '
 		list_pauli_label = ['I','X','Y','Z']
 		list_pauli = [qeye(2), sigmax(), sigmay(), sigmaz()]
 		self.dict_pauli = {}
@@ -467,14 +462,14 @@ class Simulation():
 			for k2 in range(4):
 				key = list_pauli_label[k1] + list_pauli_label[k2]
 				self.dict_pauli[key] = Qflatten(tensor(list_pauli[k1],list_pauli[k2]))
-				self.dict_tomo[key] = []
+				self.dict_tomo[strT + key] = []
 		#
 		for k, t in enumerate(self.tlist):
 			rho_lab = self.results.states[k]
 			rho_rot = T(rho_lab, U(self.H_sys, t).dag())
 			rho_logic = T(rho_rot, U_sub.dag())
 			for key, op in self.dict_pauli.items():
-				self.dict_tomo[key].append((op * rho_logic).tr())
+				self.dict_tomo[strT + key].append((op * rho_logic).tr())
 
 
 class Noise():
