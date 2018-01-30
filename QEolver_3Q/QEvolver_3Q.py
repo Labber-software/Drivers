@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jan 24 2018
-
 @author: Fei Yan
 """
 import InstrumentDriver

@@ -156,7 +156,7 @@ class QubitConfiguration():
 		self.UseDesignParam = bool(self.getValue(self.sQubit + ' Use Design Parameter'))
 		self.QubitType = self.getValue(self.sQubit + ' Type')
 		self.Freq = self.getValue(self.sQubit + ' Frequency')/1E9
-		self.Anh = self.getValue(self.sQubit + ' Anh')/1E9
+		self.Anh = self.getValue(self.sQubit + ' Anharmonicity')/1E9
 		self.Ej = self.getValue(self.sQubit + ' Ej')/1E9
 		self.Ec = self.getValue(self.sQubit + ' Ec')/1E9
 		self.Asym = self.getValue(self.sQubit + ' Asymmetry')
@@ -257,9 +257,9 @@ class Simulation():
 		self.seqCfg_Q2_Anh = SequenceConfiguration('Q2','Anh')
 		self.seqCfg_Q3_Freq = SequenceConfiguration('Q3','Frequency')
 		self.seqCfg_Q3_Anh = SequenceConfiguration('Q3','Anh')
-		self.seqCfg_Q1_DriveP = SequenceConfiguration('Q1','P-Drive')
-		self.seqCfg_Q2_DriveP = SequenceConfiguration('Q2','P-Drive')
-		self.seqCfg_Q3_DriveP = SequenceConfiguration('Q3','P-Drive')
+		self.seqCfg_Q1_DriveP = SequenceConfiguration('Q1','DriveP')
+		self.seqCfg_Q2_DriveP = SequenceConfiguration('Q2','DriveP')
+		self.seqCfg_Q3_DriveP = SequenceConfiguration('Q3','DriveP')
 
 		self.a00 = self.getValue('|0,0>')
 		self.a01 = self.getValue('|0,1>')
