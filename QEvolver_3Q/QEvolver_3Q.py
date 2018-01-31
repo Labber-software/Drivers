@@ -4,7 +4,7 @@
 """
 import InstrumentDriver
 import numpy as np
-from QSolver_ForDriver_beta import *
+from QEvolver_3Q_ForDriver import *
 
 # import logging
 # log = logging.getLogger('LabberDriver')
@@ -32,26 +32,35 @@ class Driver(InstrumentDriver.InstrumentWorker):
 
 	def performGetValue(self, quant, options={}):
 		"""Perform the Get Value instrument operation"""
-		strT = 'Time Series: '
-		lFreqOutput = [strT + s for s in ['Q1 Frequency', 'Q2 Frequency', 'Q3 Frequency']]
-		lDriveOutput = [strT + s for s in ['Q1 DriveP', 'Q2 DriveP', 'Q3 DriveP']]
+		sTimeSeries = 'Time Series: '
+		lFreqOutput = [sTimeSeries + s for s in ['Q1 Frequency', 'Q2 Frequency', 'Q3 Frequency']]
+		lDriveOutput = [sTimeSeries + s for s in ['Q1 DriveP', 'Q2 DriveP', 'Q3 DriveP']]
 		#
 		list_pauli_label = ['I','X','Y','Z']
 		lpauli2 = []
 		for k1 in range(4):
 			for k2 in range(4):
 				lpauli2.append(list_pauli_label[k1] + list_pauli_label[k2])
-		lStateOutput = [strT + s for s in lpauli2]
+		lStateOutput = [sTimeSeries + s for s in lpauli2]
 		#
 		# check type of quantity
-		if quant.name in lFreqOutput:
+		if self.bShowFrequency and (quant.name in lFreqOutput):
 			if self.isConfigUpdated():
 				self.qubitsim = Simulation()
 				self.qubitsim.generateSeqOutput()
 			# get new value
 			value = quant.getTraceDict(self.qubitsim.dict_seq[quant.name]*1E9, t0=self.qubitsim.tlist[0]*1E-9, dt=self.qubitsim.dt*1E-9)
 		#
-		if quant.name in lStateOutput:
+		# check type of quantity
+		if self.bShowDrive and (quant.name in lDriveOutput):
+			if self.isConfigUpdated():
+				self.qubitsim = Simulation()
+				self.qubitsim.generateSeqOutput()
+			# get new value
+			value = quant.getTraceDict(self.qubitsim.dict_seq[quant.name]*1E9, t0=self.qubitsim.tlist[0]*1E-9, dt=self.qubitsim.dt*1E-9)
+		#
+		# check type of quantity
+		if self.bShowMeasurement and (quant.name in lStateOutput):
 			# output data, check if simulation needs to be performed
 			if self.isConfigUpdated():
 				self.performSimulation()

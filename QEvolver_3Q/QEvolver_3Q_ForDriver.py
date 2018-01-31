@@ -198,7 +198,7 @@ class SequenceConfiguration():
 		self.sSeqType = sSeqType
 		self.nPulses = int(self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Pulse Number'))
 		self.lpulseCfg = []
-		for n in range(self.nPulses)
+		for n in range(self.nPulses):
 			pulseCfg = PulseConfiguration()
 			pulseCfg.RISE_SHAPE = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Shape #%d' %(n+1))
 			pulseCfg.PLATEAU_START = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Plateau Start #%d' %(n+1))
@@ -472,4 +472,4 @@ class Simulation():
 				self.dict_tomo[strT + key].append((op * rho_logic).tr())
 
 
-class Noise():
+# class Noise():
