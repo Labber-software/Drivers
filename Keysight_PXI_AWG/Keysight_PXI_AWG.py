@@ -14,9 +14,12 @@ class Driver(LabberDriver):
         """Perform the operation of opening the instrument connection"""
         # timeout
         self.timeout_ms = int(1000 * self.dComCfg['Timeout'])
+        # get PXI chassis
+        self.chassis = int(self.dComCfg.get('PXI chassis', 0))
         # create AWG instance
         self.AWG = keysightSD1.SD_AOU()
-        AWGPart = self.AWG.getProductNameBySlot(1, int(self.comCfg.address))
+        AWGPart = self.AWG.getProductNameBySlot(self.chassis,
+                                                int(self.comCfg.address))
         if not isinstance(AWGPart, str):
             raise Error('Unit not available')
         # check that model is supported
@@ -30,7 +33,7 @@ class Driver(LabberDriver):
             raise IdError(AWGPart, dOptionCfg['model_id'])
         # set model
         self.setModel(validName)
-        self.AWG.openWithSlot(AWGPart, 1, int(self.comCfg.address))
+        self.AWG.openWithSlot(AWGPart, self.chassis, int(self.comCfg.address))
         # sampling rate and number of channles is set by model
         if validName in ('M3202', 'H3344'):
             # 1GS/s models
