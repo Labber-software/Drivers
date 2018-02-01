@@ -370,6 +370,51 @@ class Simulation():
 					 np.sqrt(self.Gamma1_Q3) * L_Q3_a]
 
 
+
+class SequenceConfiguration():
+
+	def __init__(self, sQubit, sSeqType):
+		self.sQubit = sQubit
+		self.sSeqType = sSeqType
+		self.nPulses = int(self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Pulse Number'))
+		self.lpulseCfg = []
+		for n in range(self.nPulses):
+			pulseCfg = PulseConfiguration()
+			pulseCfg.RISE_SHAPE = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Shape #%d' %(n+1))
+			pulseCfg.PLATEAU_START = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Plateau Start #%d' %(n+1))
+			pulseCfg.RISE = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Rise #%d' %(n+1))
+			pulseCfg.PLATEAU = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Plateau #%d' %(n+1))
+			pulseCfg.FALL = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Fall #%d' %(n+1))
+			pulseCfg.STRETCH = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Stretch #%d' %(n+1))
+			pulseCfg.AMPLITUDE = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Amplitude #%d' %(n+1))
+			pulseCfg.FREQUENCY = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Frequency #%d' %(n+1))
+			pulseCfg.PHASE = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Phase #%d' %(n+1))
+			self.lpulseCfg.append(pulseCfg)
+
+
+class sequence():
+
+	def __initial__(self, config):
+		#
+		for sQubit in List_sQubit:
+			for sSeqType in List_sSeqType
+				_name_to = 'seqCfg_' + sQubit + '_' + sSeqType
+				setattr(self, , 42)
+				self.seqCfg_Q1_Freq = SequenceConfiguration(sQubit, sSeqType)
+				name_input = 'Seq ' + sQubit + ' ' + sSeqType + ' ' + sPulseParam + '#d' %
+				name_
+				self.
+		self.seqCfg_Q1_Freq = SequenceConfiguration('Q1','Frequency')
+		self.seqCfg_Q1_Anh = SequenceConfiguration('Q1','Anh')
+		self.seqCfg_Q2_Freq = SequenceConfiguration('Q2','Frequency')
+		self.seqCfg_Q2_Anh = SequenceConfiguration('Q2','Anh')
+		self.seqCfg_Q3_Freq = SequenceConfiguration('Q3','Frequency')
+		self.seqCfg_Q3_Anh = SequenceConfiguration('Q3','Anh')
+		self.seqCfg_Q1_DriveP = SequenceConfiguration('Q1','DriveP')
+		self.seqCfg_Q2_DriveP = SequenceConfiguration('Q2','DriveP')
+		self.seqCfg_Q3_DriveP = SequenceConfiguration('Q3','DriveP')
+		self.period_1qb = config.get('Pulse period, 1-QB')
+
 	### generate coefficient ###
 	def	timeFunc_Q1_Freq(self,t):
 		return add_sequence(t, self.seqCfg_Q1_Freq) + self.qubitCfg_Q1.Freq
