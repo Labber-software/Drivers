@@ -369,18 +369,25 @@ class Simulation():
 					 np.sqrt(self.Gamma1_Q2) * L_Q2_a,
 					 np.sqrt(self.Gamma1_Q3) * L_Q3_a]
 
-
+List_sQubit = ['Q1', 'Q2', 'Q3']
+List_sSeqType = ['Frequency', 'Anharmonicity', '']
+List_sPulseParam = ['Shape', 'PlateauStart', 'Rise', 'Plateau', 'Fall', 'Stretch', 'Amplitude', 'Frequency', 'Phase']
 
 class SequenceConfiguration():
 
-	def __init__(self, sQubit, sSeqType):
+	def __init__(self, sQubit, sSeqType, CONFIG):
 		self.sQubit = sQubit
 		self.sSeqType = sSeqType
 		self.nPulses = int(self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Pulse Number'))
 		self.lpulseCfg = []
 		for n in range(self.nPulses):
-			pulseCfg = PulseConfiguration()
-			pulseCfg.RISE_SHAPE = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Shape #%d' %(n+1))
+			for sPulseParam in List_sPulseParam:
+				pulseCfg = PulseConfiguration()
+				sInputName = 'Seq ' + self.sQubit + ' ' + self.sSeqType + ': ' + sPulseParam + ' #%d' %(n+1)
+				setattr(pulseCfg, sPulseParam, CONFIG.get(sInputName)
+
+
+					RISE_SHAPE = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Shape #%d' %(n+1))
 			pulseCfg.PLATEAU_START = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Plateau Start #%d' %(n+1))
 			pulseCfg.RISE = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Rise #%d' %(n+1))
 			pulseCfg.PLATEAU = self.getValue('Seq ' + self.sQubit + ' ' + self.sSeqType + ': Plateau #%d' %(n+1))
@@ -394,12 +401,13 @@ class SequenceConfiguration():
 
 class sequence():
 
-	def __initial__(self, config):
+	def __initial__(self, CONFIG):
 		#
 		for sQubit in List_sQubit:
-			for sSeqType in List_sSeqType
-				_name_to = 'seqCfg_' + sQubit + '_' + sSeqType
-				setattr(self, , 42)
+			for sSeqType in List_sSeqType:
+				sSeqName = 'seqCfg_' + sQubit + '_' + sSeqType
+				setattr(self, SeqName, SequenceConfiguration(sQubit, sSeqType, CONFIG))
+
 				self.seqCfg_Q1_Freq = SequenceConfiguration(sQubit, sSeqType)
 				name_input = 'Seq ' + sQubit + ' ' + sSeqType + ' ' + sPulseParam + '#d' %
 				name_
