@@ -4,10 +4,13 @@
 """
 import InstrumentDriver
 import numpy as np
-from QEvolver_3Q_ForDriver import *
+from simulation import *
+from sequence import *
 
-# import logging
-# log = logging.getLogger('LabberDriver')
+import logging
+log = logging.getLogger('LabberDriver')
+
+
 
 class Driver(InstrumentDriver.InstrumentWorker):
 	""" This class implements eigensolver of a multi-qubit system"""
@@ -32,7 +35,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 
 	def performGetValue(self, quant, options={}):
 		"""Perform the Get Value instrument operation"""
-		sTimeSeries = 'Time Series: '
+		sPre = 'Time Series: '
 		lFreqOutput = [sTimeSeries + s for s in ['Q1 Frequency', 'Q2 Frequency', 'Q3 Frequency']]
 		lDriveOutput = [sTimeSeries + s for s in ['Q1 DriveP', 'Q2 DriveP', 'Q3 DriveP']]
 		#
@@ -74,7 +77,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		
 	def performSimulation(self):
 		"""Perform simulation"""
-		self.qubitsim = Simulation()
+		self.qubitsim = simulation()
+		self.sequence = sequence()
 		self.qubitsim.generateHamiltonian_3Q_cap()
 		# self.qubitsim.generateLabel_3Q()
 		self.qubitsim.generateInitialState()
