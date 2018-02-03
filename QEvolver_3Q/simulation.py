@@ -88,6 +88,13 @@ class simulation_3Q():
 		# generate capacitance network config.
 		self.capCfg = CapacitanceConfiguration(CONFIG)
 
+		List_sLabel = [str(n) for n in range(16)]
+		self.List_sLabel3 = []
+		for k1 in np.arange(self.nTrunc):
+			for k2 in np.arange(self.nTrunc):
+				for k3 in np.arange(self.nTrunc):
+					self.List_sLabel3.append(List_sLabel[k1] + List_sLabel[k2] + List_sLabel[k3])
+
 		self.a00 = CONFIG.get('a00')
 		self.a01 = CONFIG.get('a01')
 		self.a10 = CONFIG.get('a10')
@@ -95,6 +102,7 @@ class simulation_3Q():
 		self.psi_input_logic = Qobj(np.array([self.a00,self.a01,self.a10,self.a11])).unit()
 		self.rho_input_logic = self.psi_input_logic * self.psi_input_logic.dag()
 
+		self.c_ops = []
 		self.T1_Q1 = CONFIG.get('Q1 T1')
 		self.Gamma1_Q1 = 1/self.T1_Q1
 		self.T1_Q2 = CONFIG.get('Q2 T1')
@@ -144,7 +152,7 @@ class simulation_3Q():
 
 	def generateHamiltonian_3Q_cap(self):
 		# # construct 3-qubit Hamiltonian
-		# self.generateSubHamiltonian_3Q()
+		self.generateSubHamiltonian_3Q()
 		# self Hamiltonian
 		self.H_Q1 = self.qubitCfg_Q1.Frequency * self.H_Q1_aa + self.qubitCfg_Q1.Anharmonicity/2 * self.H_Q1_aaaa
 		self.H_Q2 = self.qubitCfg_Q2.Frequency * self.H_Q2_aa + self.qubitCfg_Q2.Anharmonicity/2 * self.H_Q2_aaaa
@@ -160,20 +168,20 @@ class simulation_3Q():
 		self.H_idle = self.H_Q1 + self.H_Q2 + self.H_Q3 + self.H_12 + self.H_23 + self.H_13
 
 
-	def generateLabel_3Q(self):
-		# generate 3-qubit number state label list
-		list_label_gen = [str(n) for n in range(16)]
-		self.list_label_table = []
-		for k1 in np.arange(self.nTrunc):
-			for k2 in np.arange(self.nTrunc):
-				for k3 in np.arange(self.nTrunc):
-					self.list_label_table.append(list_label_gen[k1] + list_label_gen[k2] + list_label_gen[k3])
-
-
 	def generateCollapse_3Q(self):
 		self.c_ops = [np.sqrt(self.Gamma1_Q1) * L_Q1_a,
 					 np.sqrt(self.Gamma1_Q2) * L_Q2_a,
 					 np.sqrt(self.Gamma1_Q3) * L_Q3_a]
+
+
+	# def generateLabel_3Q(self):
+	# 	# generate 3-qubit number state label list
+	# 	List_sLabel = [str(n) for n in range(16)]
+	# 	self.List_sLabel3 = []
+	# 	for k1 in np.arange(self.nTrunc):
+	# 		for k2 in np.arange(self.nTrunc):
+	# 			for k3 in np.arange(self.nTrunc):
+	# 				self.List_sLabel3.append(List_sLabel[k1] + List_sLabel[k2] + List_sLabel[k3])
 
 
 	def generateInitialState(self):
@@ -181,7 +189,7 @@ class simulation_3Q():
 		self.generateLabel_3Q()
 		self.list_label_sub = ["000","001","100","101"]
 		self.vals_idle, self.vecs_idle = eigensolve(self.H_idle)
-		self.vals_idle_sub, vecs_idle_sub = level_identify(self.vals_idle, self.vecs_idle, self.list_label_table, self.list_label_sub)
+		self.vals_idle_sub, vecs_idle_sub = level_identify(self.vals_idle, self.vecs_idle, self.List_sLabel3, self.list_label_sub)
 		#
 		self.U_logic_to_full = Qobj(self.vecs_sub)
 		self.U_full_to_logic = self.U_logic_to_full.dag()
@@ -211,32 +219,24 @@ class simulation_3Q():
 		# return result.states
 
 
-	def generateObservables(self):
+	def generateObservable(self):
 		sPre = 'Time Series: '
 		self.dict_Pauli2 = {}
-		self.dict_vStateTomo = {}
+		self.dict_StateFinal = {}
+		self.dict_StateTrace = {}
 		for k1 in range(4):
 			for k2 in range(4):
 				key = List_sPauli[k1] + List_sPauli[k2]
 				self.dict_Pauli2[key] = Qflatten(tensor(List_mPauli[k1], List_mPauli[k2]))
-				self.dict_vStateTomo[sPre + key] = []
+				self.dict_StateTrace[sPre + key] = []
 		#
 		for k, t in enumerate(self.tlist):
 			rho_lab = self.results.states[k]
 			rho_rot = T(rho_lab, U(self.H_idle, t).dag())
 			rho_logic = T(rho_rot, U_sub.dag())
 			for key, op in self.dict_Pauli2.items():
-				self.dict_vStateTomo[sPre + key].append((op * rho_logic).tr())
-
-
-	def generateSeqDisplay(self):
+				self.dict_StateTrace[sPre + key].append((op * rho_logic).tr())
+				if k == self.nTimeList-1:
+					self.dict_StateFinal['Final' + key] = (op * rho_logic).tr()
 		#
-		sPre = 'Time Series: '
-		self.dict_vSeq = {sPreS + s : [] for s in self.lSeq}
-		for sQubit in List_sQubit:
-			for sSeqType in List_sSeqType:
-				sName = sPre + sQubit + ' ' + sSeqType
-				sCallName = 'timeFunc_' + sQubit + '_' + sSeqType
-				methodToCall = getattr(self, sCallName)
-				for t in self.tlist:
-					self.dict_vSeq[sName].append(methodToCall(t))
+			

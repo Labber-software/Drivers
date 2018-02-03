@@ -162,6 +162,11 @@ class sequence():
 				sName = 'seqCfg_' + sQubit + '_' + sSeqType
 				setattr(self, sName, SequenceConfiguration(sQubit, sSeqType, CONFIG))
 		#
+		self.dTimeStart = CONFIG.get('Time Start')
+		self.dTimeEnd = CONFIG.get('Time End')
+		self.nTimeList = int(CONFIG.get('Number of Samples'))
+		self.tlist = np.linspace(self.dTimeStart, self.dTimeEnd, self.nTimeList)
+		self.dt = self.tlist[1] - self.tlist[0]	
 
 
 	### generate coefficient ###
@@ -200,3 +205,16 @@ class sequence():
 
 	def	timeFunc_g13_pp(self,t):
 		return 0.5 * self.capCfg.r13 * np.sqrt(self.timeFunc_Q1_Frequency(t) * self.timeFunc_Q3_Frequency(t))
+
+
+	def generateSeqDisplay(self):
+		#
+		sPre = 'Time Series: '
+		self.dict_Seq = {sPreS + s : [] for s in self.lSeq}
+		for sQubit in List_sQubit:
+			for sSeqType in List_sSeqType:
+				sName = sPre + sQubit + ' ' + sSeqType
+				sCallName = 'timeFunc_' + sQubit + '_' + sSeqType
+				methodToCall = getattr(self, sCallName)
+				for t in self.tlist:
+					self.dict_Seq[sName].append(methodToCall(t))
