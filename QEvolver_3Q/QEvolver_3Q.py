@@ -48,12 +48,11 @@ class Driver(InstrumentDriver.InstrumentWorker):
 				self.performSequence()
 			# get new value
 			log.info(self.SEQ.dict_Seq[quant.name])
-			log.info(self.SEQ.tlist[0])
 			log.info(self.SEQ.dt)
 			value = quant.getTraceDict(self.SEQ.dict_Seq[quant.name], t0=self.SEQ.tlist[0], dt=self.SEQ.dt)
 		#
 		# check type of quantity
-		if quant.name in lStateFinal:
+		elif quant.name in lStateFinal:
 			# output data, check if simulation needs to be performed
 			if self.isConfigUpdated():
 				self.performSimulation()
@@ -61,7 +60,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 			value = quant.getTraceDict(self.SIM.dict_StateFinal[quant.name], t0=self.SIM.tlist[0], dt=self.SIM.dt)
 		#
 		# check type of quantity
-		if quant.name in lStateTrace:
+		elif quant.name in lStateTrace:
 			# output data, check if simulation needs to be performed
 			if self.isConfigUpdated():
 				self.performSimulation()

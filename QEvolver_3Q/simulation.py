@@ -126,13 +126,13 @@ class simulation_3Q():
 		self.psi_input_logic = Qobj(np.array([self.a00,self.a01,self.a10,self.a11])).unit()
 		self.rho_input_logic = self.psi_input_logic * self.psi_input_logic.dag()
 
-		self.c_ops = []
+		
+		self.bUseT1Collapse = CONFIG.get('Use T1 Collapse')
 		self.T1_Q1 = CONFIG.get('Q1 T1')
-		self.Gamma1_Q1 = 1/self.T1_Q1
 		self.T1_Q2 = CONFIG.get('Q2 T1')
-		self.Gamma1_Q2 = 1/self.T1_Q2
 		self.T1_Q3 = CONFIG.get('Q3 T1')
-		self.Gamma1_Q3 = 1/self.T1_Q3
+
+
 
 
 	def updateSequence(self, sequence):
@@ -141,6 +141,10 @@ class simulation_3Q():
 			for sSeqType in List_sSeqType:
 				sName = 'timeFunc_' + sQubit + '_' + sSeqType
 				setattr(self, sName, getattr(sequence, sName))
+		#
+		self.timeFunc_g12_pp = sequence.timeFunc_g12_pp
+		self.timeFunc_g23_pp = sequence.timeFunc_g23_pp
+		self.timeFunc_g13_pp = sequence.timeFunc_g13_pp
 
 
 	def generateSubHamiltonian_3Q(self):
@@ -193,10 +197,15 @@ class simulation_3Q():
 
 
 	def generateCollapse_3Q(self):
-		self.c_ops = [np.sqrt(self.Gamma1_Q1) * self.L_Q1_a,
-					 np.sqrt(self.Gamma1_Q2) * self.L_Q2_a,
-					 np.sqrt(self.Gamma1_Q3) * self.L_Q3_a]
-
+		if self.bUseT1Collapse:
+			self.Gamma1_Q1 = 1/self.T1_Q1
+			self.Gamma1_Q2 = 1/self.T1_Q2
+			self.Gamma1_Q3 = 1/self.T1_Q3
+			self.c_ops = [np.sqrt(self.Gamma1_Q1) * self.L_Q1_a,
+						 np.sqrt(self.Gamma1_Q2) * self.L_Q2_a,
+						 np.sqrt(self.Gamma1_Q3) * self.L_Q3_a]
+		else:
+			self.c_ops = []
 
 	# def generateLabel_3Q(self):
 	# 	# generate 3-qubit number state label list
@@ -210,12 +219,12 @@ class simulation_3Q():
 
 	def generateInitialState(self):
 		#
-		self.generateLabel_3Q()
+		# self.generateLabel_3Q()
 		self.list_label_sub = ["000","001","100","101"]
 		self.vals_idle, self.vecs_idle = eigensolve(self.H_idle)
-		self.vals_idle_sub, vecs_idle_sub = level_identify(self.vals_idle, self.vecs_idle, self.List_sLabel3, self.list_label_sub)
+		self.vals_idle_sub, self.vecs_idle_sub = level_identify(self.vals_idle, self.vecs_idle, self.List_sLabel3, self.list_label_sub)
 		#
-		self.U_logic_to_full = Qobj(self.vecs_sub)
+		self.U_logic_to_full = Qobj(self.vecs_idle_sub)
 		self.U_full_to_logic = self.U_logic_to_full.dag()
 		#
 		self.rho_input_rot = T(self.rho_input_logic, self.U_logic_to_full)

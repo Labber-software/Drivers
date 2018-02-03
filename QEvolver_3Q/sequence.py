@@ -171,7 +171,7 @@ class sequence():
 
 
 	### generate coefficient ###
-	def	timeFunc_Q1_Frequency(self,t):
+	def	timeFunc_Q1_Frequency(self,t,args):
 		return add_sequence(t, self.seqCfg_Q1_Frequency) + self.qubitCfg_Q1.Frequency
 
 	def	timeFunc_Q1_Anharmonicity(self,t):
