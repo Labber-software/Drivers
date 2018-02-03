@@ -3,13 +3,11 @@
 @author: Fei Yan
 """
 import InstrumentDriver
-import numpy as np
 from simulation import *
 from sequence import *
 
 import logging
 log = logging.getLogger('LabberDriver')
-
 
 
 class Driver(InstrumentDriver.InstrumentWorker):
@@ -18,9 +16,11 @@ class Driver(InstrumentDriver.InstrumentWorker):
 	def performOpen(self, options={}):
 		"""Perform the operation of opening the instrument connection"""
 		# init variables
-		self.SEQ = None
-		self.SIM = None
-		# CONFIG = self.instrCfg.getValuesDict()
+		# self.SEQ = None
+		# self.SIM = None
+		CONFIG = self.instrCfg.getValuesDict()
+		self.SEQ = sequence(CONFIG)
+		self.SIM = simulation_3Q(CONFIG)		
 
 
 	def performSetValue(self, quant, value, sweepRate=0.0, options={}):
@@ -35,19 +35,22 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		lSeqOutput = ['Time Series: ' + s for s in ['Q1 Frequency', 'Q1 Anharmonicity', 'Q1 DriveP', 'Q2 Frequency', 'Q2 Anharmonicity', 'Q2 DriveP', 'Q3 Frequency', 'Q3 Anharmonicity', 'Q3 DriveP']]
 		#
 		List_sPauli = ['I','X','Y','Z']
-		List_Pauli2 = []
+		List_sPauli2 = []
 		for k1 in range(4):
 			for k2 in range(4):
-				List_Pauli2.append(List_sPauli[k1] + List_sPauli[k2])
-		lStateFinal = ['Final ' + s for s in List_Pauli2]
-		lStateTrace = ['Time Series: ' + s for s in List_Pauli2]
+				List_sPauli2.append(List_sPauli[k1] + List_sPauli[k2])
+		lStateFinal = ['Final ' + s for s in List_sPauli2]
+		lStateTrace = ['Time Series: ' + s for s in List_sPauli2]
 		#
 		# check type of quantity
 		if quant.name in lSeqOutput:
 			if self.isConfigUpdated():
 				self.performSequence()
 			# get new value
-			value = quant.getTraceDict(self.SEQ.dict_Seq[quant.name]*1E9, t0=self.SEQ.tlist[0]*1E-9, dt=self.SEQ.dt*1E-9)
+			log.info(self.SEQ.dict_Seq[quant.name])
+			log.info(self.SEQ.tlist[0])
+			log.info(self.SEQ.dt)
+			value = quant.getTraceDict(self.SEQ.dict_Seq[quant.name], t0=self.SEQ.tlist[0], dt=self.SEQ.dt)
 		#
 		# check type of quantity
 		if quant.name in lStateFinal:
@@ -55,7 +58,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 			if self.isConfigUpdated():
 				self.performSimulation()
 			# get new value
-			value = quant.getTraceDict(self.SIM.dict_StateFinal[quant.name], t0=self.SIM.tlist[0]*1E-9, dt=self.SIM.dt*1E-9)
+			value = quant.getTraceDict(self.SIM.dict_StateFinal[quant.name], t0=self.SIM.tlist[0], dt=self.SIM.dt)
 		#
 		# check type of quantity
 		if quant.name in lStateTrace:
@@ -63,7 +66,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 			if self.isConfigUpdated():
 				self.performSimulation()
 			# get new value
-			value = quant.getTraceDict(self.SIM.dict_StateTrace[quant.name], t0=self.SIM.tlist[0]*1E-9, dt=self.SIM.dt*1E-9)
+			value = quant.getTraceDict(self.SIM.dict_StateTrace[quant.name], t0=self.SIM.tlist[0], dt=self.SIM.dt)
 		else:
 			# otherwise, just return current value
 			value = quant.getValue()
@@ -80,6 +83,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		"""Perform simulation"""
 		CONFIG = self.instrCfg.getValuesDict()
 		self.SEQ = sequence(CONFIG)
+		self.SEQ.generateSeqDisplay()
+		#
 		self.SIM = simulation_3Q(CONFIG)
 		self.SIM.updateSequence(self.SEQ)
 		self.SIM.generateHamiltonian_3Q_cap()

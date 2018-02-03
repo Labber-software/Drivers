@@ -3,13 +3,14 @@
 @author: Fei Yan
 """
 
-
 import numpy as np
 
+import logging
+log = logging.getLogger('LabberDriver')
 
 List_sQubit = ['Q1', 'Q2', 'Q3']
 List_sQubitParam = ['Frequency', 'Anharmonicity', 'Type', 'Ej', 'Ec', 'Asymmetry', 'Flux']
-List_sCapParam ['C1', 'C2', 'C3', 'C12', 'C23', 'C13']
+List_sCapParam = ['C1', 'C2', 'C3', 'C12', 'C23', 'C13']
 List_sSeqType = ['Frequency', 'Anharmonicity', 'DriveP']
 List_sPulseParam = ['Shape', 'PlateauStart', 'Rise', 'Plateau', 'Fall', 'Stretch', 'Amplitude', 'Frequency', 'Phase', 'DragCoeff']
 
@@ -24,13 +25,13 @@ def freq_SQUID(Ej, Ec):
 
 def freq_LC(L,C):
 	# frequency of LC oscillator
-	# L [nH]
-	# C [fH]
-	return 1/(2*np.pi)/np.sqrt(L*C)/1e-3   #[GHz]
+	# L [H]
+	# C [H]
+	return 1/(2*np.pi)/np.sqrt(L*C)   #[GHz]
 
 def Z_LC(L,C):
 	# impedence of LC oscillator
-	return np.sqrt(L/C)*1e3   #[Ohm]
+	return np.sqrt(L/C)   #[Ohm]
 
 
 
@@ -89,7 +90,7 @@ def add_sequence(t, seqCfg):
 	# add a sequence
 	y = 0
 	for n in range(seqCfg.nPulses):
-		y += addPulse(t, seqCfg.lpulseCfg[n])
+		y += add_pulse(t, seqCfg.lpulseCfg[n])
 	return y
 
 
@@ -98,13 +99,10 @@ class QubitConfiguration():
 
 	def __init__(self, sQubit, CONFIG):
 		self.sQubit = sQubit
-		setattr(self, bUseDesignParam, CONFIG.get(sQubit + ' Use Design Parameter'))
+		self.bUseDesignParam = CONFIG.get(sQubit + ' Use Design Parameter')
 		for sQubitParam in List_sQubitParam:
-			sCallName = sQubit + sQubitParam
+			sCallName = sQubit + ' ' + sQubitParam
 			setattr(self, sQubitParam, CONFIG.get(sCallName))
-		self.r12 = self.C12 / np.sqrt(self.C1 * self.C2)
-		self.r23 = self.C23 / np.sqrt(self.C2 * self.C3)
-		self.r13 = self.r12 * self.r23 + self.C13 / np.sqrt(self.C1 * self.C3)
 
 
 class CapacitanceConfiguration():
@@ -113,21 +111,24 @@ class CapacitanceConfiguration():
 		for sCapParam in List_sCapParam:
 			sCallName = 'Capacitance ' + sCapParam.replace("C", "")
 			setattr(self, sCapParam, CONFIG.get(sCallName))
+		self.r12 = self.C12 / np.sqrt(self.C1 * self.C2)
+		self.r23 = self.C23 / np.sqrt(self.C2 * self.C3)
+		self.r13 = self.r12 * self.r23 + self.C13 / np.sqrt(self.C1 * self.C3)
 
 
 class PulseConfiguration():
 
 	def __init__(self):
 		self.Shape = 'GAUSS'
-		self.PlateauStart = 0.0
-		self.Rise = 5.0
-		self.Plateau = 0.0
-		self.Fall = 5.0
-		self.Stretch = 0.5
-		self.Amplitude = 1.0
-		self.Frequency = 5.0
-		self.Phase = 0.0
-		self.DragCoeff = 0.0
+		self.PlateauStart = 0.0E-9
+		self.Rise = 5.0E-9
+		self.Plateau = 0.0E-9
+		self.Fall = 5.0E-9
+		self.Stretch = 0.5E-9
+		self.Amplitude = 1.0E-9
+		self.Frequency = 5.0E-9
+		self.Phase = 0.0E-9
+		self.DragCoeff = 0.0E-9
 
 
 class SequenceConfiguration():
@@ -149,7 +150,7 @@ class SequenceConfiguration():
 
 class sequence():
 
-	def __initial__(self, CONFIG):
+	def __init__(self, CONFIG):
 		# generate qubit idling config.
 		for sQubit in List_sQubit:
 			sName = 'qubitCfg_' + sQubit
@@ -164,7 +165,7 @@ class sequence():
 		#
 		self.dTimeStart = CONFIG.get('Time Start')
 		self.dTimeEnd = CONFIG.get('Time End')
-		self.nTimeList = int(CONFIG.get('Number of Samples'))
+		self.nTimeList = int(CONFIG.get('Number of Times'))
 		self.tlist = np.linspace(self.dTimeStart, self.dTimeEnd, self.nTimeList)
 		self.dt = self.tlist[1] - self.tlist[0]	
 
@@ -210,7 +211,13 @@ class sequence():
 	def generateSeqDisplay(self):
 		#
 		sPre = 'Time Series: '
-		self.dict_Seq = {sPreS + s : [] for s in self.lSeq}
+		self.dict_Seq = {}
+		for sQubit in List_sQubit:
+			for sSeqType in List_sSeqType:
+				sName = sPre + sQubit + ' ' + sSeqType
+				self.dict_Seq[sName] = []
+		#
+		# self.dict_Seq = {sPreS + s : [] for s in self.lSeq}
 		for sQubit in List_sQubit:
 			for sSeqType in List_sSeqType:
 				sName = sPre + sQubit + ' ' + sSeqType

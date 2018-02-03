@@ -3,7 +3,7 @@
 @author: Fei Yan
 """
 
-
+import numpy as np
 from scipy.linalg import eig
 from qutip import *
 
@@ -17,6 +17,10 @@ from qutip import *
 
 List_sPauli = ['I','X','Y','Z']
 List_mPauli = [qeye(2), sigmax(), sigmay(), sigmaz()]
+List_sQubit = ['Q1', 'Q2', 'Q3']
+List_sSeqType = ['Frequency', 'Anharmonicity', 'DriveP']
+List_sQubitParam = ['Frequency', 'Anharmonicity', 'Type', 'Ej', 'Ec', 'Asymmetry', 'Flux']
+List_sCapParam = ['C1', 'C2', 'C3', 'C12', 'C23', 'C13']
 
 
 def U(H,t):
@@ -67,6 +71,26 @@ def generateBasicOperator(nTrunc):
 	return {'I':I, 'a':a, 'x':x, 'p':p, 'aa':aa, 'aaaa':aaaa}
 
 
+class QubitConfiguration():
+
+	def __init__(self, sQubit, CONFIG):
+		self.sQubit = sQubit
+		self.bUseDesignParam = CONFIG.get(sQubit + ' Use Design Parameter')
+		for sQubitParam in List_sQubitParam:
+			sCallName = sQubit + ' ' + sQubitParam
+			setattr(self, sQubitParam, CONFIG.get(sCallName))
+
+
+class CapacitanceConfiguration():
+
+	def __init__(self, CONFIG):
+		for sCapParam in List_sCapParam:
+			sCallName = 'Capacitance ' + sCapParam.replace("C", "")
+			setattr(self, sCapParam, CONFIG.get(sCallName))
+		self.r12 = self.C12 / np.sqrt(self.C1 * self.C2)
+		self.r23 = self.C23 / np.sqrt(self.C2 * self.C3)
+		self.r13 = self.r12 * self.r23 + self.C13 / np.sqrt(self.C1 * self.C3)
+
 
 class simulation_3Q():
 
@@ -76,7 +100,7 @@ class simulation_3Q():
 		self.nTrunc = int(CONFIG.get('Degree of Trunction'))
 		self.dTimeStart = CONFIG.get('Time Start')
 		self.dTimeEnd = CONFIG.get('Time End')
-		self.nTimeList = int(CONFIG.get('Number of Samples'))
+		self.nTimeList = int(CONFIG.get('Number of Times'))
 		self.tlist = np.linspace(self.dTimeStart, self.dTimeEnd, self.nTimeList)
 		self.dt = self.tlist[1] - self.tlist[0]	
 		# self.nShow = 4
@@ -169,9 +193,9 @@ class simulation_3Q():
 
 
 	def generateCollapse_3Q(self):
-		self.c_ops = [np.sqrt(self.Gamma1_Q1) * L_Q1_a,
-					 np.sqrt(self.Gamma1_Q2) * L_Q2_a,
-					 np.sqrt(self.Gamma1_Q3) * L_Q3_a]
+		self.c_ops = [np.sqrt(self.Gamma1_Q1) * self.L_Q1_a,
+					 np.sqrt(self.Gamma1_Q2) * self.L_Q2_a,
+					 np.sqrt(self.Gamma1_Q3) * self.L_Q3_a]
 
 
 	# def generateLabel_3Q(self):
