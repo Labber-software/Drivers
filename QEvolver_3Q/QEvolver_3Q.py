@@ -47,8 +47,6 @@ class Driver(InstrumentDriver.InstrumentWorker):
 			if self.isConfigUpdated():
 				self.performSequence()
 			# get new value
-			log.info(self.SEQ.dict_Seq[quant.name])
-			log.info(self.SEQ.dt)
 			value = quant.getTraceDict(self.SEQ.dict_Seq[quant.name], t0=self.SEQ.tlist[0], dt=self.SEQ.dt)
 		#
 		# check type of quantity
