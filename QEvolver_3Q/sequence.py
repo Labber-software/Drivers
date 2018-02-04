@@ -167,7 +167,9 @@ class sequence():
 		self.dTimeEnd = CONFIG.get('Time End')
 		self.nTimeList = int(CONFIG.get('Number of Times'))
 		self.tlist = np.linspace(self.dTimeStart, self.dTimeEnd, self.nTimeList)
-		self.dt = self.tlist[1] - self.tlist[0]	
+		self.dt = self.tlist[1] - self.tlist[0]
+		#
+		self.dict_Seq = {}
 
 
 	### generate coefficient ###
@@ -211,7 +213,6 @@ class sequence():
 	def generateSeqDisplay(self):
 		#
 		sPre = 'Time Series: '
-		self.dict_Seq = {}
 		for sQubit in List_sQubit:
 			for sSeqType in List_sSeqType:
 				sName = sPre + sQubit + ' ' + sSeqType

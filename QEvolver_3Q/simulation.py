@@ -268,8 +268,8 @@ class simulation_3Q():
 			rho_rot = T(rho_lab, U(self.H_idle, t).dag())
 			rho_logic = T(rho_rot, self.U_full_to_logic)
 			for key, op in self.dict_Pauli2.items():
-				self.dict_StateTrace[sPre + key].append((op * rho_logic).tr())
+				self.dict_StateTrace[sPre + key].append(np.real((op * rho_logic).tr()))
 				if k == self.nTimeList-1:
-					self.dict_StateFinal['Final' + key] = np.real((op * rho_logic).tr())
+					self.dict_StateFinal['Final ' + key] = np.real((op * rho_logic).tr())
 		#
 			

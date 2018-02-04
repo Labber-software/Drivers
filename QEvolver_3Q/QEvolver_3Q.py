@@ -52,16 +52,17 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		# check type of quantity
 		elif quant.name in lStateFinal:
 			# output data, check if simulation needs to be performed
-			if self.isConfigUpdated():
-				self.performSimulation()
+			# if self.isConfigUpdated():
+			log.info(self.isConfigUpdated())
+			self.performSimulation()
 			# get new value
-			value = quant.getTraceDict(self.SIM.dict_StateFinal[quant.name], t0=self.SIM.tlist[0], dt=self.SIM.dt)
+			value = self.SIM.dict_StateFinal[quant.name]
 		#
 		# check type of quantity
 		elif quant.name in lStateTrace:
 			# output data, check if simulation needs to be performed
-			if self.isConfigUpdated():
-				self.performSimulation()
+			# if self.isConfigUpdated():
+			self.performSimulation()
 			# get new value
 			value = quant.getTraceDict(self.SIM.dict_StateTrace[quant.name], t0=self.SIM.tlist[0], dt=self.SIM.dt)
 		else:
