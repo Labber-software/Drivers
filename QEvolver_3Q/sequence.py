@@ -140,8 +140,8 @@ class SequenceConfiguration():
 		self.nPulses = int(CONFIG.get(sSeqName + 'Pulse Number'))
 		self.lpulseCfg = []
 		for n in range(self.nPulses):
+			pulseCfg = PulseConfiguration()
 			for sPulseParam in List_sPulseParam:
-				pulseCfg = PulseConfiguration()
 				sCallName = sSeqName + sPulseParam + ' #%d' %(n+1)
 				setattr(pulseCfg, sPulseParam, CONFIG.get(sCallName))
 			self.lpulseCfg.append(pulseCfg)
@@ -161,11 +161,14 @@ class sequence():
 		for sQubit in List_sQubit:
 			for sSeqType in List_sSeqType:
 				sName = 'seqCfg_' + sQubit + '_' + sSeqType
-				setattr(self, sName, SequenceConfiguration(sQubit, sSeqType, CONFIG))
+				seqCfg = SequenceConfiguration(sQubit, sSeqType, CONFIG)
+				setattr(self, sName, seqCfg)
 		#
 		self.dTimeStart = CONFIG.get('Time Start')
 		self.dTimeEnd = CONFIG.get('Time End')
-		self.nTimeList = int(CONFIG.get('Number of Times'))
+		# self.nTimeList = int(CONFIG.get('Number of Times'))
+		self.dSampleFreq = CONFIG.get('Sampling Frequency')
+		self.nTimeList = int((self.dTimeEnd - self.dTimeStart) * self.dSampleFreq + 1)
 		self.tlist = np.linspace(self.dTimeStart, self.dTimeEnd, self.nTimeList)
 		self.dt = self.tlist[1] - self.tlist[0]
 		#

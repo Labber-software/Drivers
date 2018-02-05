@@ -53,7 +53,6 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		elif quant.name in lStateFinal:
 			# output data, check if simulation needs to be performed
 			# if self.isConfigUpdated():
-			log.info(self.isConfigUpdated())
 			self.performSimulation()
 			# get new value
 			value = self.SIM.dict_StateFinal[quant.name]

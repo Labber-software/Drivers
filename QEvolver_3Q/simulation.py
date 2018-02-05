@@ -100,7 +100,9 @@ class simulation_3Q():
 		self.nTrunc = int(CONFIG.get('Degree of Trunction'))
 		self.dTimeStart = CONFIG.get('Time Start')
 		self.dTimeEnd = CONFIG.get('Time End')
-		self.nTimeList = int(CONFIG.get('Number of Times'))
+		# self.nTimeList = int(CONFIG.get('Number of Times'))
+		self.dSampleFreq = CONFIG.get('Sampling Frequency')
+		self.nTimeList = np.int((self.dTimeEnd - self.dTimeStart) * self.dSampleFreq + 1)
 		self.tlist = np.linspace(self.dTimeStart, self.dTimeEnd, self.nTimeList)
 		self.dt = self.tlist[1] - self.tlist[0]	
 		# self.nShow = 4
