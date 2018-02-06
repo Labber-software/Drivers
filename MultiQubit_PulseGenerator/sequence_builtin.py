@@ -3,6 +3,7 @@ import numpy as np
 from copy import copy
 from sequence import Sequence
 from gates import Gate
+from pulse import PulseShape
 
 # add logger, to allow logging to Labber's instrument log 
 import logging
@@ -39,7 +40,10 @@ class CPMG(Sequence):
         pi_to_q = config['Add pi pulses to Q']
         duration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
-        truncation = config['Truncation range']
+        if self.pulses_1qb[0].shape != PulseShape.SQUARE:  # non-square pulses
+            truncation = config['Truncation range']
+        else:  # square pulses
+            truncation = 0.0
         t0 = self.first_delay + (self.pulses_1qb[0].width*2*truncation + self.pulses_1qb[0].plateau)*0.5
         # select type of refocusing pi pulse
         gate_pi = Gate.Yp if pi_to_q else Gate.Xp
