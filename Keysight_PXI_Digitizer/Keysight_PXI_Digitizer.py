@@ -19,7 +19,7 @@ class Driver(LabberDriver):
         # timeout
         self.timeout_ms = int(1000 * self.dComCfg['Timeout'])
         # get PXI chassis
-        self.chassis = int(self.dComCfg.get('PXI chassis', 0))
+        self.chassis = int(self.dComCfg.get('PXI chassis', 1))
         # create AWG instance
         self.dig = keysightSD1.SD_AIN()
         AWGPart = self.dig.getProductNameBySlot(
