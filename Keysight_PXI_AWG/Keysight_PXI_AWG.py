@@ -57,11 +57,9 @@ class Driver(LabberDriver):
         self.log('HW:', hw_version)
         # clear old waveforms
         self.AWG.waveformFlush()
-        for ch in range(self.nCh):
-            self.AWG.AWGflush(self.get_hw_ch(ch))
 
 
-    def get_hw_ch(self, n):
+    def getHwCh(self, n):
         """Get hardware channel number for channel n. n starts at 0"""
         return n + self.ch_index_zero
 
@@ -73,11 +71,11 @@ class Driver(LabberDriver):
             # clear old waveforms
             self.AWG.waveformFlush()
             for n in range(self.nCh):
-                self.AWG.AWGflush(self.get_hw_ch(n))
-                self.AWG.AWGstop(self.get_hw_ch(n))
+                self.AWG.AWGflush(self.getHwCh(n))
+                self.AWG.AWGstop(self.getHwCh(n))
             # turn off outputs
             for n in range(self.nCh):
-                self.AWG.channelWaveShape(self.get_hw_ch(n), -1)
+                self.AWG.channelWaveShape(self.getHwCh(n), -1)
             # close instrument
             self.AWG.close()
         except:
@@ -90,6 +88,9 @@ class Driver(LabberDriver):
         return the actual value set by the instrument"""
         if self.isFirstCall(options):
             self.lWaveUpdated = [False]*self.nCh
+            if self.isHardwareTrig(options):
+                # Stop all channels
+                self.AWG.AWGstopMultiple(int(2**self.nCh - 1))
         # start with setting current quant value
         quant.setValue(value)
         # check if channel-specific, if so get channel + name
@@ -120,14 +121,17 @@ class Driver(LabberDriver):
                     # use default
                     extSource = int(self.getCmdStringFromValue('External Trig Source'))
                     trigBehavior = int(self.getCmdStringFromValue('External Trig Config'))
-                self.AWG.AWGtriggerExternalConfig(self.get_hw_ch(ch), extSource, trigBehavior, sync)
-        # 
+                self.AWG.AWGtriggerExternalConfig(self.getHwCh(ch), extSource, trigBehavior, sync)
         # software trig for all channels
         elif quant.name in ('Trig All',):
             # mask to trig all AWG channels
             nMask = int(2**self.nCh - 1)
             self.AWG.AWGtriggerMultiple(nMask)
-        # 
+        elif quant.name == 'Run':
+            for n in range(self.nCh):
+                self.AWG.AWGqueueConfig(self.getHwCh(n), 1)
+            # TODO: only for enabled channels
+            self.AWG.AWGstartMultiple(self.getEnabledChannelsMask())
         elif name in ('Function', 'Enabled'):
             if self.getValue('Ch%d - Enabled' % (ch + 1)):
                 func = int(self.getCmdStringFromValue('Ch%d - Function' % (ch + 1)))
@@ -136,69 +140,89 @@ class Driver(LabberDriver):
                     self.lWaveUpdated[ch] = True
             else:
                 func = -1
-                self.AWG.AWGstop(self.get_hw_ch(ch))
-            self.AWG.channelWaveShape(self.get_hw_ch(ch), func)
+                self.AWG.AWGstop(self.getHwCh(ch))
+            self.AWG.channelWaveShape(self.getHwCh(ch), func)
         elif name == 'Amplitude':
-            self.AWG.channelAmplitude(self.get_hw_ch(ch), value)
+            self.AWG.channelAmplitude(self.getHwCh(ch), value)
             # if in AWG mode, update waveform to scale to new range
             if self.getValue('Ch%d - Function' % (ch + 1)) == 'AWG':
                 self.lWaveUpdated[ch] = True
         elif name == 'Frequency':
-            self.AWG.channelFrequency(self.get_hw_ch(ch), value)
+            self.AWG.channelFrequency(self.getHwCh(ch), value)
         elif name == 'Phase':
-            self.AWG.channelPhase(self.get_hw_ch(ch), value)
+            self.AWG.channelPhase(self.getHwCh(ch), value)
         elif name == 'Offset':
-            self.AWG.channelOffset(self.get_hw_ch(ch), value)
-#        elif name == 'Run mode':
-#            if value:
-#                self.AWG.AWGstart(ch)
-#            else:
-#                self.AWG.AWGstop(ch)
+            self.AWG.channelOffset(self.getHwCh(ch), value)
         elif name == 'Trig':
-            self.AWG.AWGtrigger(self.get_hw_ch(ch))
-        elif name in ('Trig mode', 'Cycles'):
-            # mark wavefom as updated
-            self.lWaveUpdated[ch] = True
-        elif name == 'Waveform':
+            self.AWG.AWGtrigger(self.getHwCh(ch))
+        elif name in ('Trig mode', 'Cycles', 'Waveform'):
             # mark wavefom as updated
             self.lWaveUpdated[ch] = True
         # if final call and wave is updated, send it to AWG
         if self.isFinalCall(options):
             # check if any wave is updated (needed since we flush all)
-            if np.any(self.lWaveUpdated):
-                # always update all, since we need to flush waveforms to clear mem
-                self.lWaveUpdated = [True]*self.nCh
-                # find updated channels, turn off output
-                iChMask = 0
-                lCh = []
-                for n, update in enumerate(self.lWaveUpdated):
-                    if update:
-                        iChMask += 2**n
-                        lCh.append(n)
-                        self.AWG.AWGstop(self.get_hw_ch(n))
-                        self.AWG.AWGflush(self.get_hw_ch(n))
-                # clear old waveforms
-                self.AWG.waveformFlush()
-                # - todo: implement smarter waveform delete/upload
-                # update waveforms
-                for n in lCh:
-                    self.sendWaveform(n)
-                # turn on outputs
-                self.AWG.AWGstartMultiple(iChMask)
+            for n, updated in enumerate(self.lWaveUpdated):
+                if updated:
+                    (seq_no, n_seq) = self.getHardwareLoopIndex(options)
+                    if seq_no == 0:
+                        self.AWG.AWGflush(self.getHwCh(n))
+                    seq_no = None if n_seq == 0 else seq_no
+                    # update waveforms
+                    self.sendWaveform(n, seq_no)
+
+            # Configure markers
+            for n in range(self.nCh):
+                # conversion to front panel numbering
+                N = n + 1 
+                markerMode = int(self.getCmdStringFromValue('Ch%d - Marker Mode' % N))
+                trgPXImask = 0
+                trgIOmask = 1 if self.getValue('Ch%d - Marker External' % N) else 0
+                markerValue = int(self.getCmdStringFromValue('Ch%d - Marker Value' % N))
+                syncMode = int(self.getCmdStringFromValue('Ch%d - Marker Sync Mode' % N))
+                length = int(round(self.getValue('Ch%d - Marker Length' % N)/10e-9))
+                delay = int(round(self.getValue('Ch%d - Marker Delay' % N)/10e-9))
+                if length == 0:
+                    length = 1
+                for i in range(8):
+                    if self.getValue('Ch%d - Marker PXI%d' % (N, i)):
+                        trgPXImask += 2**i
+                self.AWG.AWGqueueMarkerConfig(nAWG=self.getHwCh(n), markerMode=markerMode, 
+                                              trgPXImask=int(trgPXImask), trgIOmask=int(trgIOmask), 
+                                              value=markerValue, syncMode=syncMode, length=length,
+                                              delay=delay)
+            # turn on outputs
+            if not self.isHardwareTrig(options):
+                for n in range(self.nCh):
+                    self.AWG.AWGqueueConfig(self.getHwCh(n), 1)
+                self.AWG.AWGstartMultiple(self.getEnabledChannelsMask())
         return value
 
+    def getEnabledChannelsMask(self):
+        mask = 0
+        for ch in range(self.nCh):
+            if self.getValue('Ch%d - Enabled' % (ch + 1)):
+                        func = int(self.getCmdStringFromValue('Ch%d - Function' % (ch + 1)))
+                        # start AWG if AWG mode
+                        if func == 6:
+                            mask =+ 2**ch
+        return int(mask)
 
-    def sendWaveform(self, ch):
+    def sendWaveform(self, ch, seq_no=None):
         """Send waveform to AWG channel"""
         # conversion to front panel numbering
         nCh = ch + 1
-        # get trigger mode
+        
         trigMode = int(self.getCmdStringFromValue('AWG%d - Trig mode' % nCh))
         delay = int(0)
-        if self.getValue('AWG%d - Trig mode' % nCh) in ('Software', 'External'):
-            cycles = int(self.getValue('AWG%d - Cycles' % nCh))
+        if seq_no is None:
+            seq_no = 0
+            if self.getValue('AWG%d - Trig mode' % nCh) in ('Software', 'External'):
+                cycles = int(self.getValue('AWG%d - Cycles' % nCh))
+            else:
+                cycles = int(0)
         else:
-            cycles = int(0)
+            # Ignore cycle setting if hardware looping
+            cycles = 1
         prescaler = int(0)
         waveformType = int(0)
         quant = self.getQuantity('AWG%d - Waveform' % nCh)
@@ -210,10 +234,24 @@ class Driver(LabberDriver):
         amp =  self.getValue('Ch%d - Amplitude' % nCh)
         dataNorm = data / amp
         dataNorm = np.clip(dataNorm, -1.0, 1.0, out=dataNorm)
-        # output waveform
-        self.AWG.AWGfromArray(self.get_hw_ch(ch), trigMode, delay, cycles, prescaler, 
-                              waveformType, dataNorm)
         
+        n = self.uploadWaveform(ch, dataNorm, waveformType, seq_no)
+        self.AWG.AWGqueueWaveform(self.getHwCh(ch), n, trigMode, delay, cycles, prescaler)
+
+    def uploadWaveform(self, ch, data, waveformType, seq=0):
+        n = self.getWaveformId(ch, seq)
+        wave = keysightSD1.SD_Wave()
+        wave.newFromArrayDouble(waveformType, data)
+        self.AWG.waveformLoad(wave, n)
+        return n
+
+    def getWaveformId(self, ch, seq):
+        # Create a unique waveform number using Szudzik's pairing method
+        if ch >= seq:
+            n = ch*ch+ch*seq
+        else:
+            n = ch+seq*seq
+        return n
 
 
 if __name__ == '__main__':
