@@ -6,6 +6,7 @@
 import numpy as np
 from scipy.linalg import eig
 from qutip import *
+from basicfunc import *
 
 # import scipy.constants as const
 # #Constants.
@@ -141,12 +142,8 @@ class simulation_3Q():
 		# input sequence
 		for sQubit in List_sQubit:
 			for sSeqType in List_sSeqType:
-				sName = 'timeFunc_' + sQubit + '_' + sSeqType
+				sName = 'seqCfg_' + sQubit + '_' + sSeqType
 				setattr(self, sName, getattr(sequence, sName))
-		#
-		self.timeFunc_g12_pp = sequence.timeFunc_g12_pp
-		self.timeFunc_g23_pp = sequence.timeFunc_g23_pp
-		self.timeFunc_g13_pp = sequence.timeFunc_g13_pp
 
 
 	def generateSubHamiltonian_3Q(self):
@@ -163,7 +160,7 @@ class simulation_3Q():
 		# coupling Hamiltonian operators
 		self.H_g12_xx = Qflatten(tensor(OP['x'], OP['x'], OP['I']))
 		self.H_g23_xx = Qflatten(tensor(OP['I'], OP['x'], OP['x']))
-		self.H_g13_xx = Qflatten(tensor(OP['x'], OP['I'], OP['x']))		#
+		self.H_g13_xx = Qflatten(tensor(OP['x'], OP['I'], OP['x']))
 		self.H_g12_pp = Qflatten(tensor(OP['p'], OP['p'], OP['I']))
 		self.H_g23_pp = Qflatten(tensor(OP['I'], OP['p'], OP['p']))
 		self.H_g13_pp = Qflatten(tensor(OP['p'], OP['I'], OP['p']))
@@ -237,20 +234,20 @@ class simulation_3Q():
 	def rhoEvolver_3Q(self):
 		#
 		self.result = mesolve(H=[
-			[2*np.pi*self.H_Q1_aa, self.timeFunc_Q1_Frequency],
-			[2*np.pi*self.H_Q1_aaaa, self.timeFunc_Q1_Anharmonicity],
-			[2*np.pi*self.H_Q2_aa, self.timeFunc_Q2_Frequency],
-			[2*np.pi*self.H_Q2_aaaa, self.timeFunc_Q2_Anharmonicity],
-			[2*np.pi*self.H_Q3_aa, self.timeFunc_Q3_Frequency],
-			[2*np.pi*self.H_Q3_aaaa, self.timeFunc_Q3_Anharmonicity],
-			[2*np.pi*self.H_g12_pp, self.timeFunc_g12_pp],
-			[2*np.pi*self.H_g23_pp, self.timeFunc_g23_pp],
-			[2*np.pi*self.H_g13_pp, self.timeFunc_g13_pp],
-			[2*np.pi*self.H_Q1_dr_p, self.timeFunc_Q1_DriveP],
-			[2*np.pi*self.H_Q2_dr_p, self.timeFunc_Q2_DriveP],
-			[2*np.pi*self.H_Q3_dr_p, self.timeFunc_Q3_DriveP]
+			[2*np.pi*self.H_Q1_aa, timeFunc_Q1_Frequency],
+			[2*np.pi*self.H_Q1_aaaa, timeFunc_Q1_Anharmonicity],
+			[2*np.pi*self.H_Q2_aa, timeFunc_Q2_Frequency],
+			[2*np.pi*self.H_Q2_aaaa, timeFunc_Q2_Anharmonicity],
+			[2*np.pi*self.H_Q3_aa, timeFunc_Q3_Frequency],
+			[2*np.pi*self.H_Q3_aaaa, timeFunc_Q3_Anharmonicity],
+			[2*np.pi*self.H_g12_pp, timeFunc_g12_pp],
+			[2*np.pi*self.H_g23_pp, timeFunc_g23_pp],
+			[2*np.pi*self.H_g13_pp, timeFunc_g13_pp],
+			[2*np.pi*self.H_Q1_dr_p, timeFunc_Q1_DriveP],
+			[2*np.pi*self.H_Q2_dr_p, timeFunc_Q2_DriveP],
+			[2*np.pi*self.H_Q3_dr_p, timeFunc_Q3_DriveP]
 			],
-			rho0 = self.rho0, tlist = self.tlist, c_ops = self.c_ops, args = [])#, options = options), store_states=True, c_ops=[], e_ops=[]
+			rho0 = self.rho0, tlist = self.tlist, c_ops = self.c_ops, args = self)#, options = options), store_states=True, c_ops=[], e_ops=[]
 		# return result.states
 
 

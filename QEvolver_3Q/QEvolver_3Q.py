@@ -32,7 +32,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 
 	def performGetValue(self, quant, options={}):
 		"""Perform the Get Value instrument operation""" 
-		lSeqOutput = ['Time Series: ' + s for s in ['Q1 Frequency', 'Q1 Anharmonicity', 'Q1 DriveP', 'Q2 Frequency', 'Q2 Anharmonicity', 'Q2 DriveP', 'Q3 Frequency', 'Q3 Anharmonicity', 'Q3 DriveP']]
+		lSeqOutput = ['Time Series: ' + s for s in ['Q1 Frequency', 'Q1 Anharmonicity', 'Q1 DriveP', 'Q2 Frequency', 'Q2 Anharmonicity', 'Q2 DriveP', 'Q3 Frequency', 'Q3 Anharmonicity', 'Q3 DriveP', 'g12 pp', 'g23 pp', 'g13 pp']]
 		#
 		List_sPauli = ['I','X','Y','Z']
 		List_sPauli2 = []
@@ -68,6 +68,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 			# otherwise, just return current value
 			value = quant.getValue()
 		return value
+
 
 	def performSequence(self):
 		CONFIG = self.instrCfg.getValuesDict()
