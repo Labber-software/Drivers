@@ -298,7 +298,8 @@ class QubitSimulator():
 
     def simulate(self, vI, vQ, dTimeStep, dDelta, dDetuning, dRabiAmp, \
                             dDriveFreq, nReshape, nRep, lNoise, bRWA=False,
-                            bRotFrame=True, hDriveFunc=None):
+                            bRotFrame=True, hDriveFunc=None,
+                            noise_epsilon=None, noise_delta=None):
         # simulate the time evolution for the start state vStart
         # a state is defined as [Psi0 Psi1]'
         # a vector of states is a matrix, defined as [state1 state2 ... stateN]
@@ -346,6 +347,22 @@ class QubitSimulator():
             for noise in lNoise:
                 noise.addStaticNoise(vStaticDelta, vStaticDet, vStaticDrive, 
                                      dStaticHF, 1E-9)
+
+        # figure out resampling of input noise
+        # log.info(str(noise_epsilon) + ' ' +  str(noise_epsilon is not None))
+        if (noise_epsilon is not None):
+            n = len(noise_epsilon['y']) // nRep
+            noise_epsilon_t = np.arange(n) * noise_epsilon['dt'] * 1E9
+            # create matrix with noise data
+            noise_eps_m = 1E-9 * noise_epsilon['y'][:(nRep * n)].reshape((nRep, n))
+            # log.info(str(noise_eps_m.shape) + str(noise_eps_m[0,0]))
+
+        if (noise_delta is not None):
+            n = len(noise_delta['y']) // nRep
+            noise_delta_t = np.arange(n) * noise_delta['dt'] * 1E9
+            # create matrix with noise data
+            noise_delta_m = 1E-9 * noise_delta['y'][:(nRep * n)].reshape((nRep, n))
+
         # calculate color codes based on total noise
         vColNoise = (vStaticDelta + vStaticDet)
         dNoiseColAmp = np.max(np.abs(vColNoise))
@@ -355,38 +372,44 @@ class QubitSimulator():
         mRotX = splin.expm(-1j*0.5*np.pi*0.5*mSx)
         mRotY = splin.expm(-1j*0.5*np.pi*0.5*mSy)
         for n1 in range(nRep):
-           # create new vectors for delta and detuning for each time step
-           vDelta = dDelta * np.ones(len(vTime)) + vStaticDelta[n1]
-           vDetNoise = vDetuning.copy()*(1.0+vStaticDrive[n1]) + vStaticDet[n1]
-           # add noise to both delta and epsilon from all noise sources
-           if nRep>1:
-               for noise in lNoise:
-                   noise.addNoise(vDelta, vDetNoise, dTimeStep*1E-9, 1E-9)
-           # do simulation
-           if bRWA:
-               mState = integrateH_RWA(vStart, vTime, vDelta, np.real(vDetNoise),
-                                       np.imag(vDetNoise), nReshape)
-               # mState = self.integrateH_RWA(vStart, vTime, vDelta, np.real(vDetNoise),
-               #                              np.imag(vDetNoise), nReshape)
-           else:
-               mState = integrateH(vStart, vTime, vDelta, vDetNoise, nReshape)
-               # mState = self.integrateH(vStart, vTime, vDelta, vDetNoise, nReshape)
-           # convert the results to an eigenbasis of dDelta, dDetuning
-           mState = self.convertToEigen(mState, dDelta0, dDetuning)
-           # go to the rotating frame (add timeStep/2 to get the right phase)
-           if bRotFrame and not bRWA:
-               mState = self.goToRotatingFrame(mState, vTimeReshape, dDriveFreq, dTimeZero+dTimeStep/2)
-           # get probablity of measuring p1
-           mStateEig = mState
-           self.mPz[n1,:] = np.real(mStateEig[1,:]*np.conj(mStateEig[1,:]))
-           vP1 += self.mPz[n1,:]
-           # get projection on X and Y
-           mStateEig = np.dot(mRotX,mState)
-           self.mPx[n1,:] = np.real(mStateEig[1,:]*np.conj(mStateEig[1,:]))
-           vPx += self.mPx[n1,:]
-           mStateEig = np.dot(mRotY,mState)
-           self.mPy[n1,:] = np.real(mStateEig[1,:]*np.conj(mStateEig[1,:]))
-           vPy += self.mPy[n1,:]
+            # create new vectors for delta and detuning for each time step
+            vDelta = dDelta * np.ones(len(vTime)) + vStaticDelta[n1]
+            vDetNoise = vDetuning.copy()*(1.0+vStaticDrive[n1]) + vStaticDet[n1]
+            # add noise to both delta and epsilon from all noise sources
+            if nRep>1:
+                for noise in lNoise:
+                    noise.addNoise(vDelta, vDetNoise, dTimeStep*1E-9, 1E-9)
+            # add externally applied noise for the right rep
+            if (noise_epsilon is not None):
+                vDetNoise += np.interp(vTime, noise_epsilon_t, noise_eps_m[n1])
+            if (noise_delta is not None):
+                vDelta += np.interp(vTime, noise_delta_t, noise_delta_m[n1])
+ 
+             # do simulation
+            if bRWA:
+                mState = integrateH_RWA(vStart, vTime, vDelta, np.real(vDetNoise),
+                                        np.imag(vDetNoise), nReshape)
+                # mState = self.integrateH_RWA(vStart, vTime, vDelta, np.real(vDetNoise),
+                #                              np.imag(vDetNoise), nReshape)
+            else:
+                mState = integrateH(vStart, vTime, vDelta, vDetNoise, nReshape)
+                # mState = self.integrateH(vStart, vTime, vDelta, vDetNoise, nReshape)
+            # convert the results to an eigenbasis of dDelta, dDetuning
+            mState = self.convertToEigen(mState, dDelta0, dDetuning)
+            # go to the rotating frame (add timeStep/2 to get the right phase)
+            if bRotFrame and not bRWA:
+                mState = self.goToRotatingFrame(mState, vTimeReshape, dDriveFreq, dTimeZero+dTimeStep/2)
+            # get probablity of measuring p1
+            mStateEig = mState
+            self.mPz[n1,:] = np.real(mStateEig[1,:]*np.conj(mStateEig[1,:]))
+            vP1 += self.mPz[n1,:]
+            # get projection on X and Y
+            mStateEig = np.dot(mRotX,mState)
+            self.mPx[n1,:] = np.real(mStateEig[1,:]*np.conj(mStateEig[1,:]))
+            vPx += self.mPx[n1,:]
+            mStateEig = np.dot(mRotY,mState)
+            self.mPy[n1,:] = np.real(mStateEig[1,:]*np.conj(mStateEig[1,:]))
+            vPy += self.mPy[n1,:]
         # divide to get average
         vP1 = vP1/nRep
         vPx = vPx/nRep
@@ -427,7 +450,8 @@ class QubitSimulator():
                           
 
 
-    def performSimulation(self, vI, vQ, dTimeStepIn, dTimeStepOut):
+    def performSimulation(self, vI, vQ, dTimeStepIn, dTimeStepOut,
+                          noise_epsilon=None, noise_delta=None):
         start_time = time.time()
         # update sample rate to match time step
         if dTimeStepIn != self.dTimeStep:
@@ -451,7 +475,8 @@ class QubitSimulator():
         # do simulation
         (vPz, vPx, vPy, vTime, vColNoise) = self.simulate(vI, vQ, self.dTimeStep, self.dDelta, \
              self.dDetuning, 2*self.dRabiAmp, dDriveFreq, self.nReshape, \
-             self.nRep, self.lNoiseCfg, self.bRWA, self.bRotFrame)
+             self.nRep, self.lNoiseCfg, self.bRWA, self.bRotFrame,
+             noise_epsilon=noise_epsilon, noise_delta=noise_delta)
         end_time = time.time()
         self.simulationTime = end_time-start_time
         return (vPz, vPx, vPy, dTimeStepOut)

@@ -87,12 +87,20 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # get I/Q from input data
         vI = self.getValue('Trace - I')['y']
         vQ = self.getValue('Trace - Q')['y']
+        # get noise from input data
+        noise_epsilon = self.getValue('Noise trace - Epsilon')
+        if len(noise_epsilon.get('y', [])) == 0:
+            noise_epsilon = None
+        noise_delta = self.getValue('Noise trace - Delta')
+        if len(noise_delta.get('y', [])) == 0:
+            noise_delta = None
         dTimeStepIn = 1E9 * self.getValue('Trace - I')['dt']
         dTimeStepOut = 1E9 * self.getValue('Time step, output traces')
         # do simulation
         if len(vI)>0 and len(vQ)>0:
             (vPz, vPx, vPy, dTimeStepOut) = self.qubitSim.performSimulation(
-                                            vI, vQ, dTimeStepIn, dTimeStepOut)
+                                            vI, vQ, dTimeStepIn, dTimeStepOut,
+                                            noise_epsilon, noise_delta)
             self.vPolarization = np.array([vPx[-1], vPy[-1], vPz[-1]])
             self.lTrace = [vPx, vPy, vPz]
             self.dTimeStepOut = 1E-9 * dTimeStepOut
