@@ -18,6 +18,13 @@ class Driver(InstrumentDriver.InstrumentWorker):
         self.dTimeStepOut = 0.0
 
 
+    def initSetConfig(self):
+        """This function is run before setting values in Set Config"""
+        # remove all applied noise
+        self.setValue('Noise trace - Epsilon', [])
+        self.setValue('Noise trace - Delta', [])
+
+
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
         """Perform the Set Value instrument operation. This function should
         return the actual value set by the instrument"""
