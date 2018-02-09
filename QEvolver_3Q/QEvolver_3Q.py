@@ -39,7 +39,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		for k1 in range(4):
 			for k2 in range(4):
 				List_sPauli2.append(List_sPauli[k1] + List_sPauli[k2])
-		lStateFinal = ['Final ' + s for s in List_sPauli2]
+		lStateFinal = ['Final Pauli-16'] + ['Final ' + s for s in List_sPauli2]
 		lStateTrace = ['Time Series: ' + s for s in List_sPauli2]
 		#
 		# check type of quantity
@@ -49,21 +49,29 @@ class Driver(InstrumentDriver.InstrumentWorker):
 			# get new value
 			value = quant.getTraceDict(self.SEQ.dict_Seq[quant.name], t0=self.SEQ.tlist[0], dt=self.SEQ.dt)
 		#
-		# check type of quantity
 		elif quant.name in lStateFinal:
 			# output data, check if simulation needs to be performed
+			if self.isConfigUpdated():
+				self.performSimulation()
+			if quant.name == 'Final Pauli-16':
+				# get new value
+				value = quant.getTraceDict(self.SIM.dict_StateFinal[quant.name], x0=0, dx=1)
+			else:
+		# check type of quantity
+		# elif quant.name in lStateFinal:
+			# output data, check if simulation needs to be performed
 			# if self.isConfigUpdated():
-			self.performSimulation()
+			# 	self.performSimulation()
 			# get new value
-			value = self.SIM.dict_StateFinal[quant.name]
+				value = self.SIM.dict_StateFinal[quant.name]
 		#
 		# check type of quantity
 		elif quant.name in lStateTrace:
 			# output data, check if simulation needs to be performed
-			# if self.isConfigUpdated():
-			self.performSimulation()
+			if self.isConfigUpdated():
+				self.performSimulation()
 			# get new value
-			value = quant.getTraceDict(self.SIM.dict_StateTrace[quant.name], t0=self.SIM.tlist[0], dt=self.SIM.dt)
+			value = quant.getTraceDict(self.SIM.dict_StateTrace[quant.name], t0=self.SIM.tlist_disp[0], dt=self.SIM.dt_disp)
 		else:
 			# otherwise, just return current value
 			value = quant.getValue()
@@ -81,7 +89,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		"""Perform simulation"""
 		CONFIG = self.instrCfg.getValuesDict()
 		self.SEQ = sequence(CONFIG)
-		self.SEQ.generateSeqDisplay()
+		# self.SEQ.generateSeqDisplay()
 		#
 		self.SIM = simulation_3Q(CONFIG)
 		self.SIM.updateSequence(self.SEQ)

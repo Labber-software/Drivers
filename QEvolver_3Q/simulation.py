@@ -105,7 +105,11 @@ class simulation_3Q():
 		self.dSampleFreq = CONFIG.get('Sampling Frequency')
 		self.nTimeList = np.int((self.dTimeEnd - self.dTimeStart) * self.dSampleFreq + 1)
 		self.tlist = np.linspace(self.dTimeStart, self.dTimeEnd, self.nTimeList)
-		self.dt = self.tlist[1] - self.tlist[0]	
+		self.dt = self.tlist[1] - self.tlist[0]
+		self.dSampleFreq_disp = CONFIG.get('Display Sampling Frequency')
+		self.nTimeList_disp = np.int((self.dTimeEnd - self.dTimeStart) * self.dSampleFreq_disp + 1)
+		self.tlist_disp = np.linspace(self.dTimeStart, self.dTimeEnd, self.nTimeList_disp)
+		self.dt_disp = self.tlist_disp[1] - self.tlist_disp[0]
 		# self.nShow = 4
 
 		# generate qubit idling config.
@@ -255,6 +259,7 @@ class simulation_3Q():
 		sPre = 'Time Series: '
 		self.dict_Pauli2 = {}
 		self.dict_StateFinal = {}
+		self.dict_StateFinal['Final Pauli-16'] = []
 		self.dict_StateTrace = {}
 		for k1 in range(4):
 			for k2 in range(4):
@@ -262,13 +267,18 @@ class simulation_3Q():
 				self.dict_Pauli2[key] = Qflatten(tensor(List_mPauli[k1], List_mPauli[k2]))
 				self.dict_StateTrace[sPre + key] = []
 		#
-		for k, t in enumerate(self.tlist):
-			rho_lab = self.result.states[k]
+		for k, t in enumerate(self.tlist_disp):
+			rho_lab = self.result.states[ int(round((t - self.dTimeStart)/self.dt)) ]
 			rho_rot = T(rho_lab, U(self.H_idle, t).dag())
 			rho_logic = T(rho_rot, self.U_full_to_logic)
 			for key, op in self.dict_Pauli2.items():
 				self.dict_StateTrace[sPre + key].append(np.real((op * rho_logic).tr()))
-				if k == self.nTimeList-1:
+				if k == self.nTimeList_disp - 1:
 					self.dict_StateFinal['Final ' + key] = np.real((op * rho_logic).tr())
-		#
-			
+					self.dict_StateFinal['Final Pauli-16'].append(np.real((op * rho_logic).tr()))
+		#			
+		# for key, op in self.dict_Pauli2.items():
+		# 	rho_lab = self.result.states[-1]
+		# 	rho_rot = T(rho_lab, U(self.H_idle, self.tlist[-1]).dag())
+		# 	rho_logic = T(rho_rot, self.U_full_to_logic)
+		# 	self.dict_StateFinal['Final ' + key] = np.real((op * rho_logic).tr())
