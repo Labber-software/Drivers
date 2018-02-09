@@ -166,6 +166,7 @@ class QubitSimulator():
         self.bRelFreq = True
         self.bRWA = False
         self.bRotFrame = True
+        self.bRemoveNoise = False
         self.lNoiseCfg = [] # [NoiseCfg(bEmpty = True)]
         if simCfg is not None:
             # update simulation options
@@ -349,13 +350,11 @@ class QubitSimulator():
                                      dStaticHF, 1E-9)
 
         # figure out resampling of input noise
-        # log.info(str(noise_epsilon) + ' ' +  str(noise_epsilon is not None))
         if (noise_epsilon is not None):
             n = len(noise_epsilon['y']) // nRep
             noise_epsilon_t = np.arange(n) * noise_epsilon['dt'] * 1E9
             # create matrix with noise data
             noise_eps_m = 1E-9 * noise_epsilon['y'][:(nRep * n)].reshape((nRep, n))
-            # log.info(str(noise_eps_m.shape) + str(noise_eps_m[0,0]))
 
         if (noise_delta is not None):
             n = len(noise_delta['y']) // nRep
@@ -381,9 +380,19 @@ class QubitSimulator():
                     noise.addNoise(vDelta, vDetNoise, dTimeStep*1E-9, 1E-9)
             # add externally applied noise for the right rep
             if (noise_epsilon is not None):
-                vDetNoise += np.interp(vTime, noise_epsilon_t, noise_eps_m[n1])
+                noise_data = np.interp(vTime, noise_epsilon_t, noise_eps_m[n1])
+                if self.bRemoveNoise:
+                    # remove data where pulses are applied
+                    pulse_indx = np.where(np.abs(vDetuning - dDetuning) > 1E-15)[0]
+                    noise_data[pulse_indx] = 0.0
+                vDetNoise += noise_data
             if (noise_delta is not None):
-                vDelta += np.interp(vTime, noise_delta_t, noise_delta_m[n1])
+                noise_data = np.interp(vTime, noise_delta_t, noise_delta_m[n1])
+                if self.bRemoveNoise:
+                    # remove data where pulses are applied
+                    pulse_indx = np.where(np.abs(vDetuning - dDetuning) > 1E-15)[0]
+                    noise_data[pulse_indx] = 0.0
+                vDelta += noise_data
  
              # do simulation
             if bRWA:
