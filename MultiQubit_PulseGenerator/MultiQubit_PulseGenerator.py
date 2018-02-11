@@ -75,15 +75,17 @@ class Driver(LabberDriver):
         # ignore if no sequence
         if self.sequence is None:
             return quant.getValue()
+
         # check type of quantity
-        if quant.name.startswith('Voltage, QB'):
+        if (quant.name.startswith('Voltage, QB') or
+            quant.name.startswith('Single-shot, QB')):
             # perform demodulation, check if config is updated
             if self.isConfigUpdated():
                 # update sequence object with current driver configuation
                 config = self.instrCfg.getValuesDict()
                 self.sequence.set_parameters(config)
             # get qubit index and waveforms
-            n = int(quant.name.split('Voltage, QB')[1]) - 1
+            n = int(quant.name.split(', QB')[1]) - 1
             demod_iq = self.getValue('Demodulation - IQ')
             if demod_iq:
                 signal_i = self.getValue('Demodulation - Input I')
@@ -93,9 +95,12 @@ class Driver(LabberDriver):
             ref = self.getValue('Demodulation - Reference')
             # perform demodulation
             if demod_iq:
-                value = np.mean(self.sequence.readout.demodulate_iq(n, signal_i, signal_q, ref))
+                value = self.sequence.readout.demodulate_iq(n, signal_i, signal_q, ref)
             else:
-                value = np.mean(self.sequence.readout.demodulate(n, signal, ref))
+                value = self.sequence.readout.demodulate(n, signal, ref)
+            # average values if not single-shot
+            if not quant.name.startswith('Single-shot, QB'):
+                value = np.mean(value)
 
         elif quant.isVector():
             # traces, check if waveform needs to be re-calculated
