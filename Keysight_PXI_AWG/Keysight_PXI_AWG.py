@@ -204,7 +204,7 @@ class Driver(LabberDriver):
                         func = int(self.getCmdStringFromValue('Ch%d - Function' % (ch + 1)))
                         # start AWG if AWG mode
                         if func == 6:
-                            mask =+ 2**ch
+                            mask += 2**ch
         return int(mask)
 
     def sendWaveform(self, ch, seq_no=None):
