@@ -44,7 +44,6 @@ class CPMG(Sequence):
             truncation = config['Truncation range']
         else:  # square pulses
             truncation = 0.0
-
         # center pulses in add_gates mode; ensure sufficient pulse spacing in CPMG mode
         t0 = self.first_delay + (self.pulses_1qb[0].width*2*truncation + self.pulses_1qb[0].plateau)*0.5
         # select type of refocusing pi pulse
