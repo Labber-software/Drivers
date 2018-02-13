@@ -21,8 +21,7 @@ else:
 #                      "include_dirs":np.get_include()},
 #                      reload_support=True)
 
-from _integrateHNoNumpy_ForDriver import (integrateH, integrateH_RWA, 
-                                          goToRotatingFrame, integrateHy)
+from _integrateHNoNumpy_ForDriver import integrateH, integrateHy
 
 #import matplotlib.pyplot as plt
 
@@ -219,41 +218,6 @@ class QubitSimulator():
         return mState
         
 
-    def integrateH_RWA(self, vStart, vTime, vDelta, vDetX, vDetY, nReshape):
-        # simulate the time evolution for the start state vStart
-        # a state is defined as [Psi0 Psi1]'
-        # a vector of states is a matrix, defined as [state1 state2 ... stateN]
-        #
-        # pre-allocate space for the output variable
-        mState = np.zeros((2,len(vTime)), dtype='complex128')
-        # use start vector for the first entry
-        mState[:,0] = vStart
-        # get time steps
-        vDTime = np.diff(vTime)
-        # precalc vectors
-        vEnergy = 1E-200 + 0.5*np.sqrt(vDelta**2 + vDetX**2 + vDetY**2)
-        vAngle = 2*np.pi*vEnergy[0:-1]*vDTime
-        vCos = np.cos(vAngle)
-        vSin = np.sin(vAngle)
-        # pre-define matrices
-        mIdentity = np.eye(2)
-        mSx = np.array([[0.,1.],[1.,0.]])
-        mSy = np.array([[0.,-1j],[1j,0.]])
-        mSz = np.array([[1.,0.],[0.,-1.]])
-        # apply hamiltonian N times
-        for n1, dTime in enumerate(vDTime):
-           # define hamiltonian
-           H = -0.5 * (mSx*vDelta[n1] + mSz*vDetX[n1] + mSy*vDetY[n1])
-           # define time-evolution operator
-           U = mIdentity * vCos[n1] - 1j*H*vSin[n1]/vEnergy[n1]
-           # calculate next state
-           mState[:,n1+1] = np.dot(U,mState[:,n1])
-        # reshape data to reduce vector size
-        if nReshape>1:
-           mState = mState[:,0::nReshape]
-        return mState
-
-
     def goToRotatingFrame(self, mState, vTime, dDriveFreq, dTimeZero):
         vRot = np.exp(-1j*np.pi*dDriveFreq*(vTime-dTimeZero))
         mState[0,:] = vRot*mState[0,:] 
@@ -311,19 +275,17 @@ class QubitSimulator():
         # a vector of states is a matrix, defined as [state1 state2 ... stateN]
         #
         # define start state
-        vStart = np.r_[1,0]
+        vStart = np.r_[1.0, 0.0]
         dDelta0 = dDelta
-        # project the start state to a right/left circulating current basis
-        vStart = self.convertToLeftRight(vStart, dDelta0, dDetuning)
         # introduce a drive to the detuning
         vTime = np.arange(len(vI))*dTimeStep
         dTimeZero = 0
-        # check if rotating wave approximation
+        # create drive waveform, check if rotating wave approximation
         if bRWA:
-            dDelta = dDelta - dDriveFreq
-            dDriveFreq = 0
             vDrive = - 1j*dRabiAmp*vI*0.5 + dRabiAmp*vQ*0.5
         else:
+            # project the start state to a right/left circulating current basis
+            vStart = self.convertToLeftRight(vStart, dDelta0, dDetuning)
             if hDriveFunc is None:
                 vDrive = -\
                     dRabiAmp*vI*np.sin(2*np.pi*dDriveFreq*(vTime)) + \
@@ -397,37 +359,41 @@ class QubitSimulator():
                 noise_data = np.interp(vTime, noise_delta_t, noise_delta_m[n1])
                 vDelta += noise_data
 
+            # if wanted, remove noise where pulses are applied
             if self.bRemoveNoise:
-                # remove noise where pulses are applied
                 vDelta[pulse_indx] = 0.0
                 vDetuning[pulse_indx] = 0.0
 
-            # combine noise with bias points and drive vector
+            # combine noise with static bias points
             vDelta += dDelta
             vDetuning += dDetuning
-            if self.bDriveCharge:
-                vY = vDrive * (1.0 + vStaticDrive[n1])
-            else:
-                vDetuning += vDrive * (1.0 + vStaticDrive[n1])
-                vY = np.zeros_like(vDrive)
  
-             # do simulation
+             # do simulation, either using RWA or full Hamiltonian
             if bRWA:
-                mState = integrateH_RWA(vStart, vTime, vDelta, np.real(vDetuning),
-                                        np.imag(vDetuning), nReshape)
-                # mState = self.integrateH_RWA(vStart, vTime, vDelta, np.real(vDetuning),
-                #                              np.imag(vDetuning), nReshape)
+                # new frame, refer to drive frequency
+                vDetuning = np.sqrt(vDetuning**2 + vDelta**2) - dDriveFreq
+                mState = integrateHy(vStart, vTime, np.real(vDrive), vDetuning, 
+                    np.imag(vDrive), nReshape)
+                # mState = self.integrateH(vStart, vTime, np.real(vDrive), vDetuning, 
+                #     np.imag(vDrive), nReshape)
             else:
-                if len(vY) > 0:
+                # two different methonds depending if using Y-drive or not
+                if self.bDriveCharge:
+                    # drive on Y (= charge)
+                    vY = vDrive * (1.0 + vStaticDrive[n1])
                     mState = integrateHy(vStart, vTime, vDelta, vDetuning, vY, nReshape)
+                    # mState = self.integrateH(vStart, vTime, vDelta, vDetuning, vY, nReshape)
                 else:
+                    # drive on Z (= flux)
+                    vDetuning += vDrive * (1.0 + vStaticDrive[n1])
                     mState = integrateH(vStart, vTime, vDelta, vDetuning, nReshape)
-                # mState = self.integrateH(vStart, vTime, vDelta, vDetuning, vY, nReshape)
-            # convert the results to an eigenbasis of dDelta, dDetuning
-            mState = self.convertToEigen(mState, dDelta0, dDetuning)
-            # go to the rotating frame (add timeStep/2 to get the right phase)
-            if bRotFrame and not bRWA:
-                mState = self.goToRotatingFrame(mState, vTimeReshape, dDriveFreq, dTimeZero+dTimeStep/2)
+                    # vY = np.zeros_like(vDrive)
+                    # mState = self.integrateH(vStart, vTime, vDelta, vDetuning, vY, nReshape)
+                # convert the results to an eigenbasis of dDelta, dDetuning
+                mState = self.convertToEigen(mState, dDelta0, dDetuning)
+                # go to the rotating frame (add timeStep/2 to get the right phase)
+                if bRotFrame:
+                    mState = self.goToRotatingFrame(mState, vTimeReshape, dDriveFreq, dTimeZero+dTimeStep/2)
             # get probablity of measuring p1
             mStateEig = mState
             self.mPz[n1,:] = np.real(mStateEig[1,:]*np.conj(mStateEig[1,:]))
