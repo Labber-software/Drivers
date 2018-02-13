@@ -21,7 +21,8 @@ else:
 #                      "include_dirs":np.get_include()},
 #                      reload_support=True)
 
-from _integrateHNoNumpy_ForDriver import integrateH, integrateH_RWA, goToRotatingFrame
+from _integrateHNoNumpy_ForDriver import (integrateH, integrateH_RWA, 
+                                          goToRotatingFrame, integrateHy)
 
 #import matplotlib.pyplot as plt
 
@@ -167,6 +168,7 @@ class QubitSimulator():
         self.bRWA = False
         self.bRotFrame = True
         self.bRemoveNoise = False
+        self.bDriveCharge = True
         self.lNoiseCfg = [] # [NoiseCfg(bEmpty = True)]
         if simCfg is not None:
             # update simulation options
@@ -180,11 +182,13 @@ class QubitSimulator():
                 setattr(self, key, value)
         
        
-    def integrateH(self, vStart, vTime, vDelta, vDetuning, nReshape):
+    def integrateH(self, vStart, vTime, vDelta, vDetuning, vY, nReshape):
         # simulate the time evolution for the start state vStart
         # a state is defined as [Psi0 Psi1]'
         # a vector of states is a matrix, defined as [state1 state2 ... stateN]
         #
+        if len(vY) == 0:
+            vY = np.zeros_like(vDelta)
         # pre-allocate space for the output variable
         mState = np.zeros((2,len(vTime)), dtype='complex128')
         # use start vector for the first entry
@@ -192,18 +196,19 @@ class QubitSimulator():
         # get time steps
         vDTime = np.diff(vTime)
         # precalc vectors
-        vEnergy = 0.5*np.sqrt(vDelta**2 + vDetuning**2)
+        vEnergy = 0.5*np.sqrt(vDelta**2 + vDetuning**2 + vY**2)
         vAngle = 2*np.pi*vEnergy[0:-1]*vDTime
         vCos = np.cos(vAngle)
         vSin = np.sin(vAngle)
         # pre-define matrices
         mIdentity = np.eye(2)
-        mSx = np.array([[0.,1.],[1.,0.]])
-        mSz = np.array([[1.,0.],[0.,-1.]])
+        mSx = np.array([[0.,1.],[1.,0.]], dtype='complex128')
+        mSy = np.array([[0,-1j],[1j,0.]], dtype='complex128')
+        mSz = np.array([[1.,0.],[0.,-1.]], dtype='complex128')
         # apply hamiltonian N times
         for n1, dTime in enumerate(vDTime):
            # define hamiltonian
-           H = -0.5 * (mSx*vDelta[n1] + mSz*vDetuning[n1])
+           H = -0.5 * (mSx*vDelta[n1] + mSz*vDetuning[n1] + mSy*vY[n1])
            # define time-evolution operator
            U = mIdentity * vCos[n1] - 1j*H*vSin[n1]/vEnergy[n1]
            # calculate next state
@@ -317,14 +322,14 @@ class QubitSimulator():
         if bRWA:
             dDelta = dDelta - dDriveFreq
             dDriveFreq = 0
-            vDetuning = dDetuning - 1j*dRabiAmp*vI*0.5 + dRabiAmp*vQ*0.5
+            vDrive = - 1j*dRabiAmp*vI*0.5 + dRabiAmp*vQ*0.5
         else:
             if hDriveFunc is None:
-                vDetuning = dDetuning - \
+                vDrive = -\
                     dRabiAmp*vI*np.sin(2*np.pi*dDriveFreq*(vTime)) + \
                     dRabiAmp*vQ*np.cos(2*np.pi*dDriveFreq*(vTime))
             else:
-                vDetuning = dDetuning + hDriveFunc(vTime, vI, vQ)
+                vDrive = hDriveFunc(vTime, vI, vQ)
         #
         # pre-allocate result vector
         vTimeReshape = vTime[0::nReshape]
@@ -362,6 +367,10 @@ class QubitSimulator():
             # create matrix with noise data
             noise_delta_m = 1E-9 * noise_delta['y'][:(nRep * n)].reshape((nRep, n))
 
+        # find indices with pulses to be able to remove noise during pulses 
+        if self.bRemoveNoise:
+            pulse_indx = np.where((np.abs(vI) + np.abs(vQ)) > 1E-15)[0]
+
         # calculate color codes based on total noise
         vColNoise = (vStaticDelta + vStaticDet)
         dNoiseColAmp = np.max(np.abs(vColNoise))
@@ -372,37 +381,48 @@ class QubitSimulator():
         mRotY = splin.expm(-1j*0.5*np.pi*0.5*mSy)
         for n1 in range(nRep):
             # create new vectors for delta and detuning for each time step
-            vDelta = dDelta * np.ones(len(vTime)) + vStaticDelta[n1]
-            vDetNoise = vDetuning.copy()*(1.0+vStaticDrive[n1]) + vStaticDet[n1]
+            vDelta = np.zeros(len(vTime)) + vStaticDelta[n1]
+            vDetuning = np.zeros(len(vTime)) + vStaticDet[n1]
+
             # add noise to both delta and epsilon from all noise sources
             if nRep>1:
                 for noise in lNoise:
-                    noise.addNoise(vDelta, vDetNoise, dTimeStep*1E-9, 1E-9)
-            # add externally applied noise for the right rep
+                    noise.addNoise(vDelta, vDetuning, dTimeStep*1E-9, 1E-9)
+
+            # add externally applied noise for the right repetition
             if (noise_epsilon is not None):
                 noise_data = np.interp(vTime, noise_epsilon_t, noise_eps_m[n1])
-                if self.bRemoveNoise:
-                    # remove data where pulses are applied
-                    pulse_indx = np.where(np.abs(vDetuning - dDetuning) > 1E-15)[0]
-                    noise_data[pulse_indx] = 0.0
-                vDetNoise += noise_data
+                vDetuning += noise_data
             if (noise_delta is not None):
                 noise_data = np.interp(vTime, noise_delta_t, noise_delta_m[n1])
-                if self.bRemoveNoise:
-                    # remove data where pulses are applied
-                    pulse_indx = np.where(np.abs(vDetuning - dDetuning) > 1E-15)[0]
-                    noise_data[pulse_indx] = 0.0
                 vDelta += noise_data
+
+            if self.bRemoveNoise:
+                # remove noise where pulses are applied
+                vDelta[pulse_indx] = 0.0
+                vDetuning[pulse_indx] = 0.0
+
+            # combine noise with bias points and drive vector
+            vDelta += dDelta
+            vDetuning += dDetuning
+            if self.bDriveCharge:
+                vY = vDrive * (1.0 + vStaticDrive[n1])
+            else:
+                vDetuning += vDrive * (1.0 + vStaticDrive[n1])
+                vY = []
  
              # do simulation
             if bRWA:
-                mState = integrateH_RWA(vStart, vTime, vDelta, np.real(vDetNoise),
-                                        np.imag(vDetNoise), nReshape)
-                # mState = self.integrateH_RWA(vStart, vTime, vDelta, np.real(vDetNoise),
-                #                              np.imag(vDetNoise), nReshape)
+                mState = integrateH_RWA(vStart, vTime, vDelta, np.real(vDetuning),
+                                        np.imag(vDetuning), nReshape)
+                # mState = self.integrateH_RWA(vStart, vTime, vDelta, np.real(vDetuning),
+                #                              np.imag(vDetuning), nReshape)
             else:
-                mState = integrateH(vStart, vTime, vDelta, vDetNoise, nReshape)
-                # mState = self.integrateH(vStart, vTime, vDelta, vDetNoise, nReshape)
+                if len(vY) > 0:
+                    mState = integrateHy(vStart, vTime, vDelta, vDetuning, vY, nReshape)
+                else:
+                    mState = integrateH(vStart, vTime, vDelta, vDetuning, nReshape)
+                # mState = self.integrateH(vStart, vTime, vDelta, vDetuning, vY, nReshape)
             # convert the results to an eigenbasis of dDelta, dDetuning
             mState = self.convertToEigen(mState, dDelta0, dDetuning)
             # go to the rotating frame (add timeStep/2 to get the right phase)
