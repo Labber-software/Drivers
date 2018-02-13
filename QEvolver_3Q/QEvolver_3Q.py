@@ -89,7 +89,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		"""Perform simulation"""
 		CONFIG = self.instrCfg.getValuesDict()
 		self.SEQ = sequence(CONFIG)
-		# self.SEQ.generateSeqDisplay()
+		self.SEQ.generateSeqDisplay()
 		#
 		self.SIM = simulation_3Q(CONFIG)
 		self.SIM.updateSequence(self.SEQ)
