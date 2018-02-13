@@ -409,7 +409,7 @@ class QubitSimulator():
                 vY = vDrive * (1.0 + vStaticDrive[n1])
             else:
                 vDetuning += vDrive * (1.0 + vStaticDrive[n1])
-                vY = []
+                vY = np.zeros_like(vDrive)
  
              # do simulation
             if bRWA:
