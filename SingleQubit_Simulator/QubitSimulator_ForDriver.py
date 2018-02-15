@@ -223,19 +223,8 @@ class QubitSimulator():
         mState[0,:] = vRot*mState[0,:] 
         mState[1,:] = mState[1,:]/vRot 
         return mState
-        
-#        for n2, dTime in enumerate(vTime):
-#            A11 = np.exp(-1j*np.pi*dDriveFreq*(dTime-dTimeZero))
-#            A22 = 1/A11
-#            mState[0,n2] = A11*mState[0,n2] 
-#            mState[1,n2] = A22*mState[1,n2]
-#        return mState
-        
-#        mSz = np.array([[1., 0.],[0., -1.]])
-#            mState[:,n2] = np.dot(splin.expm2(-1j*2*np.pi*dDriveFreq * \
-#                      (dTime-dTimeZero)*0.5*mSz),mState[:,n2])
-           
-           
+
+
     def convertToEigen(self, mStateIn, dDelta, dDetuning):
         # converts a state in right/left basis to the local basis set by Delta, detuning
         # a state is defined as [Psi0 Psi1]'
@@ -374,8 +363,6 @@ class QubitSimulator():
                 vDetuning = np.sqrt(vDetuning**2 + vDelta**2) - dDriveFreq
                 mState = integrateHy(vStart, vTime, np.real(vDrive), vDetuning, 
                     np.imag(vDrive), nReshape)
-                # mState = self.integrateH(vStart, vTime, np.real(vDrive), vDetuning, 
-                #     np.imag(vDrive), nReshape)
             else:
                 # two different methonds depending if using Y-drive or not
                 if self.bDriveCharge:
