@@ -67,6 +67,10 @@ class Driver(InstrumentDriver.InstrumentWorker):
                        bRotFrame=bool(self.getValue('Use rotating frame')),
                        bRemoveNoise=bool(self.getValue('Disable noise during pulses')),
                        bRWA=bool(self.getValue('Use rotating-wave approximation')))
+        if self.getValue('Drive type') == 'Charge':
+            dConfig['bDriveCharge'] = True
+        else:
+            dConfig['bDriveCharge'] = False
         # get noise config
         nNoise = int(self.getValueIndex('Noise sources'))
         lNoiseCfg = []
