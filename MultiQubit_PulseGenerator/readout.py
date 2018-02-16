@@ -71,6 +71,8 @@ class Readout(object):
         self.use_phase_ref = config.get('Use phase reference signal')
         self.iq_ratio = config.get('Readout I/Q ratio')
         self.iq_skew = config.get('Readout IQ skew') * np.pi / 180
+        # number of records, will be remoevd in later version
+        self.n_records = config.get('Demodulation - Number of records', 1)
 
     def create_waveform(self, t_start=0.0):
         """Generate readout waveform
@@ -150,7 +152,7 @@ class Readout(object):
         """
         # get parameters
         frequency = self.frequencies[n] - self.freq_offset
-        n_segment = 1
+        n_segment = self.n_records
         # get input data from dict, with keys {'y': value, 't0': t0, 'dt': dt}
         if signal is None:
             return np.zeros(n_segment, dtype=complex)
@@ -216,7 +218,7 @@ class Readout(object):
         """
         # get parameters
         frequency = self.frequencies[n] - self.freq_offset
-        n_segment = 1
+        n_segment = self.n_records
         # get input data from dict, with keys {'y': value, 't0': t0, 'dt': dt}
         if signal_i is None or signal_q is None:
             return np.zeros(n_segment, dtype=complex)
