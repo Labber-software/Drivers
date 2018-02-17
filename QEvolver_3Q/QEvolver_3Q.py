@@ -35,12 +35,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		lSeqOutput = ['Time Series: ' + s for s in ['Q1 Frequency', 'Q1 Anharmonicity', 'Q1 DriveP', 'Q2 Frequency', 'Q2 Anharmonicity', 'Q2 DriveP', 'Q3 Frequency', 'Q3 Anharmonicity', 'Q3 DriveP', 'g12 pp', 'g23 pp', 'g13 pp']]
 		#
 		List_sPauli = ['I','X','Y','Z']
-		List_sPauli2 = []
-		for k1 in range(4):
-			for k2 in range(4):
-				List_sPauli2.append(List_sPauli[k1] + List_sPauli[k2])
-		lStateFinal = ['Final Pauli-16'] + ['Final ' + s for s in List_sPauli2]
-		lStateTrace = ['Time Series: ' + s for s in List_sPauli2]
+		lTraceOutput = ['Time Series: ' + s1 + s2 for s1 in List_sPauli for s2 in List_sPauli]
 		#
 		# check type of quantity
 		if quant.name in lSeqOutput:
@@ -49,29 +44,22 @@ class Driver(InstrumentDriver.InstrumentWorker):
 			# get new value
 			value = quant.getTraceDict(self.SEQ.dict_Seq[quant.name], t0=self.SEQ.tlist[0], dt=self.SEQ.dt)
 		#
-		elif quant.name in lStateFinal:
-			# output data, check if simulation needs to be performed
+		elif quant.name in ['Final State']:
 			if self.isConfigUpdated():
 				self.performSimulation()
-			if quant.name == 'Final Pauli-16':
-				# get new value
-				value = quant.getTraceDict(self.SIM.dict_StateFinal[quant.name], x0=0, dx=1)
-			else:
-		# check type of quantity
-		# elif quant.name in lStateFinal:
-			# output data, check if simulation needs to be performed
-			# if self.isConfigUpdated():
-			# 	self.performSimulation()
-			# get new value
-				value = self.SIM.dict_StateFinal[quant.name]
+			value = quant.getTraceDict(self.SIM.final_state, x0=0, dx=1)
 		#
-		# check type of quantity
-		elif quant.name in lStateTrace:
+		elif quant.name in ['Final Pauli-16']:
+			if self.isConfigUpdated():
+				self.performSimulation()
+			value = quant.getTraceDict(self.SIM.final_pauli16, x0=0, dx=1)
+		#
+		elif quant.name in lTraceOutput:
 			# output data, check if simulation needs to be performed
 			if self.isConfigUpdated():
 				self.performSimulation()
 			# get new value
-			value = quant.getTraceDict(self.SIM.dict_StateTrace[quant.name], t0=self.SIM.tlist_disp[0], dt=self.SIM.dt_disp)
+			value = quant.getTraceDict(self.SIM.dict_Trace[quant.name], t0=self.SIM.tlist[0], dt=self.SIM.dt)
 		else:
 			# otherwise, just return current value
 			value = quant.getValue()
@@ -83,7 +71,6 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		self.SEQ = sequence(CONFIG)
 		self.SEQ.generateSeqDisplay()
 
-
 		
 	def performSimulation(self):
 		"""Perform simulation"""
@@ -94,10 +81,28 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		self.SIM = simulation_3Q(CONFIG)
 		self.SIM.updateSequence(self.SEQ)
 		self.SIM.generateHamiltonian_3Q_cap()
-		self.SIM.generateCollapse_3Q()
 		self.SIM.generateInitialState()
-		self.SIM.rhoEvolver_3Q()
-		self.SIM.generateObservable()
+		#
+		self.bUseT1Collapse = bool(CONFIG.get('Use T1 Collapse'))
+		if self.bUseT1Collapse:
+			self.SIM.generateCollapse_3Q()
+			self.bUseDensityMatrix == True
+		else:
+			self.bUseDensityMatrix = bool(CONFIG.get('Use Density Matrix'))
+		#
+		self.bShowTrace = bool(CONFIG.get('Show Trace'))
+		log.info(self.bUseDensityMatrix)
+		log.info(self.bShowTrace)
+		if self.bUseDensityMatrix:
+			self.SIM.rhoEvolver_3Q()
+			self.SIM.generateFinalRho()
+			if self.bShowTrace:
+				self.SIM.generateTraceRho()
+		else:
+			self.SIM.psiEvolver_3Q()
+			self.SIM.generateFinalPsi()
+			if self.bShowTrace:
+				self.SIM.generateTracePsi()
 
 
 if __name__ == '__main__':
