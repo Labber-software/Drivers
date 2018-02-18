@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+"""
+@author: Fei Yan
+"""
+
 import numpy as np
 
 ### basic functions ###

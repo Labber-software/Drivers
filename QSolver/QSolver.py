@@ -55,7 +55,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		Config = dict(
 					nQubit = int(self.getValue('Number of Qubits')),
 					nTrunc = int(self.getValue('Degree of Trunction')),
-					nShow = int(self.getValue('Max Number of Display')),
+					# nShow = int(self.getValue('Max Number of Display')),
 					bDesignParam_Q1 = bool(self.getValue('Q1 Use Design Parameter')),
 					bDesignParam_Q2 = bool(self.getValue('Q2 Use Design Parameter')),
 					bDesignParam_Q3 = bool(self.getValue('Q3 Use Design Parameter')),
@@ -90,23 +90,23 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		self.multiqubit.updateSimCfg(Config)
 		if self.multiqubit.nQubit == 1:
 			self.multiqubit.generateLabel_1Q()
-			self.multiqubit.list_label_select = ["0","1","2","3"]
+			self.multiqubit.list_label_select = ['0','1','2','3']
 			self.multiqubit.generateHamiltonian_1Q_cap()
 		if self.multiqubit.nQubit == 2:
 			self.multiqubit.generateLabel_2Q()
-			self.multiqubit.list_label_select = ["00","10","01","11","20","02"]
+			self.multiqubit.list_label_select = ['00','10','01','11','20','02']
 			self.multiqubit.generateHamiltonian_2Q_cap()
 		elif self.multiqubit.nQubit == 3:
 			self.multiqubit.generateLabel_3Q()
-			self.multiqubit.list_label_select = ["000","100","010","001","110","101","011","200","020","002"]
+			self.multiqubit.list_label_select = ['000','100','010','001','110','101','011','200','020','002']
 			self.multiqubit.generateHamiltonian_3Q_cap()
 		# log.info(str(self.multiqubit.dC1))
 		#
 		# find eigensolution of system Hamiltonian
 		self.multiqubit.vals_unlabel, self.multiqubit.vecs_unlabel = eigensolve(self.multiqubit.H_sys)
 		self.multiqubit.vals_label, self.multiqubit.vecs_label = level_identify(self.multiqubit.vals_unlabel, self.multiqubit.vecs_unlabel, self.multiqubit.list_label_table, self.multiqubit.list_label_select)
-		self.vals_unlabel_show = self.multiqubit.vals_unlabel[:self.multiqubit.nShow]
-		self.vals_label_show = self.multiqubit.vals_label[:self.multiqubit.nShow]
+		self.vals_unlabel_show = self.multiqubit.vals_unlabel
+		self.vals_label_show = self.multiqubit.vals_label
 
 
 if __name__ == '__main__':

@@ -199,29 +199,11 @@ class sequence():
 
 	def generateSeqDisplay(self):
 		#
-		sPre = 'Time Series: '
-		# for sQubit in List_sQubit:
-		# 	for sSeqType in List_sSeqType:
-		# 		sName = sPre + sQubit + ' ' + sSeqType
-		# 		self.dict_Seq[sName] = []
-		#
-		# self.dict_Seq = {sPreS + s : [] for s in self.lSeq}
-		# for sQubit in List_sQubit:
-		# 	for sSeqType in List_sSeqType:
-		# 		sName = sPre + sQubit + ' ' + sSeqType
-		# 		sCallName = 'timeFunc_' + sQubit + '_' + sSeqType
-		# 		methodToCall = getattr(self, sCallName)
-		# 		for t in self.tlist:
-		# 			self.dict_Seq[sName] = dict_timeFunc[key](t,self)
-		# 			# self.dict_Seq[sName].append(methodToCall(t,self))
-		# 			self.dict_Seq[sName].append(dict_timeFunc[sCallName](t,self))
-		
-
 		for key, method in dict_timeFunc.items():
-			sName = sPre + key.replace('timeFunc_','').replace('_',' ')
+			sName = 'Time Series: ' + key.replace('timeFunc_','').replace('_',' ')
 			self.dict_Seq[sName] = []
 		#
 		for key, method in dict_timeFunc.items():
-			sName = sPre + key.replace('timeFunc_','').replace('_',' ')
+			sName = 'Time Series: ' + key.replace('timeFunc_','').replace('_',' ')
 			for t in self.tlist:
 				self.dict_Seq[sName].append(method(t,self))

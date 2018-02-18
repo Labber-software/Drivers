@@ -2,6 +2,7 @@
 """
 @author: Fei Yan
 """
+
 import InstrumentDriver
 from simulation import *
 from sequence import *
@@ -91,8 +92,6 @@ class Driver(InstrumentDriver.InstrumentWorker):
 			self.bUseDensityMatrix = bool(CONFIG.get('Use Density Matrix'))
 		#
 		self.bShowTrace = bool(CONFIG.get('Show Trace'))
-		log.info(self.bUseDensityMatrix)
-		log.info(self.bShowTrace)
 		if self.bUseDensityMatrix:
 			self.SIM.rhoEvolver_3Q()
 			self.SIM.generateFinalRho()
