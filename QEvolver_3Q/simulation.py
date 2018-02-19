@@ -174,6 +174,8 @@ class simulation_3Q():
 		self.final_pauli16 = []
 		self.dict_Trace = {'Time Series: ' + key: [] for key in dict_pauli16.keys()}
 
+		self.opts_mesolve = Options(atol=1e-10, rtol=1e-08, nsteps=10000)
+
 
 	def updateSequence(self, sequence):
 		# input sequence
@@ -249,16 +251,19 @@ class simulation_3Q():
 		self.vals_idle, self.vecs_idle = eigensolve(self.H_idle)
 		self.vals_idle_sub, self.vecs_idle_sub = level_identify(self.vals_idle, self.vecs_idle, self.List_sLabel3, self.list_label_sub)
 		#
+		self.H_idle_logic = Qobj(np.diag(self.vals_idle_sub))
 		self.U_logic_to_full = Qobj(self.vecs_idle_sub)
 		self.U_full_to_logic = self.U_logic_to_full.dag()
 		#
-		self.rho_input_rot = T(self.rho_input_logic, self.U_logic_to_full)
-		self.rho_input_lab = T(self.rho_input_rot, U(2*np.pi*self.H_idle, self.tlist[0]))
-		self.rho0 = self.rho_input_lab
+		self.rho_input_logic_lab = T(self.rho_input_logic, U(2*np.pi*self.H_idle_logic, self.tlist[0]))
+		self.rho_input_full_lab = T(self.rho_input_logic_lab, self.U_logic_to_full)
+		self.rho0 = self.rho_input_full_lab
 		#
-		self.psi_input_rot = self.U_logic_to_full * self.psi_input_logic
-		self.psi_input_lab = U(2*np.pi*self.H_idle, self.tlist[0]) * self.psi_input_rot
-		self.psi0 = self.psi_input_lab
+		self.psi_input_logic_lab = U(2*np.pi*self.H_idle_logic, self.tlist[0]) * self.psi_input_logic
+		self.psi_input_full_lab = self.U_logic_to_full * self.psi_input_logic_lab
+		self.psi0 = self.psi_input_full_lab
+
+		log.info(self.H_idle_logic)
 
 
 	def rhoEvolver_3Q(self):
@@ -296,39 +301,39 @@ class simulation_3Q():
 			[2*np.pi*self.H_Q2_dr_p, timeFunc_Q2_DriveP],
 			[2*np.pi*self.H_Q3_dr_p, timeFunc_Q3_DriveP]
 			],
-			rho0 = self.psi0, tlist = self.tlist, c_ops = [], args = self)#, options = options), store_states=True, c_ops=[], e_ops=[]
+			rho0 = self.psi0, tlist = self.tlist, c_ops = [], args = self, options=self.opts_mesolve)#, options = options), store_states=True, c_ops=[], e_ops=[]
 
 
 
 	def generateFinalRho(self):
-		rho_lab = self.result_rho.states[-1]
-		rho_rot = T(rho_lab, U(2*np.pi*self.H_idle, self.tlist[-1]).dag())
-		rho_logic = T(rho_rot, self.U_full_to_logic)
+		rho_full_lab = self.result_rho.states[-1]
+		rho_logic_lab = T(rho_full_lab, self.U_full_to_logic)
+		rho_logic = T(rho_logic_lab, U(2*np.pi*self.H_idle_logic, self.tlist[-1]).dag())
 		self.final_state = rho_logic.full().flatten()
 		self.final_pauli16 = np.array([np.real((op * rho_logic).tr()) for op in dict_pauli16.values()])
 
 
 	def generateTraceRho(self):
 		for k, t in enumerate(self.tlist):
-			rho_lab = self.result_rho.states[k]
-			rho_rot = T(rho_lab, U(2*np.pi*self.H_idle, t).dag())
-			rho_logic = T(rho_rot, self.U_full_to_logic)
+			rho_full_lab = self.result_rho.states[k]
+			rho_logic_lab = T(rho_full_lab, self.U_full_to_logic)
+			rho_logic = T(rho_logic_lab, U(2*np.pi*self.H_idle_logic, t).dag())
 			for key, op in dict_pauli16.items():
 				self.dict_Trace['Time Series: ' + key].append(np.real((op * rho_logic).tr()))
 
 
 	def generateFinalPsi(self):
-		psi_lab = self.result_psi.states[-1]
-		psi_rot = U(2*np.pi*self.H_idle, self.tlist[-1]).dag() * psi_lab
-		psi_logic = self.U_full_to_logic * psi_rot
+		psi_full_lab = self.result_psi.states[-1]
+		psi_logic_lab = self.U_full_to_logic * psi_full_lab
+		psi_logic = U(2*np.pi*self.H_idle_logic, self.tlist[-1]).dag() * psi_logic_lab
 		self.final_state = psi_logic.full().T[0]
 		self.final_pauli16 = np.array([np.real((op * psi_logic * psi_logic.dag()).tr()) for op in dict_pauli16.values()])
 
 
 	def generateTracePsi(self):
 		for k, t in enumerate(self.tlist):
-			psi_lab = self.result_psi.states[k]
-			psi_rot = U(2*np.pi*self.H_idle, t).dag() * psi_lab
-			psi_logic = self.U_full_to_logic * psi_rot
+			psi_full_lab = self.result_psi.states[k]
+			psi_logic_lab = self.U_full_to_logic * psi_full_lab
+			psi_logic = U(2*np.pi*self.H_idle_logic, t).dag() * psi_logic_lab
 			for key, op in dict_pauli16.items():
 				self.dict_Trace['Time Series: ' + key].append(np.real((op * psi_logic * psi_logic.dag()).tr()))
