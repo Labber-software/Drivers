@@ -36,7 +36,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		lSeqOutput = ['Time Series: ' + s for s in ['Q1 Frequency', 'Q1 Anharmonicity', 'Q1 DriveP', 'Q2 Frequency', 'Q2 Anharmonicity', 'Q2 DriveP', 'Q3 Frequency', 'Q3 Anharmonicity', 'Q3 DriveP', 'g12 pp', 'g23 pp', 'g13 pp']]
 		#
 		List_sPauli = ['I','X','Y','Z']
-		lTraceOutput = ['Time Series: ' + s1 + s2 for s1 in List_sPauli for s2 in List_sPauli]
+		lTraceStateOutput = ['Time Series: a' + s for s in ['11','10','01','00']]
+		lTracePauliOutput = ['Time Series: ' + s1 + s2 for s1 in List_sPauli for s2 in List_sPauli]
 		#
 		# check type of quantity
 		if quant.name in lSeqOutput:
@@ -55,12 +56,19 @@ class Driver(InstrumentDriver.InstrumentWorker):
 				self.performSimulation()
 			value = quant.getTraceDict(self.SIM.final_pauli16, x0=0, dx=1)
 		#
-		elif quant.name in lTraceOutput:
+		elif quant.name in lTraceStateOutput:
 			# output data, check if simulation needs to be performed
 			if self.isConfigUpdated():
 				self.performSimulation()
 			# get new value
-			value = quant.getTraceDict(self.SIM.dict_Trace[quant.name], t0=self.SIM.tlist[0], dt=self.SIM.dt)
+			value = quant.getTraceDict(self.SIM.dict_Trace_state[quant.name], t0=self.SIM.tlist[0], dt=self.SIM.dt)
+		#
+		elif quant.name in lTracePauliOutput:
+			# output data, check if simulation needs to be performed
+			if self.isConfigUpdated():
+				self.performSimulation()
+			# get new value
+			value = quant.getTraceDict(self.SIM.dict_Trace_pauli16[quant.name], t0=self.SIM.tlist[0], dt=self.SIM.dt)
 		else:
 			# otherwise, just return current value
 			value = quant.getValue()
@@ -87,7 +95,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 		self.bUseT1Collapse = bool(CONFIG.get('Use T1 Collapse'))
 		if self.bUseT1Collapse:
 			self.SIM.generateCollapse_3Q()
-			self.bUseDensityMatrix == True
+			self.bUseDensityMatrix = True
 		else:
 			self.bUseDensityMatrix = bool(CONFIG.get('Use Density Matrix'))
 		#
@@ -97,6 +105,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 			self.SIM.generateFinalRho()
 			if self.bShowTrace:
 				self.SIM.generateTraceRho()
+			log.info('Density')
 		else:
 			self.SIM.psiEvolver_3Q()
 			self.SIM.generateFinalPsi()

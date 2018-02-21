@@ -24,7 +24,6 @@ def Z_LC(L,C):
 	return np.sqrt(L/C)   #[Ohm]
 
 
-
 ### sequence generating fucnctions ###
 # rise/fall generating functions
 def UNIT_RAMP(t):
@@ -78,7 +77,7 @@ def add_pulse(t, pulseCfg):
 
 def add_sequence(t, seqCfg):
 	# add a sequence
-	y = 0
+	y = 0.0
 	for n in range(seqCfg.nPulses):
 		y += add_pulse(t, seqCfg.lpulseCfg[n])
 	return y
