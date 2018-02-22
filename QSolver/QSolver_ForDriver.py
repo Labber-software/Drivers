@@ -84,7 +84,7 @@ class MultiQubitHamiltonian():
 		# init with some default settings
 		self.nQubit = 3
 		self.nTrunc = 4
-		self.nShow = 4
+		# self.nShow = 4
 		self.bDesignParam_Q1 = False
 		self.bDesignParam_Q2 = False
 		self.bDesignParam_Q3 = False
