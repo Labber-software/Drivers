@@ -152,7 +152,7 @@ class Readout(object):
         """
         # get parameters
         frequency = self.frequencies[n] - self.freq_offset
-        n_segment = self.n_records
+        n_segment = int(self.n_records)
         # get input data from dict, with keys {'y': value, 't0': t0, 'dt': dt}
         if signal is None:
             return np.zeros(n_segment, dtype=complex)
@@ -218,7 +218,7 @@ class Readout(object):
         """
         # get parameters
         frequency = self.frequencies[n] - self.freq_offset
-        n_segment = self.n_records
+        n_segment = int(self.n_records)
         # get input data from dict, with keys {'y': value, 't0': t0, 'dt': dt}
         if signal_i is None or signal_q is None:
             return np.zeros(n_segment, dtype=complex)
