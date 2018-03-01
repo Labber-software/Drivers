@@ -147,19 +147,7 @@ class CZecho(Sequence):
         self.add_single_gate(0, Gate.X2p, self.first_delay + 7*self.period_1qb/2 + 2*self.period_2qb)
         self.add_single_gate(1, Gate.Xp, self.first_delay + 9*self.period_1qb/2 + 2*self.period_2qb)
 
-class ZZ2Echo(Sequence):
-    """Sequence for multi-qubit pulse trains, for pulse calibrations"""
 
-    def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms"""
-        
-        # create list with gates
-        self.add_single_gate(0, Gate.ZZ2, self.first_delay + self.period_2qb/2)
-        self.add_single_gate(0, Gate.Xp, self.first_delay + self.period_1qb/2 + self.period_2qb)
-        self.add_single_gate(1, Gate.Xp, self.first_delay + 3*self.period_1qb/2 + self.period_2qb)
-        self.add_single_gate(0, Gate.ZZ2, self.first_delay + 2*self.period_1qb + 3*self.period_2qb/2)
-        self.add_single_gate(0, Gate.Xp, self.first_delay + 5*self.period_1qb/2 + 2*self.period_2qb)
-        self.add_single_gate(1, Gate.Xp, self.first_delay + 7*self.period_1qb/2 + 2*self.period_2qb)
 
 if __name__ == '__main__':
     pass
