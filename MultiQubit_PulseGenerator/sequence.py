@@ -340,7 +340,7 @@ class Sequence(object):
             waveform[indices] += (data_i + 1j * data_q)
 
 
-    def add_single_gate(self, qubit, gate, t0, align_left=False):
+    def add_single_gate(self, qubit, gate, t0, align_left=False, config={}):
         """Add single gate to specified qubit waveform
 
         Parameters
@@ -381,9 +381,18 @@ class Sequence(object):
 
         else:
             # two-qubit gate, get pulse
+            if gate is (Gate.ZZ2):
+                self.add_single_gate(qubit, Gate.CPh, t0 + self.period_2qb/2)
+                self.add_single_gate(qubit, Gate.Xp, t0 + self.period_1qb/2 + self.period_2qb)
+                self.add_single_gate(qubit+1, Gate.Xp, t0 + 3*self.period_1qb/2 + self.period_2qb)
+                self.add_single_gate(qubit, Gate.CPh, t0 + 2*self.period_1qb + 3*self.period_2qb/2)
+                self.add_single_gate(qubit, Gate.Xp, t0 + 5*self.period_1qb/2 + 2*self.period_2qb)
+                self.add_single_gate(qubit+1, Gate.Xp, t0 + 7*self.period_1qb/2 + 2*self.period_2qb)
+
             pulse = copy(self.pulses_2qb[qubit])
             # add pulse to waveform
             self.add_single_pulse(qubit, pulse, t0, align_left=align_left)
+
             # TODO (simon): Update two-qubit pulse to include phase correction,
             # compensation pulses to neighboring qubits, etc.
 
