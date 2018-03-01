@@ -16,13 +16,14 @@ class Gate(Enum):
     Y2p = 7
     # two-qubit gates
     CPh = 8
+    ZZ2 = 9
 
 
 # define set of one- and two-qubit gates
 ONE_QUBIT_GATES = (Gate.Xp, Gate.Xm, Gate.X2p, Gate.X2m,
                    Gate.Yp, Gate.Ym, Gate.Y2p, Gate.Y2m,
                    Gate.I)
-TWO_QUBIT_GATES = (Gate.CPh,)
+TWO_QUBIT_GATES = (Gate.CPh, Gate.ZZ2)
 
 
 
