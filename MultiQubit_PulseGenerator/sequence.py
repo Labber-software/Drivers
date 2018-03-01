@@ -388,16 +388,16 @@ class Sequence(object):
                 self.add_single_gate(qubit, Gate.CPh, t0 + 2*self.period_1qb + 3*self.period_2qb/2)
                 self.add_single_gate(qubit, Gate.Xp, t0 + 5*self.period_1qb/2 + 2*self.period_2qb)
                 self.add_single_gate(qubit+1, Gate.Xp, t0 + 7*self.period_1qb/2 + 2*self.period_2qb)
+            else:
+                pulse = copy(self.pulses_2qb[qubit])
+                # add pulse to waveform
+                self.add_single_pulse(qubit, pulse, t0, align_left=align_left)
 
-            pulse = copy(self.pulses_2qb[qubit])
-            # add pulse to waveform
-            self.add_single_pulse(qubit, pulse, t0, align_left=align_left)
-
-            # TODO (simon): Update two-qubit pulse to include phase correction,
-            # compensation pulses to neighboring qubits, etc.
+                # TODO (simon): Update two-qubit pulse to include phase correction,
+                # compensation pulses to neighboring qubits, etc.
 
 
-    def add_gates(self, gates):
+    def add_gates(self, gates, align_left=False):
         """Add multiple gates to qubit waveforms
 
         Add multiple gates to the qubit waveform.  Pulses are added to the end
@@ -430,17 +430,22 @@ class Sequence(object):
             raise Exception('The input must be a list of list with gates')
         # add gates sequence to waveforms
         for gates_qubits in gates:
-            # check if any two-qubit gates
-            two_qubit = np.any([g in TWO_QUBIT_GATES for g in gates_qubits])
-            # pulse period may be different for two-qubi gates
-            period = self.period_2qb if two_qubit else self.period_1qb
+            # check if any two-qubit gates (pulse period changes)
+            bCZ = np.any([g == 'CZ' for g in gates_qubits])
+            composite = np.any([g == 'ZZ2' for g in gates_qubits])
+            if composite:
+                period = 2*self.period_2qb + 4*self.period_1qb
+            elif bCZ:
+                period = self.period_2qb
+            else:
+                period = self.period_1qb            
             # go through all qubits
             for n, g in enumerate(gates_qubits):
                 # ignore if gate is None
                 if g is None:
                     continue
                 # add gate to specific qubit waveform
-                self.add_single_gate(n, g, t0=self.time_pulse+period/2)
+                self.add_single_gate(n, g, t0=self.time_pulse+period/2, align_left=align_left)
             # after adding all pulses, increment current gate time
             self.time_pulse += period
 

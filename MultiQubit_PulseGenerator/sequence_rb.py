@@ -189,12 +189,12 @@ def add_CNOT_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
 
     generator = kwargs.get('generator', 'CZ')
     if generator == 'CZ':
-        add_singleQ_S1(index_1, gate_seq_1)
-        add_singleQ_S1_Y2p(index_2, gate_seq_2)
-        gate_seq_1.append(Gate.I)
-        gate_seq_2.append(Gate.CPh)
-        add_singleQ_clifford(index_3, gate_seq_1)
-        add_singleQ_clifford(index_4, gate_seq_2)
+        add_singleQ_S1(index_1, gate_seq_2)
+        add_singleQ_S1_Y2p(index_2, gate_seq_1)
+        gate_seq_2.append(Gate.I)
+        gate_seq_1.append(Gate.CPh)
+        add_singleQ_clifford(index_3, gate_seq_2)
+        add_singleQ_clifford(index_4, gate_seq_1)
     elif generator == 'iSWAP':
         pass
 
@@ -207,16 +207,16 @@ def add_iSWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
     index_4 = (index // 3 // 3 // 24) % 24 #randomly sample from single qubit cliffords (24)
 
     if generator == 'CZ':
-        add_singleQ_S1_Y2p(index_1, gate_seq_1)
-        add_singleQ_S1_X2p(index_2, gate_seq_2)
-        gate_seq_1.append(Gate.I)
-        gate_seq_2.append(Gate.CPh)
-        gate_seq_1.append(Gate.Y2p)
-        gate_seq_2.append(Gate.X2m)
-        gate_seq_1.append(Gate.I)
-        gate_seq_2.append(Gate.CPh)
-        add_singleQ_clifford(index_3, gate_seq_1)
-        add_singleQ_clifford(index_4, gate_seq_2)
+        add_singleQ_S1_Y2p(index_1, gate_seq_2)
+        add_singleQ_S1_X2p(index_2, gate_seq_1)
+        gate_seq_2.append(Gate.I)
+        gate_seq_1.append(Gate.CPh)
+        gate_seq_2.append(Gate.Y2p)
+        gate_seq_1.append(Gate.X2m)
+        gate_seq_2.append(Gate.I)
+        gate_seq_1.append(Gate.CPh)
+        add_singleQ_clifford(index_3, gate_seq_2)
+        add_singleQ_clifford(index_4, gate_seq_1)
     elif generator == 'iSWAP':
         pass
 
@@ -226,20 +226,20 @@ def add_SWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
     index_2 = (index // 24) % 24 #randomly sample from single qubit cliffords (24)
     generator = kwargs.get('generator', 'CZ')
     if generator == 'CZ':
-        gate_seq_1.append(Gate.I)
-        gate_seq_2.append(Gate.Y2p)
-        gate_seq_1.append(Gate.I)
-        gate_seq_2.append(Gate.CPh)
+        gate_seq_2.append(Gate.I)
         gate_seq_1.append(Gate.Y2p)
-        gate_seq_2.append(Gate.Y2m)
-        gate_seq_1.append(Gate.I)
-        gate_seq_2.append(Gate.CPh)
-        gate_seq_1.append(Gate.Y2m)
+        gate_seq_2.append(Gate.I)
+        gate_seq_1.append(Gate.CPh)
         gate_seq_2.append(Gate.Y2p)
-        gate_seq_1.append(Gate.I)
-        gate_seq_2.append(Gate.CPh)
-        add_singleQ_clifford(index_1, gate_seq_1)
-        add_singleQ_clifford(index_2, gate_seq_2)
+        gate_seq_1.append(Gate.Y2m)
+        gate_seq_2.append(Gate.I)
+        gate_seq_1.append(Gate.CPh)
+        gate_seq_2.append(Gate.Y2m)
+        gate_seq_1.append(Gate.Y2p)
+        gate_seq_2.append(Gate.I)
+        gate_seq_1.append(Gate.CPh)
+        add_singleQ_clifford(index_1, gate_seq_2)
+        add_singleQ_clifford(index_2, gate_seq_1)
 
     elif generator == 'iSWAP':
         pass
@@ -379,13 +379,13 @@ class TwoQubit_RB(Sequence):
         randomize = config['Randomize'] 
         interleave = config['Interleave 2-QB Gate']
         if interleave == True:
-            interleaved_gate = config['Interleaved 2-QB Gate'] 
+            self.interleaved_gate = config['Interleaved 2-QB Gate'] 
         else:
-            interleaved_gate =  -999.999
+            self.interleaved_gate =  -999.999
         # log.log(msg='Hi0', level =10)
         # generate new randomized clifford gates only if configuration changes
         if (self.prev_sequence != sequence or self.prev_randomize != randomize or self.prev_N_cliffords != N_cliffords or
-            self.prev_interleave != interleave or self.prev_interleaved_gate != interleaved_gate):
+            self.prev_interleave != interleave or self.prev_interleaved_gate != self.interleaved_gate):
 
             self.prev_randomize = randomize
             self.prev_N_cliffords = N_cliffords
@@ -401,10 +401,25 @@ class TwoQubit_RB(Sequence):
                 add_twoQ_clifford(rndnum, gate_seq_1, gate_seq_2)
                 #If interleave gate, 
                 if interleave == True:
-                    self.prev_interleaved_gate = interleaved_gate
-                    if interleaved_gate == '2-QB Gate,CZ':
-                        gate_seq_1.append(Gate.I)
-                        gate_seq_2.append(Gate.CPh)
+                    self.prev_interleaved_gate = self.interleaved_gate
+                    if self.interleaved_gate == '2-QB Gate,CZ':
+                        gate_seq_1.append(Gate.CPh)
+                        gate_seq_2.append(Gate.I)
+                    elif self.interleaved_gate == '2-QB Gate,ZZ/2':
+                        gate_seq_1.append(Gate.CPh)
+                        gate_seq_2.append(Gate.I)
+                        gate_seq_1.append(Gate.Xp)
+                        gate_seq_2.append(Gate.Xp)
+                        gate_seq_1.append(Gate.CPh)
+                        gate_seq_2.append(Gate.I)
+                        gate_seq_1.append(Gate.Xp)
+                        gate_seq_2.append(Gate.Xp)
+                for i, pulse in enumerate(self.pulses_1qb):
+                    if not config.get('Phase per 2QB Gate, #%1d' % (i+1)):
+                        phase = 0
+                    else:
+                        phase = config.get('Phase per 2QB Gate, #%1d' % (i+1))
+                    pulse.phase += phase*np.pi/180
 
             #get recovery gate seq
             (recovery_seq_1, recovery_seq_2) = self.get_recovery_gate(gate_seq_1, gate_seq_2)
@@ -479,9 +494,12 @@ class TwoQubit_RB(Sequence):
                 gate_2 = np.matmul(np.matrix([[0,1],[-1,0]]), gate_2)
 
             gate_12 = np.kron(gate_1, gate_2)
-            if (gate_seq_1[i] == Gate.CPh or gate_seq_2[i] == Gate.CPh):
-                gate_12 = np.matmul(np.matrix([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,-1]]), gate_12)
-
+            if self.interleaved_gate == '2-QB Gate,CZ':
+                if (gate_seq_1[i] == Gate.CPh or gate_seq_2[i] == Gate.CPh):
+                    gate_12 = np.matmul(np.matrix([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,-1]]), gate_12)
+            elif self.interleaved_gate == '2-QB Gate,ZZ/2':
+                if (gate_seq_1[i] == Gate.CPh or gate_seq_2[i] == Gate.CPh):
+                    gate_12 = np.matmul(np.matrix([[np.exp(-1j*np.pi/4),0,0,0],[0,np.exp(1j*np.pi/4),0,0],[0,0,np.exp(1j*np.pi/4),0],[0,0,0,np.exp(-1j*np.pi/4)]]), gate_12)
             twoQ_gate = np.matmul(gate_12, twoQ_gate)
 
 
