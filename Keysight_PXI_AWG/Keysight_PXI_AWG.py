@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 import sys
 sys.path.append('C:\Program Files (x86)\Keysight\SD1\Libraries\Python')
-
+import os
 from BaseDriver import LabberDriver, Error, IdError
 import keysightSD1
-
 import numpy as np
 
 class Driver(LabberDriver):
@@ -15,8 +14,10 @@ class Driver(LabberDriver):
         # timeout
         self.timeout_ms = int(1000 * self.dComCfg['Timeout'])
         # create AWG instance
+        # get PXI chassis
+        self.chassis = int(self.dComCfg.get('PXI chassis', 1))
         self.AWG = keysightSD1.SD_AOU()
-        AWGPart = self.AWG.getProductNameBySlot(1, int(self.comCfg.address))
+        AWGPart = self.AWG.getProductNameBySlot(self.chassis, int(self.comCfg.address))
         if not isinstance(AWGPart, str):
             raise Error('Unit not available')
         # check that model is supported
@@ -30,7 +31,7 @@ class Driver(LabberDriver):
             raise IdError(AWGPart, dOptionCfg['model_id'])
         # set model
         self.setModel(validName)
-        self.AWG.openWithSlot(AWGPart, 1, int(self.comCfg.address))
+        self.AWG.openWithSlot(AWGPart, self.chassis, int(self.comCfg.address))
         # sampling rate and number of channles is set by model
         if validName in ('M3202', 'H3344'):
             # 1GS/s models
@@ -58,6 +59,12 @@ class Driver(LabberDriver):
         # clear old waveforms
         self.AWG.waveformFlush()
 
+        # Create and open HVI 
+        self.HVI= keysightSD1.SD_HVI()
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        self.HVI.open(os.path.join(dir_path, 'InternalTrigger.HVI'))
+        self.HVI.assignHardwareWithIndexAndSlot(0, self.chassis, int(self.comCfg.address));
+
 
     def getHwCh(self, n):
         """Get hardware channel number for channel n. n starts at 0"""
@@ -78,6 +85,8 @@ class Driver(LabberDriver):
                 self.AWG.channelWaveShape(self.getHwCh(n), -1)
             # close instrument
             self.AWG.close()
+            self.HVI.stop()
+            self.HVI.close()
         except:
             # never return error here
             pass
@@ -132,6 +141,16 @@ class Driver(LabberDriver):
                 self.AWG.AWGqueueConfig(self.getHwCh(n), 1)
             # TODO: only for enabled channels
             self.AWG.AWGstartMultiple(self.getEnabledChannelsMask())
+        elif quant.name in ('Generate internal trigger', 'Internal trigger time'):
+            if self.getValue('Generate internal trigger'):
+                self.HVI.stop()
+                # Update and start HVI
+                wait = int(self.getValue('Internal trigger time')/10e-9)-11 #110ns delay in HVI
+                self.HVI.writeIntegerConstantWithIndex(0, 'Wait time', wait)
+                self.HVI.compile()
+                self.HVI.load()
+                self.HVI.start()
+
         elif name in ('Function', 'Enabled'):
             if self.getValue('Ch%d - Enabled' % (ch + 1)):
                 func = int(self.getCmdStringFromValue('Ch%d - Function' % (ch + 1)))
@@ -161,14 +180,16 @@ class Driver(LabberDriver):
         # if final call and wave is updated, send it to AWG
         if self.isFinalCall(options):
             # check if any wave is updated (needed since we flush all)
+            self.log(self.lWaveUpdated)
             for n, updated in enumerate(self.lWaveUpdated):
                 if updated:
                     (seq_no, n_seq) = self.getHardwareLoopIndex(options)
                     if seq_no == 0:
+                        self.log("Flush")
                         self.AWG.AWGflush(self.getHwCh(n))
                     seq_no = None if n_seq == 0 else seq_no
                     # update waveforms
-                    self.sendWaveform(n, seq_no)
+                    self.sendWaveform(n, seq_no, n_seq)
 
             # Configure markers
             for n in range(self.nCh):
@@ -207,13 +228,14 @@ class Driver(LabberDriver):
                             mask += 2**ch
         return int(mask)
 
-    def sendWaveform(self, ch, seq_no=None):
+    def sendWaveform(self, ch, seq_no=None, n_seq=0):
         """Send waveform to AWG channel"""
         # conversion to front panel numbering
         nCh = ch + 1
         
         trigMode = int(self.getCmdStringFromValue('AWG%d - Trig mode' % nCh))
         delay = int(0)
+
         if seq_no is None:
             seq_no = 0
             if self.getValue('AWG%d - Trig mode' % nCh) in ('Software', 'External'):
@@ -237,6 +259,26 @@ class Driver(LabberDriver):
         
         n = self.uploadWaveform(ch, dataNorm, waveformType, seq_no)
         self.AWG.AWGqueueWaveform(self.getHwCh(ch), n, trigMode, delay, cycles, prescaler)
+
+        if trigMode == 0:
+            # If internally triggerd, get rep rate and calculate delay
+            delay = int(6.5e3)
+            rep_rate = 1e3
+            zero_pad_length = round(1/(rep_rate*self.dt))-len(dataNorm)
+            zero_pad = np.zeros(256)
+            n_zero_pad = round(zero_pad_length//len(zero_pad)) - 1
+            n_zero_pad_reminder = zero_pad_length % len(zero_pad) + len(zero_pad)
+            zero_pad_reminder = np.zeros(n_zero_pad_reminder)
+
+            self.log(zero_pad_length)
+            self.log(n_zero_pad)
+            self.log(n_zero_pad_reminder)
+            # Upload the zero padded waveform with a unique ID (n_seq+1)
+            if n_zero_pad > 0:
+                n = self.uploadWaveform(ch, zero_pad, waveformType, n_seq+1)
+                self.AWG.AWGqueueWaveform(self.getHwCh(ch), n, trigMode, 0, n_zero_pad, prescaler)
+            n = self.uploadWaveform(ch, zero_pad_reminder, waveformType, n_seq+2)
+            self.AWG.AWGqueueWaveform(self.getHwCh(ch), n, trigMode, 0, 1, prescaler)
 
     def uploadWaveform(self, ch, data, waveformType, seq=0):
         n = self.getWaveformId(ch, seq)
