@@ -17,7 +17,8 @@ class Driver(LabberDriver):
         # get PXI chassis
         self.chassis = int(self.dComCfg.get('PXI chassis', 1))
         self.AWG = keysightSD1.SD_AOU()
-        AWGPart = self.AWG.getProductNameBySlot(self.chassis, int(self.comCfg.address))
+        AWGPart = self.AWG.getProductNameBySlot(self.chassis,
+                                                int(self.comCfg.address))
         if not isinstance(AWGPart, str):
             raise Error('Unit not available')
         # check that model is supported
@@ -145,7 +146,7 @@ class Driver(LabberDriver):
             if self.getValue('Generate internal trigger'):
                 self.HVI.stop()
                 # Update and start HVI
-                wait = int(self.getValue('Internal trigger time')/10e-9)-11 #110ns delay in HVI
+                wait = round(self.getValue('Internal trigger time')/10e-9)-11 #110ns delay in HVI
                 self.HVI.writeIntegerConstantWithIndex(0, 'Wait time', wait)
                 self.HVI.compile()
                 self.HVI.load()
