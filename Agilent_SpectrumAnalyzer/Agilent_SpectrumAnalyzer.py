@@ -90,7 +90,10 @@ class Driver(VISA_Driver):
             # get start/stop frequencies
             startFreq = self.readValueFromOther('Start frequency')
             stopFreq = self.readValueFromOther('Stop frequency')
-            sweepType = self.readValueFromOther('Sweep type')
+            if self.getModel() in ('N90xx'):
+                sweepType = 'Lin'
+            else:
+                sweepType = self.readValueFromOther('Sweep type')
             # if log scale, take log of start/stop frequencies
             if sweepType == 'Log':
                 startFreq = np.log10(startFreq)

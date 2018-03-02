@@ -14,8 +14,8 @@ class Driver(VISA_Driver):
             sCmd = 'SNAP?1,2'
             sAns = self.askAndLog(sCmd).strip()
             lData =  sAns.split(',')
-            
-            #Sometimes, we receive the value twice 
+
+            #Sometimes, we receive the value twice
             #(0.12e-3,4.56e-70.12e-3,4.56e-7 instead of 0.12e-3,4.56e-7)
             #This is a simple fix:
             if len(lData) > 2:
@@ -24,8 +24,8 @@ class Driver(VISA_Driver):
             #(0.12e-3,4.56e-7- instead of 0.12e-3,4.56e-7)
             #Hence, another simple fix:
             if lData[1][-1] == "-":
-                lData[1] = ldata[1][:-1]
-            
+                lData[1] = lData[1][:-1]
+
             # return complex values
             return complex(float(lData[0].strip()), float(lData[1].strip()))
         else:

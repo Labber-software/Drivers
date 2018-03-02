@@ -18,6 +18,13 @@ class Driver(InstrumentDriver.InstrumentWorker):
         self.dTimeStepOut = 0.0
 
 
+    def initSetConfig(self):
+        """This function is run before setting values in Set Config"""
+        # remove all applied noise
+        self.setValue('Noise trace - Epsilon', [])
+        self.setValue('Noise trace - Delta', [])
+
+
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
         """Perform the Set Value instrument operation. This function should
         return the actual value set by the instrument"""
@@ -57,8 +64,13 @@ class Driver(InstrumentDriver.InstrumentWorker):
                        nRep=int(self.getValue('Number of randomizations')),
                        dDriveFreq=self.getValue('Drive frequency')/1E9,
                        bRelFreq=bool(self.getValue('Drive relative to qubit frequency')),
-                       bRWA=bool(self.getValue('Use rotating frame')),
-                       bRotFrame=bool(self.getValue('Use rotating-wave approximation')))
+                       bRotFrame=bool(self.getValue('Use rotating frame')),
+                       bRemoveNoise=bool(self.getValue('Disable noise during pulses')),
+                       bRWA=bool(self.getValue('Use rotating-wave approximation')))
+        if self.getValue('Drive type') == 'Charge':
+            dConfig['bDriveCharge'] = True
+        else:
+            dConfig['bDriveCharge'] = False
         # get noise config
         nNoise = int(self.getValueIndex('Noise sources'))
         lNoiseCfg = []
@@ -87,12 +99,20 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # get I/Q from input data
         vI = self.getValue('Trace - I')['y']
         vQ = self.getValue('Trace - Q')['y']
+        # get noise from input data
+        noise_epsilon = self.getValue('Noise trace - Epsilon')
+        if len(noise_epsilon.get('y', [])) == 0:
+            noise_epsilon = None
+        noise_delta = self.getValue('Noise trace - Delta')
+        if len(noise_delta.get('y', [])) == 0:
+            noise_delta = None
         dTimeStepIn = 1E9 * self.getValue('Trace - I')['dt']
         dTimeStepOut = 1E9 * self.getValue('Time step, output traces')
         # do simulation
         if len(vI)>0 and len(vQ)>0:
             (vPz, vPx, vPy, dTimeStepOut) = self.qubitSim.performSimulation(
-                                            vI, vQ, dTimeStepIn, dTimeStepOut)
+                                            vI, vQ, dTimeStepIn, dTimeStepOut,
+                                            noise_epsilon, noise_delta)
             self.vPolarization = np.array([vPx[-1], vPy[-1], vPz[-1]])
             self.lTrace = [vPx, vPy, vPz]
             self.dTimeStepOut = 1E-9 * dTimeStepOut

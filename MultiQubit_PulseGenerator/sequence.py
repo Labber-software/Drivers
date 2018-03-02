@@ -239,9 +239,6 @@ class Sequence(object):
             for n in range(1, self.n_qubit):
                 self.wave_xy[n][:] = 0.0
 
-        # I/Q waveform predistortion
-        self.predistort_waveforms()
-
         # cross-talk compensation
         self.perform_crosstalk_compensation()
 
@@ -253,6 +250,9 @@ class Sequence(object):
 
         # microwave gate switch waveform
         self.add_microwave_gate(config)
+
+        # I/Q waveform predistortion
+        self.predistort_waveforms()
 
         # create and return dictionary with waveforms
         data = dict()
@@ -431,7 +431,7 @@ class Sequence(object):
                 if g is None:
                     continue
                 # add gate to specific qubit waveform
-                self.add_single_gate(n, g, t0=self.time_pulse + period / 2.0)
+                self.add_single_gate(n, g, t0=self.time_pulse+period/2)
             # after adding all pulses, increment current gate time
             self.time_pulse += period
 
@@ -514,7 +514,7 @@ class Sequence(object):
             # create trig waveform directly
             i1 = min(int(round((t + self.readout_duration) * self.sample_rate)),
                      len(self.readout_trig) - 1)
-            self.readout_trig[i0:i1] = 1.0
+            self.readout_trig[i0:i1] = self.readout_amplitude
 
             # # create pulse object and insert into trig waveform
             # trig = Pulse(amplitude=self.readout_amplitude,
@@ -536,6 +536,9 @@ class Sequence(object):
             else:
                 i1 = min(len(self.readout_iq), i0 + len(wave))
                 self.readout_iq[i0:i1] = wave[:(i1 - i0)]
+            # add IQ offsets
+            self.readout_iq.real += self.i_offset
+            self.readout_iq.imag += self.q_offset
 
 
     def add_microwave_gate(self, config):
@@ -556,10 +559,7 @@ class Sequence(object):
                                self.gate_delay) * self.sample_rate):] = 0.0
             else:
                 # non-uniform gate, find non-zero elements
-                if config.get('Predistort waveforms'):
-                    gate = np.array(np.abs(wave) > config.get('Gate - noise floor level'), dtype=float)
-                else:
-                    gate = np.array(np.abs(wave) > 0.0, dtype=float)
+                gate = np.array(np.abs(wave) > 0.0, dtype=float)
                 # fix gate overlap
                 n_overlap = int(np.round(self.gate_overlap * self.sample_rate))
                 diff_gate = np.diff(gate)
@@ -644,7 +644,10 @@ class Sequence(object):
                 # force readout trig to end in zero
                 self.readout_trig[-1] = 0.0
             if self.generate_readout_iq and self.readout.match_main_size:
-                self.readout_iq = np.r_[np.zeros(m), self.readout_iq[i0:i1]]
+                # Add offsets
+                self.readout_iq = \
+                    np.r_[np.zeros(m) + self.i_offset + 1j*self.q_offset,
+                          self.readout_iq[i0:i1]]
 
         else:
             # trim waveforms
@@ -679,7 +682,7 @@ class Sequence(object):
 
         # waveform parameters
         self.sample_rate = config.get('Sample rate')
-        self.readout_noise = config.get('Readout trig - noise floor level')
+        self.readout_noise = 0.0
         self.n_pts = int(config.get('Number of points'))
         self.first_delay = config.get('First pulse delay')
         self.trim_to_sequence = config.get('Trim waveform to sequence')
@@ -693,6 +696,7 @@ class Sequence(object):
             # global parameters
             pulse.shape = PulseShape(config.get('Pulse type'))
             pulse.truncation_range = config.get('Truncation range')
+            pulse.start_at_zero = config.get('Start at zero')
             pulse.use_drag = config.get('Use DRAG')
             # pulse shape
             if config.get('Uniform pulse shape'):
@@ -723,7 +727,7 @@ class Sequence(object):
                     pulse.plateau = config.get('Plateau, 2QB')
 
                 # Get Fourier values
-                if d[config.get('Fourier terms, 2QB')] == 4 : 
+                if d[config.get('Fourier terms, 2QB')] == 4 :
                     pulse.Lcoeff = np.array([config.get('L1, 2QB' + s),config.get('L2, 2QB' + s),config.get('L3, 2QB' + s),config.get('L4, 2QB' + s)])
                 elif d[config.get('Fourier terms, 2QB')] == 3 :
                     pulse.Lcoeff = np.array([config.get('L1, 2QB' + s),config.get('L2, 2QB' + s),config.get('L3, 2QB' + s)])
@@ -739,6 +743,7 @@ class Sequence(object):
 
             else:
                 pulse.truncation_range = config.get('Truncation range, 2QB')
+                pulse.start_at_zero = config.get('Start at zero, 2QB')
                 # pulse shape
                 if config.get('Uniform 2QB pulses'):
                     pulse.width = config.get('Width, 2QB')
@@ -775,6 +780,9 @@ class Sequence(object):
         self.readout_delay = config.get('Readout delay')
         self.readout_amplitude = config.get('Readout trig amplitude')
         self.readout_duration = config.get('Readout trig duration')
+        self.iq_skew = config.get('Readout IQ skew')
+        self.i_offset = config.get('Readout offset - I')
+        self.q_offset = config.get('Readout offset - Q')
 
         # readout, wave settings
         self.generate_readout_iq = config.get('Generate readout waveform')

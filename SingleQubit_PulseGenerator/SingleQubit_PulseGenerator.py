@@ -6,7 +6,7 @@ import numpy as np
 
 class Driver(InstrumentDriver.InstrumentWorker):
     """ This class implements a Single-qubit pulse generator"""
-    
+
 
     def performOpen(self, options={}):
         """Perform the operation of opening the instrument connection"""
@@ -66,6 +66,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         sPulseType = self.getValue('Pulse type')
         dSampleRate = self.getValue('Sample rate')
         truncRange = self.getValue('Truncation range')
+        start_at_zero = self.getValue('Start at zero')
         # get pulse params
         dAmp = self.getValue('Amplitude #%d' % nType)
         dWidth = self.getValue('Width #%d' % nType)
@@ -93,11 +94,11 @@ class Driver(InstrumentDriver.InstrumentWorker):
         elif sPulseType == 'Ramp':
             # rising and falling slopes
             vRise = (vTime-(dTime-dPlateau/2-dWidth))/dWidth
-            vRise[vRise<0.0] = 0.0 
-            vRise[vRise>1.0] = 1.0 
+            vRise[vRise<0.0] = 0.0
+            vRise[vRise>1.0] = 1.0
             vFall = ((dTime+dPlateau/2+dWidth)-vTime)/dWidth
-            vFall[vFall<0.0] = 0.0 
-            vFall[vFall>1.0] = 1.0 
+            vFall[vFall<0.0] = 0.0
+            vFall[vFall>1.0] = 1.0
             vPulse = vRise * vFall
 #            vPulse = np.min(1, np.max(0, (vTime-(dTime-dPlateau/2-dWidth))/dWidth)) * \
 #               np.min(1, np.max(0, ((dTime+dPlateau/2+dWidth)-vTime)/dWidth))
@@ -127,6 +128,9 @@ class Driver(InstrumentDriver.InstrumentWorker):
 #        # add the pulse to the previous ones
 #        vY[iPulse] = vY[iPulse] + dAmp * vPulse
         vPulse = dAmp * vPulse
+        if start_at_zero:
+            vPulse = vPulse - vPulse.min()
+            vPulse = vPulse/vPulse.max()*dAmp
         # return both time, envelope, and indices
         return (vTime, vPulse, vIndx)
 
@@ -187,8 +191,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
             return pulseEdgeWidth * width + plateau
         else:
             return 0.0
-           
-           
+
+
     def generatePrePulses(self, startTime):
         """Add pre-pulses, return time after pre-pulses end"""
         # get params
@@ -224,7 +228,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # update pi/2 pulse to be either 0 or pi/2 phase
         phase = 0.0 if stateIndex==1 else np.pi/2
         self.addPulse(iPulseDef, startTime+delay, phase=phase, bTimeStart=True)
-        
+
 
     def generateReadout(self, startTime=0.0):
         """Generate readout waveform"""
@@ -335,7 +339,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             vGate[-1] = 0.0
             self.lGate[n] = vGate
 
-        
+
 
     def calculateWaveform(self):
         """Generate waveforms, including pre-pulses, readout and gates"""
@@ -353,8 +357,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
         else:
             self.vReadout = np.array([], dtype=float)
         # create list of output vectors
-        self.lI = [np.zeros_like(self.vTime) for n in range(nOutput)] 
-        self.lQ = [np.zeros_like(self.vTime) for n in range(nOutput)] 
+        self.lI = [np.zeros_like(self.vTime) for n in range(nOutput)]
+        self.lQ = [np.zeros_like(self.vTime) for n in range(nOutput)]
         self.lGate = [np.array([], dtype=float) for n in range(nOutput)]
         # add pre-pulses
         timePos = self.generatePrePulses(startTime=firstDelay)
