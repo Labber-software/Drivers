@@ -182,15 +182,25 @@ class Driver(LabberDriver):
         if self.isFinalCall(options):
             # check if any wave is updated (needed since we flush all)
             self.log(self.lWaveUpdated)
+            (seq_no, n_seq) = self.getHardwareLoopIndex(options)
+            if np.any(self.lWaveUpdated):
+                if seq_no == 0:
+                    self.i = 1 # WaveformID counter
+
             for n, updated in enumerate(self.lWaveUpdated):
                 if updated:
-                    (seq_no, n_seq) = self.getHardwareLoopIndex(options)
                     if seq_no == 0:
                         self.log("Flush")
                         self.AWG.AWGflush(self.getHwCh(n))
-                    seq_no = None if n_seq == 0 else seq_no
                     # update waveforms
-                    self.sendWaveform(n, seq_no, n_seq)
+                    self.log('i is {}'.format(self.i))
+                    self.sendWaveform(n, self.i, loop=(n_seq>0))
+                    if self.isHardwareLoop(options):
+                        self.reportStatus('Sending waveform (%d/%d)' % (seq_no+1, n_seq))
+                        self.sendWaveform(n, self.i, loop=True)
+                    else:
+                        self.sendWaveform(n, self.i, loop=False)
+                    self.i += 1
 
             # Configure markers
             for n in range(self.nCh):
@@ -229,73 +239,42 @@ class Driver(LabberDriver):
                             mask += 2**ch
         return int(mask)
 
-    def sendWaveform(self, ch, seq_no=None, n_seq=0):
+    def sendWaveform(self, ch, i, loop=False):
         """Send waveform to AWG channel"""
         # conversion to front panel numbering
         nCh = ch + 1
-        
+                
         trigMode = int(self.getCmdStringFromValue('AWG%d - Trig mode' % nCh))
         delay = int(0)
 
-        if seq_no is None:
-            seq_no = 0
+        if not loop:
             if self.getValue('AWG%d - Trig mode' % nCh) in ('Software', 'External'):
                 cycles = int(self.getValue('AWG%d - Cycles' % nCh))
             else:
-                cycles = int(0)
+                cycles = 0
         else:
             # Ignore cycle setting if hardware looping
             cycles = 1
-        prescaler = int(0)
-        waveformType = int(0)
+        prescaler = 0
+        waveformType = 0
         quant = self.getQuantity('AWG%d - Waveform' % nCh)
         data = quant.getValueArray()
         # make sure we have at least 256 elements (limit might be 236)
-        if len(data)<256:
+        if len(data) < 256:
             data = np.pad(data, (0, 256-len(data)), 'constant')
         # scale to range
         amp =  self.getValue('Ch%d - Amplitude' % nCh)
         dataNorm = data / amp
         dataNorm = np.clip(dataNorm, -1.0, 1.0, out=dataNorm)
         
-        n = self.uploadWaveform(ch, dataNorm, waveformType, seq_no)
-        self.AWG.AWGqueueWaveform(self.getHwCh(ch), n, trigMode, delay, cycles, prescaler)
+        self.uploadWaveform(ch, dataNorm, waveformType, i)
+        self.AWG.AWGqueueWaveform(self.getHwCh(ch), i, trigMode, delay, cycles, prescaler)
 
-        if trigMode == 0:
-            # If internally triggerd, get rep rate and calculate delay
-            delay = int(6.5e3)
-            rep_rate = 1e3
-            zero_pad_length = round(1/(rep_rate*self.dt))-len(dataNorm)
-            zero_pad = np.zeros(256)
-            n_zero_pad = round(zero_pad_length//len(zero_pad)) - 1
-            n_zero_pad_reminder = zero_pad_length % len(zero_pad) + len(zero_pad)
-            zero_pad_reminder = np.zeros(n_zero_pad_reminder)
-
-            self.log(zero_pad_length)
-            self.log(n_zero_pad)
-            self.log(n_zero_pad_reminder)
-            # Upload the zero padded waveform with a unique ID (n_seq+1)
-            if n_zero_pad > 0:
-                n = self.uploadWaveform(ch, zero_pad, waveformType, n_seq+1)
-                self.AWG.AWGqueueWaveform(self.getHwCh(ch), n, trigMode, 0, n_zero_pad, prescaler)
-            n = self.uploadWaveform(ch, zero_pad_reminder, waveformType, n_seq+2)
-            self.AWG.AWGqueueWaveform(self.getHwCh(ch), n, trigMode, 0, 1, prescaler)
-
-    def uploadWaveform(self, ch, data, waveformType, seq=0):
-        n = self.getWaveformId(ch, seq)
+    def uploadWaveform(self, ch, data, waveformType, i):
         wave = keysightSD1.SD_Wave()
         wave.newFromArrayDouble(waveformType, data)
-        self.AWG.waveformLoad(wave, n)
-        return n
-
-    def getWaveformId(self, ch, seq):
-        # Create a unique waveform number using Szudzik's pairing method
-        if ch >= seq:
-            n = ch*ch+ch*seq
-        else:
-            n = ch+seq*seq
-        return n
-
+        self.AWG.waveformLoad(wave, i)
+ 
 
 if __name__ == '__main__':
     pass
