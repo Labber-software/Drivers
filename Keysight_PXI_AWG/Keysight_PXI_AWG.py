@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 import sys
-sys.path.append('C:\Program Files (x86)\Keysight\SD1\Libraries\Python')
-import os
-from BaseDriver import LabberDriver, Error, IdError
 import keysightSD1
 import numpy as np
+import os
+sys.path.append('C:\Program Files (x86)\Keysight\SD1\Libraries\Python')
+from BaseDriver import LabberDriver, Error, IdError
+
 
 class Driver(LabberDriver):
     """Keysigh PXI AWG"""
@@ -23,8 +24,9 @@ class Driver(LabberDriver):
             raise Error('Unit not available')
         # check that model is supported
         dOptionCfg = self.dInstrCfg['options']
-        for validId, validName in zip(dOptionCfg['model_id'], dOptionCfg['model_str']):
-            if AWGPart.find(validId)>=0:
+        for validId, validName in zip(dOptionCfg['model_id'],
+                                      dOptionCfg['model_str']):
+            if AWGPart.find(validId) >= 0:
                 # id found, stop searching
                 break
         else:
@@ -60,17 +62,16 @@ class Driver(LabberDriver):
         # clear old waveforms
         self.AWG.waveformFlush()
 
-        # Create and open HVI 
-        self.HVI= keysightSD1.SD_HVI()
+        # Create and open HVI
+        self.HVI = keysightSD1.SD_HVI()
         dir_path = os.path.dirname(os.path.realpath(__file__))
         self.HVI.open(os.path.join(dir_path, 'InternalTrigger.HVI'))
-        self.HVI.assignHardwareWithIndexAndSlot(0, self.chassis, int(self.comCfg.address));
-
+        self.HVI.assignHardwareWithIndexAndSlot(0, self.chassis,
+                                                int(self.comCfg.address))
 
     def getHwCh(self, n):
         """Get hardware channel number for channel n. n starts at 0"""
         return n + self.ch_index_zero
-
 
     def performClose(self, bError=False, options={}):
         """Perform the close instrument connection operation"""
@@ -92,7 +93,6 @@ class Driver(LabberDriver):
             # never return error here
             pass
 
-
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
         """Perform the Set Value instrument operation. This function should
         return the actual value set by the instrument"""
@@ -104,12 +104,9 @@ class Driver(LabberDriver):
         # start with setting current quant value
         quant.setValue(value)
         # check if channel-specific, if so get channel + name
-        if quant.name.startswith('Ch') and len(quant.name)>6:
+        if quant.name.startswith('Ch') and len(quant.name) > 6:
             ch = int(quant.name[2]) - 1
             name = quant.name[6:]
-        elif quant.name.startswith('AWG') and len(quant.name)>7:
-            ch = int(quant.name[3]) - 1
-            name = quant.name[7:]
         else:
             ch, name = None, ''
         # proceed depending on command
@@ -117,21 +114,18 @@ class Driver(LabberDriver):
             # get direction and sync from index of comboboxes
             direction = int(self.getCmdStringFromValue('Trig I/O'))
             self.AWG.triggerIOconfig(direction)
-        elif quant.name in ('External Trig Source', 'External Trig Config',
-                            'Trig Sync Mode') or\
-                   name in ('External Trig Source', 'External Trig Config'):
+        elif name in ('External Trig Source', 'External Trig Config'):
             sync = int(self.getCmdStringFromValue('Trig Sync Mode'))
             for ch in range(self.nCh):
-                # check if separate trigger is used
-                if self.getValue('Ch%d - Separate trigger' % (ch + 1)):
-                    # use unique trigger for this channel
-                    extSource = int(self.getCmdStringFromValue('Ch%d - External Trig Source' % (ch + 1)))
-                    trigBehavior = int(self.getCmdStringFromValue('Ch%d - External Trig Config' % (ch + 1)))
-                else:
-                    # use default
-                    extSource = int(self.getCmdStringFromValue('External Trig Source'))
-                    trigBehavior = int(self.getCmdStringFromValue('External Trig Config'))
-                self.AWG.AWGtriggerExternalConfig(self.getHwCh(ch), extSource, trigBehavior, sync)
+                # check if external trigger is used
+                if self.getChannelValue(ch, 'Trig mode') in \
+                    ('External', 'Software',
+                     'External (per cycle)', 'Software (per cycle)'):
+                    extSource = int(self.getChannelCmd(ch, 'External Trig Source'))
+                    trigBehavior = int(self.getChannelCmd(ch, 'External Trig Config'))
+                    self.AWG.AWGtriggerExternalConfig(self.getHwCh(ch),
+                                                      extSource,
+                                                      trigBehavior, sync)
         # software trig for all channels
         elif quant.name in ('Trig All',):
             # mask to trig all AWG channels
@@ -140,13 +134,15 @@ class Driver(LabberDriver):
         elif quant.name == 'Run':
             for n in range(self.nCh):
                 self.AWG.AWGqueueConfig(self.getHwCh(n), 1)
-            # TODO: only for enabled channels
+                # TODO: Is this needed?
             self.AWG.AWGstartMultiple(self.getEnabledChannelsMask())
-        elif quant.name in ('Generate internal trigger', 'Internal trigger time'):
+        elif quant.name in ('Generate internal trigger',
+                            'Internal trigger time'):
             if self.getValue('Generate internal trigger'):
                 self.HVI.stop()
                 # Update and start HVI
-                wait = round(self.getValue('Internal trigger time')/10e-9)-11 #110ns delay in HVI
+                # 110ns delay in HVI
+                wait = round(self.getValue('Internal trigger time')/10e-9)-11
                 self.HVI.writeIntegerConstantWithIndex(0, 'Wait time', wait)
                 self.HVI.compile()
                 self.HVI.load()
@@ -154,8 +150,8 @@ class Driver(LabberDriver):
 
         elif name in ('Function', 'Enabled'):
             if self.getValue('Ch%d - Enabled' % (ch + 1)):
-                func = int(self.getCmdStringFromValue('Ch%d - Function' % (ch + 1)))
-                # start AWG if AWG mode
+                func = int(self.getChannelCmd(ch, 'Function'))
+                # set channel as updated if AWG mode
                 if func == 6:
                     self.lWaveUpdated[ch] = True
             else:
@@ -185,7 +181,7 @@ class Driver(LabberDriver):
             (seq_no, n_seq) = self.getHardwareLoopIndex(options)
             if np.any(self.lWaveUpdated):
                 if seq_no == 0:
-                    self.i = 1 # WaveformID counter
+                    self.i = 1  # WaveformID counter
 
             for n, updated in enumerate(self.lWaveUpdated):
                 if updated:
@@ -193,34 +189,35 @@ class Driver(LabberDriver):
                         self.log("Flush")
                         self.AWG.AWGflush(self.getHwCh(n))
                     # update waveforms
-                    self.log('i is {}'.format(self.i))
-                    self.sendWaveform(n, self.i, loop=(n_seq>0))
+                    self.sendWaveform(n, self.i, loop=(n_seq > 0))
                     if self.isHardwareLoop(options):
-                        self.reportStatus('Sending waveform (%d/%d)' % (seq_no+1, n_seq))
+                        self.reportStatus('Sending waveform (%d/%d)'
+                                          % (seq_no+1, n_seq))
                         self.sendWaveform(n, self.i, loop=True)
                     else:
                         self.sendWaveform(n, self.i, loop=False)
                     self.i += 1
 
             # Configure markers
-            for n in range(self.nCh):
-                # conversion to front panel numbering
-                N = n + 1 
-                markerMode = int(self.getCmdStringFromValue('Ch%d - Marker Mode' % N))
+            for ch in range(self.nCh):
+                markerMode = int(self.getChannelCmd(ch, 'Marker Mode'))
                 trgPXImask = 0
-                trgIOmask = 1 if self.getValue('Ch%d - Marker External' % N) else 0
-                markerValue = int(self.getCmdStringFromValue('Ch%d - Marker Value' % N))
-                syncMode = int(self.getCmdStringFromValue('Ch%d - Marker Sync Mode' % N))
-                length = int(round(self.getValue('Ch%d - Marker Length' % N)/10e-9))
-                delay = int(round(self.getValue('Ch%d - Marker Delay' % N)/10e-9))
+                trgIOmask = 1 if self.getChannelValue(ch, 'Marker External') else 0
+                markerValue = int(self.getChannelCmd(ch, ' Marker Value'))
+                syncMode = int(self.getChannelCmd(ch, 'Marker Sync Mode'))
+                length = int(round(self.getChannelValue(ch, 'Marker Length')/10e-9))
+                delay = int(round(self.getChannelValue(ch, 'Marker Delay')/10e-9))
                 if length == 0:
                     length = 1
                 for i in range(8):
-                    if self.getValue('Ch%d - Marker PXI%d' % (N, i)):
+                    if self.getChannelValue(ch, 'Marker PXI%d' % i):
                         trgPXImask += 2**i
-                self.AWG.AWGqueueMarkerConfig(nAWG=self.getHwCh(n), markerMode=markerMode, 
-                                              trgPXImask=int(trgPXImask), trgIOmask=int(trgIOmask), 
-                                              value=markerValue, syncMode=syncMode, length=length,
+                self.AWG.AWGqueueMarkerConfig(nAWG=self.getHwCh(n),
+                                              markerMode=markerMode,
+                                              trgPXImask=trgPXImask,
+                                              trgIOmask=trgIOmask,
+                                              value=markerValue,
+                                              syncMode=syncMode, length=length,
                                               delay=delay)
             # turn on outputs
             if not self.isHardwareTrig(options):
@@ -233,7 +230,7 @@ class Driver(LabberDriver):
         mask = 0
         for ch in range(self.nCh):
             if self.getValue('Ch%d - Enabled' % (ch + 1)):
-                        func = int(self.getCmdStringFromValue('Ch%d - Function' % (ch + 1)))
+                        func = int(self.getChannelCmd(ch, 'Function'))
                         # start AWG if AWG mode
                         if func == 6:
                             mask += 2**ch
@@ -241,15 +238,14 @@ class Driver(LabberDriver):
 
     def sendWaveform(self, ch, i, loop=False):
         """Send waveform to AWG channel"""
-        # conversion to front panel numbering
-        nCh = ch + 1
-                
-        trigMode = int(self.getCmdStringFromValue('AWG%d - Trig mode' % nCh))
+
+        trigMode = int(self.getChannelCmd(ch, 'Trig mode'))
         delay = int(0)
 
         if not loop:
-            if self.getValue('AWG%d - Trig mode' % nCh) in ('Software', 'External'):
-                cycles = int(self.getValue('AWG%d - Cycles' % nCh))
+            if self.getChannelValue(ch, 'Trig mode') in ('Software',
+                                                         'External'):
+                cycles = int(self.getChannelValue(ch, 'Cycles'))
             else:
                 cycles = 0
         else:
@@ -257,24 +253,31 @@ class Driver(LabberDriver):
             cycles = 1
         prescaler = 0
         waveformType = 0
-        quant = self.getQuantity('AWG%d - Waveform' % nCh)
+        quant = self.getQuantity('Ch%d - Waveform' % ch+1)
         data = quant.getValueArray()
         # make sure we have at least 256 elements (limit might be 236)
         if len(data) < 256:
             data = np.pad(data, (0, 256-len(data)), 'constant')
         # scale to range
-        amp =  self.getValue('Ch%d - Amplitude' % nCh)
+        amp = self.getChannelValue(ch, 'Amplitude')
         dataNorm = data / amp
         dataNorm = np.clip(dataNorm, -1.0, 1.0, out=dataNorm)
-        
+
         self.uploadWaveform(ch, dataNorm, waveformType, i)
-        self.AWG.AWGqueueWaveform(self.getHwCh(ch), i, trigMode, delay, cycles, prescaler)
+        self.AWG.AWGqueueWaveform(self.getHwCh(ch), i, trigMode, delay,
+                                  cycles, prescaler)
 
     def uploadWaveform(self, ch, data, waveformType, i):
         wave = keysightSD1.SD_Wave()
         wave.newFromArrayDouble(waveformType, data)
         self.AWG.waveformLoad(wave, i)
- 
+
+    def getChannelValue(self, ch, value):
+        return self.getValue('Ch{} - {}'.format(ch+1, value))
+
+    def getChannelCmd(self, ch, value):
+        return self.getCmdStringFromValue('Ch{} - {}'.format(ch+1, value))
+
 
 if __name__ == '__main__':
     pass
