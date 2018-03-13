@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 import sys
-import keysightSD1
+from BaseDriver import LabberDriver, Error, IdError
 import numpy as np
 import os
 sys.path.append('C:\Program Files (x86)\Keysight\SD1\Libraries\Python')
-from BaseDriver import LabberDriver, Error, IdError
+import keysightSD1
 
 
 class Driver(LabberDriver):
@@ -40,7 +40,7 @@ class Driver(LabberDriver):
             # 1GS/s models
             self.dt = 1E-9
             self.nCh = 4
-        elif validName in ('M3302',):
+        elif validName == 'M3302':
             # two-channel, 500 MS/s model
             self.dt = 2E-9
             self.nCh = 2
@@ -58,11 +58,11 @@ class Driver(LabberDriver):
         else:
             # SIGNADYNE - channel numbers start with 0
             self.ch_index_zero = 0
-        self.log('HW:', hw_version)
+
         # clear old waveforms
         self.AWG.waveformFlush()
 
-        # Create and open HVI
+        # Create and open HVI for internal triggering
         self.HVI = keysightSD1.SD_HVI()
         dir_path = os.path.dirname(os.path.realpath(__file__))
         self.HVI.open(os.path.join(dir_path, 'InternalTrigger.HVI'))
@@ -114,20 +114,7 @@ class Driver(LabberDriver):
             # get direction and sync from index of comboboxes
             direction = int(self.getCmdStringFromValue('Trig I/O'))
             self.AWG.triggerIOconfig(direction)
-        elif name in ('External Trig Source', 'External Trig Config'):
-            sync = int(self.getCmdStringFromValue('Trig Sync Mode'))
-            for ch in range(self.nCh):
-                # check if external trigger is used
-                if self.getChannelValue(ch, 'Trig mode') in \
-                    ('External', 'Software',
-                     'External (per cycle)', 'Software (per cycle)'):
-                    extSource = int(self.getChannelCmd(ch, 'External Trig Source'))
-                    trigBehavior = int(self.getChannelCmd(ch, 'External Trig Config'))
-                    self.AWG.AWGtriggerExternalConfig(self.getHwCh(ch),
-                                                      extSource,
-                                                      trigBehavior, sync)
-        # software trig for all channels
-        elif quant.name in ('Trig All',):
+        elif quant.name == 'Trig All':
             # mask to trig all AWG channels
             nMask = int(2**self.nCh - 1)
             self.AWG.AWGtriggerMultiple(nMask)
@@ -174,22 +161,33 @@ class Driver(LabberDriver):
         elif name in ('Trig mode', 'Cycles', 'Waveform'):
             # mark wavefom as updated
             self.lWaveUpdated[ch] = True
+        elif name in ('External Trig Source', 'External Trig Config'):
+            sync = int(self.getCmdStringFromValue('Trig Sync Mode'))
+            for ch in range(self.nCh):
+                # check if external trigger is used
+                if self.getChannelValue(ch, 'Trig mode') in \
+                    ('External', 'Software',
+                     'External (per cycle)', 'Software (per cycle)'):
+                    extSource = int(self.getChannelCmd(ch, 'External Trig Source'))
+                    trigBehavior = int(self.getChannelCmd(ch, 'External Trig Config'))
+                    self.AWG.AWGtriggerExternalConfig(self.getHwCh(ch),
+                                                      extSource,
+                                                      trigBehavior, sync)
         # if final call and wave is updated, send it to AWG
         if self.isFinalCall(options):
-            # check if any wave is updated (needed since we flush all)
-            self.log(self.lWaveUpdated)
             (seq_no, n_seq) = self.getHardwareLoopIndex(options)
             if np.any(self.lWaveUpdated):
+                # Reset waveform ID counter if this is the first sequence
                 if seq_no == 0:
                     self.i = 1  # WaveformID counter
 
             for n, updated in enumerate(self.lWaveUpdated):
                 if updated:
                     if seq_no == 0:
+                        # Flush the AWG memory if this is the first sequence
                         self.log("Flush")
                         self.AWG.AWGflush(self.getHwCh(n))
-                    # update waveforms
-                    self.sendWaveform(n, self.i, loop=(n_seq > 0))
+                    # Send the waveform to the AWG
                     if self.isHardwareLoop(options):
                         self.reportStatus('Sending waveform (%d/%d)'
                                           % (seq_no+1, n_seq))
@@ -198,7 +196,7 @@ class Driver(LabberDriver):
                         self.sendWaveform(n, self.i, loop=False)
                     self.i += 1
 
-            # Configure markers
+            # Configure channel specific markers
             for ch in range(self.nCh):
                 markerMode = int(self.getChannelCmd(ch, 'Marker Mode'))
                 trgPXImask = 0
@@ -207,6 +205,8 @@ class Driver(LabberDriver):
                 syncMode = int(self.getChannelCmd(ch, 'Marker Sync Mode'))
                 length = int(round(self.getChannelValue(ch, 'Marker Length')/10e-9))
                 delay = int(round(self.getChannelValue(ch, 'Marker Delay')/10e-9))
+
+                # TODO Check minimum length and update in ini file
                 if length == 0:
                     length = 1
                 for i in range(8):
@@ -219,7 +219,8 @@ class Driver(LabberDriver):
                                               value=markerValue,
                                               syncMode=syncMode, length=length,
                                               delay=delay)
-            # turn on outputs
+            # In hardware trigger mode, outputs are turned on by the run button
+            # TODO Check queue config
             if not self.isHardwareTrig(options):
                 for n in range(self.nCh):
                     self.AWG.AWGqueueConfig(self.getHwCh(n), 1)
@@ -227,6 +228,7 @@ class Driver(LabberDriver):
         return value
 
     def getEnabledChannelsMask(self):
+        """ Returns a mask for the enabled channels """
         mask = 0
         for ch in range(self.nCh):
             if self.getValue('Ch%d - Enabled' % (ch + 1)):
@@ -268,14 +270,17 @@ class Driver(LabberDriver):
                                   cycles, prescaler)
 
     def uploadWaveform(self, ch, data, waveformType, i):
+        """ Uploads the given waveform with an id i """
         wave = keysightSD1.SD_Wave()
         wave.newFromArrayDouble(waveformType, data)
         self.AWG.waveformLoad(wave, i)
 
     def getChannelValue(self, ch, value):
+        """ Returns a channel specific value """
         return self.getValue('Ch{} - {}'.format(ch+1, value))
 
     def getChannelCmd(self, ch, value):
+        """ Returns a channel specific command string """
         return self.getCmdStringFromValue('Ch{} - {}'.format(ch+1, value))
 
 
