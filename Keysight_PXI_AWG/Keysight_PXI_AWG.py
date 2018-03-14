@@ -77,14 +77,13 @@ class Driver(LabberDriver):
         """Perform the close instrument connection operation"""
         # do not check for error if close was called with an error
         try:
-            # clear old waveforms
+            # clear old waveforms and stop awg
             self.AWG.waveformFlush()
-            for n in range(self.nCh):
-                self.AWG.AWGflush(self.getHwCh(n))
-                self.AWG.AWGstop(self.getHwCh(n))
-            # turn off outputs
-            for n in range(self.nCh):
-                self.AWG.channelWaveShape(self.getHwCh(n), -1)
+            for ch in range(self.nCh):
+                self.AWG.AWGflush(self.getHwCh(ch))
+                self.AWG.AWGstop(self.getHwCh(ch))
+                self.AWG.channelWaveShape(self.getHwCh(ch), -1)
+                
             # close instrument
             self.AWG.close()
             self.HVI.stop()
@@ -136,7 +135,7 @@ class Driver(LabberDriver):
                 self.HVI.start()
 
         elif name in ('Function', 'Enabled'):
-            if self.getValue('Ch%d - Enabled' % (ch + 1)):
+            if self.getChannelValue(ch, 'Enabled'):
                 func = int(self.getChannelCmd(ch, 'Function'))
                 # set channel as updated if AWG mode
                 if func == 6:
@@ -148,7 +147,7 @@ class Driver(LabberDriver):
         elif name == 'Amplitude':
             self.AWG.channelAmplitude(self.getHwCh(ch), value)
             # if in AWG mode, update waveform to scale to new range
-            if self.getValue('Ch%d - Function' % (ch + 1)) == 'AWG':
+            if self.getChannelValue(ch, 'Function') == 'AWG':
                 self.lWaveUpdated[ch] = True
         elif name == 'Frequency':
             self.AWG.channelFrequency(self.getHwCh(ch), value)
@@ -201,7 +200,7 @@ class Driver(LabberDriver):
                 markerMode = int(self.getChannelCmd(ch, 'Marker Mode'))
                 trgPXImask = 0
                 trgIOmask = 1 if self.getChannelValue(ch, 'Marker External') else 0
-                markerValue = int(self.getChannelCmd(ch, ' Marker Value'))
+                markerValue = int(self.getChannelCmd(ch, 'Marker Value'))
                 syncMode = int(self.getChannelCmd(ch, 'Marker Sync Mode'))
                 length = int(round(self.getChannelValue(ch, 'Marker Length')/10e-9))
                 delay = int(round(self.getChannelValue(ch, 'Marker Delay')/10e-9))
@@ -212,18 +211,20 @@ class Driver(LabberDriver):
                 for i in range(8):
                     if self.getChannelValue(ch, 'Marker PXI%d' % i):
                         trgPXImask += 2**i
-                self.AWG.AWGqueueMarkerConfig(nAWG=self.getHwCh(n),
+                self.log('Mode {}'.format(markerMode))
+                e = self.AWG.AWGqueueMarkerConfig(nAWG=self.getHwCh(ch),
                                               markerMode=markerMode,
-                                              trgPXImask=trgPXImask,
-                                              trgIOmask=trgIOmask,
+                                              trgPXImask=int(trgPXImask),
+                                              trgIOmask=int(trgIOmask),
                                               value=markerValue,
                                               syncMode=syncMode, length=length,
                                               delay=delay)
+                self.log('Marker error {}'.format(e))
             # In hardware trigger mode, outputs are turned on by the run button
             # TODO Check queue config
             if not self.isHardwareTrig(options):
-                for n in range(self.nCh):
-                    self.AWG.AWGqueueConfig(self.getHwCh(n), 1)
+                for ch in range(self.nCh):
+                    self.AWG.AWGqueueConfig(self.getHwCh(ch), 1)
                 self.AWG.AWGstartMultiple(self.getEnabledChannelsMask())
         return value
 
@@ -255,7 +256,7 @@ class Driver(LabberDriver):
             cycles = 1
         prescaler = 0
         waveformType = 0
-        quant = self.getQuantity('Ch%d - Waveform' % ch+1)
+        quant = self.getQuantity('Ch%d - Waveform' % (ch+1))
         data = quant.getValueArray()
         # make sure we have at least 256 elements (limit might be 236)
         if len(data) < 256:
