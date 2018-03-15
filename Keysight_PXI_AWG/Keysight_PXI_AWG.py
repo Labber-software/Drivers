@@ -97,9 +97,9 @@ class Driver(LabberDriver):
         return the actual value set by the instrument"""
         if self.isFirstCall(options):
             self.lWaveUpdated = [False]*self.nCh
-            if self.isHardwareTrig(options):
-                # Stop all channels
-                self.AWG.AWGstopMultiple(int(2**self.nCh - 1))
+            # Stop all channels
+            self.log('Stop all')
+            self.AWG.AWGstopMultiple(int(2**self.nCh - 1))
         # start with setting current quant value
         quant.setValue(value)
         # check if channel-specific, if so get channel + name
@@ -118,9 +118,6 @@ class Driver(LabberDriver):
             nMask = int(2**self.nCh - 1)
             self.AWG.AWGtriggerMultiple(nMask)
         elif quant.name == 'Run':
-            for n in range(self.nCh):
-                self.AWG.AWGqueueConfig(self.getHwCh(n), 1)
-                # TODO: Is this needed?
             self.AWG.AWGstartMultiple(self.getEnabledChannelsMask())
         elif quant.name in ('Generate internal trigger',
                             'Internal trigger time'):
@@ -190,9 +187,7 @@ class Driver(LabberDriver):
                     if self.isHardwareLoop(options):
                         self.reportStatus('Sending waveform (%d/%d)'
                                           % (seq_no+1, n_seq))
-                        self.sendWaveform(n, self.i, loop=True)
-                    else:
-                        self.sendWaveform(n, self.i, loop=False)
+                    self.sendWaveform(n, self.i)
                     self.i += 1
 
             # Configure channel specific markers
@@ -205,26 +200,21 @@ class Driver(LabberDriver):
                 length = int(round(self.getChannelValue(ch, 'Marker Length')/10e-9))
                 delay = int(round(self.getChannelValue(ch, 'Marker Delay')/10e-9))
 
-                # TODO Check minimum length and update in ini file
-                if length == 0:
-                    length = 1
                 for i in range(8):
                     if self.getChannelValue(ch, 'Marker PXI%d' % i):
                         trgPXImask += 2**i
-                self.log('Mode {}'.format(markerMode))
-                e = self.AWG.AWGqueueMarkerConfig(nAWG=self.getHwCh(ch),
+                self.AWG.AWGqueueMarkerConfig(nAWG=self.getHwCh(ch),
                                               markerMode=markerMode,
-                                              trgPXImask=int(trgPXImask),
-                                              trgIOmask=int(trgIOmask),
+                                              trgPXImask=trgPXImask,
+                                              trgIOmask=trgIOmask,
                                               value=markerValue,
-                                              syncMode=syncMode, length=length,
+                                              syncMode=syncMode,
+                                              length=length,
                                               delay=delay)
-                self.log('Marker error {}'.format(e))
+                self.AWG.AWGqueueConfig(self.getHwCh(ch), 1) # Cyclic mode
+
             # In hardware trigger mode, outputs are turned on by the run button
-            # TODO Check queue config
             if not self.isHardwareTrig(options):
-                for ch in range(self.nCh):
-                    self.AWG.AWGqueueConfig(self.getHwCh(ch), 1)
                 self.AWG.AWGstartMultiple(self.getEnabledChannelsMask())
         return value
 
@@ -239,21 +229,19 @@ class Driver(LabberDriver):
                             mask += 2**ch
         return int(mask)
 
-    def sendWaveform(self, ch, i, loop=False):
+    def sendWaveform(self, ch, i):
         """Send waveform to AWG channel"""
 
         trigMode = int(self.getChannelCmd(ch, 'Trig mode'))
         delay = int(0)
 
-        if not loop:
-            if self.getChannelValue(ch, 'Trig mode') in ('Software',
-                                                         'External'):
-                cycles = int(self.getChannelValue(ch, 'Cycles'))
-            else:
-                cycles = 0
+       
+        if self.getChannelValue(ch, 'Trig mode') in ('Software',
+                                                     'External'):
+            cycles = int(self.getChannelValue(ch, 'Cycles'))
         else:
-            # Ignore cycle setting if hardware looping
             cycles = 1
+
         prescaler = 0
         waveformType = 0
         quant = self.getQuantity('Ch%d - Waveform' % (ch+1))
@@ -266,11 +254,11 @@ class Driver(LabberDriver):
         dataNorm = data / amp
         dataNorm = np.clip(dataNorm, -1.0, 1.0, out=dataNorm)
 
-        self.uploadWaveform(ch, dataNorm, waveformType, i)
+        self.uploadWaveform(dataNorm, waveformType, i)
         self.AWG.AWGqueueWaveform(self.getHwCh(ch), i, trigMode, delay,
                                   cycles, prescaler)
 
-    def uploadWaveform(self, ch, data, waveformType, i):
+    def uploadWaveform(self, data, waveformType, i):
         """ Uploads the given waveform with an id i """
         wave = keysightSD1.SD_Wave()
         wave.newFromArrayDouble(waveformType, data)
