@@ -152,12 +152,17 @@ class Readout(object):
         """
         # get parameters
         frequency = self.frequencies[n] - self.freq_offset
-        n_segment = self.n_records
+        n_segment = int(self.n_records)
         # get input data from dict, with keys {'y': value, 't0': t0, 'dt': dt}
         if signal is None:
             return np.zeros(n_segment, dtype=complex)
         vY = signal['y']
         dt = signal['dt']
+        # get shape of input data
+        shape = signal.get('shape', vY.shape)
+        # override segment parameter if input data has more than one dimension
+        if len(shape) > 1:
+            n_segment = shape[0]
         # avoid exceptions if no time step is given
         if dt == 0:
             dt = 1.0
@@ -218,7 +223,7 @@ class Readout(object):
         """
         # get parameters
         frequency = self.frequencies[n] - self.freq_offset
-        n_segment = self.n_records
+        n_segment = int(self.n_records)
         # get input data from dict, with keys {'y': value, 't0': t0, 'dt': dt}
         if signal_i is None or signal_q is None:
             return np.zeros(n_segment, dtype=complex)
@@ -227,6 +232,10 @@ class Readout(object):
         if vI.shape != vQ.shape:
             raise ValueError('I and Q must have the same shape.')
 
+        # override segment parameter if input data has more than one dimension
+        shape = signal_i.get('shape', vI.shape)
+        if len(shape) > 1:
+            n_segment = shape[0]
         dt = signal_i['dt']
         # avoid exceptions if no time step is given
         if dt == 0:
