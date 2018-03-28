@@ -204,9 +204,10 @@ class AlazarTechDigitizer():
 
 
     #RETURN_CODE AlazarSetRecordCount( HANDLE h, U32 Count);
-    def AlazarSetRecordCount(self, Count):
-        self.nRecord = int(Count)
-        self.callFunc('AlazarSetRecordCount', self.handle, U32(Count))
+    def AlazarSetRecordCount(self, nRecord, nAverage):
+        self.nRecord = int(nRecord)
+        self.nAverage = int(nAverage)
+        self.callFunc('AlazarSetRecordCount', self.handle, U32(nRecord*nAverage))
 
 
     #RETURN_CODE AlazarStartCapture( HANDLE h);
@@ -500,16 +501,17 @@ class AlazarTechDigitizer():
         codeRange = 2 ** (float(bitsPerSample) - 1) - 0.5
         voltScale = self.dRange[Channel] /codeRange
         # initialize a scaled float vector
-        vData = np.zeros(samplesPerRecord, dtype=float)
+        vData = np.zeros(samplesPerRecord*self.nRecord, dtype=float)
         for n1 in range(self.nRecord):
-            self.AlazarRead(Channel, dataBuffer, bytesPerSample, n1+1,
-                            -self.nPreSize, samplesPerRecord)
-            # convert and scale to float
-            vBuffer = voltScale * ((np.array(dataBuffer[:samplesPerRecord]) - codeZero))
-            # add to output vector
-            vData += vBuffer
+            for n2 in range(self.nAverage):
+                self.AlazarRead(Channel, dataBuffer, bytesPerSample, n2+n2*n1+1,
+                                -self.nPreSize, samplesPerRecord)
+                # convert and scale to float
+                vBuffer = voltScale * ((np.array(dataBuffer[:samplesPerRecord]) - codeZero))
+                # add to output vector
+                vData[n1*samplesPerRecord:(n1+1)*samplesPerRecord] += vBuffer
         # normalize
-        vData /= float(self.nRecord)
+        vData /= float(self.nAverage)
         return vData
 
 

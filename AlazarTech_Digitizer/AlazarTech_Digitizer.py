@@ -289,7 +289,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             return
         
         self.dig.AlazarSetRecordSize(nPreSize, nPostSize)
-        self.dig.AlazarSetRecordCount(nRecord*nAverage)
+        self.dig.AlazarSetRecordCount(nRecord, nAverage)
         # start aquisition
         self.dig.AlazarStartCapture()
         nTry = self.dComCfg['Timeout']/0.05
