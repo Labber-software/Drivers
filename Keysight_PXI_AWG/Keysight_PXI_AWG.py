@@ -98,7 +98,7 @@ class Driver(LabberDriver):
         if self.isFirstCall(options):
             self.lWaveUpdated = [False]*self.nCh
             # Stop all channels
-            self.log('Stop all')
+            self.log('First call, stop all')
             self.AWG.AWGstopMultiple(int(2**self.nCh - 1))
         # start with setting current quant value
         quant.setValue(value)
@@ -113,10 +113,6 @@ class Driver(LabberDriver):
             # get direction and sync from index of comboboxes
             direction = int(self.getCmdStringFromValue('Trig I/O'))
             self.AWG.triggerIOconfig(direction)
-        elif quant.name == 'Trig All':
-            # mask to trig all AWG channels
-            nMask = int(2**self.nCh - 1)
-            self.AWG.AWGtriggerMultiple(nMask)
         elif quant.name == 'Run':
             self.AWG.AWGstartMultiple(self.getEnabledChannelsMask())
         elif quant.name in ('Generate internal trigger',
@@ -152,43 +148,40 @@ class Driver(LabberDriver):
             self.AWG.channelPhase(self.getHwCh(ch), value)
         elif name == 'Offset':
             self.AWG.channelOffset(self.getHwCh(ch), value)
-        elif name == 'Trig':
-            self.AWG.AWGtrigger(self.getHwCh(ch))
         elif name in ('Trig mode', 'Cycles', 'Waveform'):
-            # mark wavefom as updated
+            # mark wavefom as updated, so that it gets re-uploaded
             self.lWaveUpdated[ch] = True
         elif name in ('External Trig Source', 'External Trig Config'):
             sync = int(self.getCmdStringFromValue('Trig Sync Mode'))
             for ch in range(self.nCh):
                 # check if external trigger is used
-                if self.getChannelValue(ch, 'Trig mode') in \
-                    ('External', 'Software',
-                     'External (per cycle)', 'Software (per cycle)'):
+                if self.getChannelValue(ch, 'Trig mode') in ('External', 'Software'):
                     extSource = int(self.getChannelCmd(ch, 'External Trig Source'))
                     trigBehavior = int(self.getChannelCmd(ch, 'External Trig Config'))
                     self.AWG.AWGtriggerExternalConfig(self.getHwCh(ch),
                                                       extSource,
-                                                      trigBehavior, sync)
-        # if final call and wave is updated, send it to AWG
+                                                      trigBehavior,
+                                                      sync)
+        # For effiency, we only upload the waveform at the final call
         if self.isFinalCall(options):
-            (seq_no, n_seq) = self.getHardwareLoopIndex(options)
+            seq_no, n_seq = self.getHardwareLoopIndex(options)
             if np.any(self.lWaveUpdated):
                 # Reset waveform ID counter if this is the first sequence
                 if seq_no == 0:
                     self.i = 1  # WaveformID counter
 
-            for n, updated in enumerate(self.lWaveUpdated):
+            for ch, updated in enumerate(self.lWaveUpdated):
                 if updated:
                     if seq_no == 0:
                         # Flush the AWG memory if this is the first sequence
-                        self.log("Flush")
-                        self.AWG.AWGflush(self.getHwCh(n))
-                    # Send the waveform to the AWG
+                        self.AWG.AWGflush(self.getHwCh(ch))
                     if self.isHardwareLoop(options):
                         self.reportStatus('Sending waveform (%d/%d)'
                                           % (seq_no+1, n_seq))
-                    self.sendWaveform(n, self.i)
+                    self.sendWaveform(ch, self.i)
+                    self.log('Sent waveform {} to channel {}'.format(self.i, ch))
                     self.i += 1
+
 
             # Configure channel specific markers
             for ch in range(self.nCh):
@@ -217,6 +210,12 @@ class Driver(LabberDriver):
             if not self.isHardwareTrig(options):
                 self.AWG.AWGstartMultiple(self.getEnabledChannelsMask())
         return value
+
+    def performArm(self, quant_names, options={}):
+        """Perform the instrument arm operation"""
+        self.log('Arm, stop all')
+        # Stop all channels
+        self.AWG.AWGstopMultiple(int(2**self.nCh - 1))
 
     def getEnabledChannelsMask(self):
         """ Returns a mask for the enabled channels """
