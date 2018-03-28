@@ -51,13 +51,17 @@ class Driver(InstrumentDriver.InstrumentWorker):
         dFreq = self.getValue('Modulation frequency')
         skipStart = self.getValue('Skip start')
         nSegment = int(self.getValue('Number of segments'))
-        # nSegment = 1
         # get input data from dict, with keys {'y': value, 't0': t0, 'dt': dt}
         traceIn = self.getValue('Input data')
         if traceIn is None:
             return complex(0.0)
         vY = traceIn['y']     
         dt = traceIn['dt']
+        # get shape of input data
+        shape = traceIn.get('shape', vY.shape)
+        # override segment parameter if input data has more than one dimension
+        if len(shape) > 1:
+            nSegment = shape[0]
         # avoid exceptions if no time step is given
         if dt==0:
             dt = 1.0
@@ -98,13 +102,17 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # get parameters
         skipStart = self.getValue('Skip start')
         nSegment = int(self.getValue('Number of segments'))
-#        nSegment = 1
         # get input data from dict, with keys {'y': value, 't0': t0, 'dt': dt}
         traceIn = self.getValue('Input data')
         if traceIn is None:
             return complex(0.0)
         vY = traceIn['y']     
         dt = traceIn['dt']
+        # get shape of input data
+        shape = traceIn.get('shape', vY.shape)
+        # override segment parameter if input data has more than one dimension
+        if len(shape) > 1:
+            nSegment = shape[0]
         # avoid exceptions if no time step is given
         if dt==0:
             dt = 1.0
