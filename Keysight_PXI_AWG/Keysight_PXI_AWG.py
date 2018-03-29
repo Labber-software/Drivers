@@ -245,9 +245,9 @@ class Driver(LabberDriver):
         waveformType = 0
         quant = self.getQuantity('Ch%d - Waveform' % (ch+1))
         data = quant.getValueArray()
-        # make sure we have at least 256 elements (limit might be 236)
-        if len(data) < 256:
-            data = np.pad(data, (0, 256-len(data)), 'constant')
+        # make sure we have at least 30 elements
+        if len(data) < 30:
+            data = np.pad(data, (0, 30-len(data)), 'constant')
         # granularity of the awg is 10
         data = np.pad(data, (0, 10-(len(data) % 10)), 'constant')
         # scale to range
