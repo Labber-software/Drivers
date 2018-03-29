@@ -504,8 +504,9 @@ class AlazarTechDigitizer():
         vData = np.zeros(samplesPerRecord*self.nRecord, dtype=float)
         for n1 in range(self.nRecord):
             for n2 in range(self.nAverage):
-                self.AlazarRead(Channel, dataBuffer, bytesPerSample, n2+n2*n1+1,
-                                -self.nPreSize, samplesPerRecord)
+                self.AlazarRead(Channel, dataBuffer, bytesPerSample,
+                                n2+self.nAverage*n1+1, -self.nPreSize,
+                                samplesPerRecord)
                 # convert and scale to float
                 vBuffer = voltScale * ((np.array(dataBuffer[:samplesPerRecord]) - codeZero))
                 # add to output vector
