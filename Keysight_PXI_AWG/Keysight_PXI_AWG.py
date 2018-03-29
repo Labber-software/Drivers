@@ -248,6 +248,8 @@ class Driver(LabberDriver):
         # make sure we have at least 256 elements (limit might be 236)
         if len(data) < 256:
             data = np.pad(data, (0, 256-len(data)), 'constant')
+        # granularity of the awg is 10
+        data = np.pad(data, (0, 10-(len(data) % 10)), 'constant')
         # scale to range
         amp = self.getChannelValue(ch, 'Amplitude')
         dataNorm = data / amp
