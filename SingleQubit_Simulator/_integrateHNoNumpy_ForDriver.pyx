@@ -60,6 +60,9 @@ def integrateHy(np.ndarray[double, ndim=1] vStart, np.ndarray[double, ndim=1] vT
     cdef np.ndarray[double, ndim=1] vAngle = 2*np.pi*vEnergy*vDTime
     cdef np.ndarray[double, ndim=1] vCos = np.cos(vAngle)
     cdef np.ndarray[double, ndim=1] vSinEn = np.sin(vAngle)/vEnergy
+    # take care of sin(x)/x division by zero
+    nan_indx = np.isnan(vSinEn)
+    vSinEn[nan_indx] = 2 * np.pi * vDTime[nan_indx]
 
     # apply hamiltonian N times
     for n1 in range(len(vDTime)):

@@ -195,10 +195,13 @@ class QubitSimulator():
         # get time steps
         vDTime = np.diff(vTime)
         # precalc vectors
-        vEnergy = 0.5*np.sqrt(vDelta**2 + vDetuning**2 + vY**2)
-        vAngle = 2*np.pi*vEnergy[0:-1]*vDTime
+        vEnergy = 0.5 * np.sqrt(vDelta[:-1]**2 + vDetuning[:-1]**2 + vY[:-1]**2)
+        vAngle = 2*np.pi*vEnergy*vDTime
         vCos = np.cos(vAngle)
-        vSin = np.sin(vAngle)
+        vSinEn = np.sin(vAngle) / vEnergy
+        # take care of sin(x)/x division by zero
+        nan_indx = np.isnan(vSinEn)
+        vSinEn[nan_indx] = 2 * np.pi * vDTime[nan_indx]
         # pre-define matrices
         mIdentity = np.eye(2)
         mSx = np.array([[0.,1.],[1.,0.]], dtype='complex128')
@@ -209,7 +212,7 @@ class QubitSimulator():
            # define hamiltonian
            H = -0.5 * (mSx*vDelta[n1] + mSz*vDetuning[n1] + mSy*vY[n1])
            # define time-evolution operator
-           U = mIdentity * vCos[n1] - 1j*H*vSin[n1]/vEnergy[n1]
+           U = mIdentity * vCos[n1] - 1j*H*vSinEn[n1]
            # calculate next state
            mState[:,n1+1] = np.dot(U,mState[:,n1])
         # reshape data to reduce vector size
@@ -373,9 +376,10 @@ class QubitSimulator():
                 # new frame, refer to drive frequency
                 vDetuning = np.sqrt(vDetuning**2 + vDelta**2) - dDriveFreq
                 mState = integrateHy(vStart, vTime, np.real(vDrive), vDetuning, 
-                    np.imag(vDrive), nReshape)
+                                     -np.imag(vDrive), nReshape)
                 # mState = self.integrateH(vStart, vTime, np.real(vDrive), vDetuning, 
                 #     np.imag(vDrive), nReshape)
+
             else:
                 # two different methonds depending if using Y-drive or not
                 if self.bDriveCharge:
@@ -405,6 +409,7 @@ class QubitSimulator():
             mStateEig = np.dot(mRotY,mState)
             self.mPy[n1,:] = np.real(mStateEig[1,:]*np.conj(mStateEig[1,:]))
             vPy += self.mPy[n1,:]
+
         # divide to get average
         vP1 = vP1/nRep
         vPx = vPx/nRep
