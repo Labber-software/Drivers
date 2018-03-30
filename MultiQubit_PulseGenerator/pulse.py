@@ -9,6 +9,7 @@ class PulseShape(Enum):
     SQUARE = 'Square'
     RAMP = 'Ramp'
     CZ = 'CZ'
+    COSINE = 'Cosine'
 
 class Pulse(object):
     """This class represents a pulse for qubit rotations.
@@ -87,6 +88,8 @@ class Pulse(object):
             duration = self.truncation_range * self.width + self.plateau
         elif self.shape == PulseShape.CZ:
             duration = self.width + self.plateau
+        elif self.shape == PulseShape.COSINE:
+            duration = self.width
         return duration
 
 
@@ -206,6 +209,10 @@ class Pulse(object):
 
             # Going from frequency to voltage assuming a linear dependence. Should be improved in the future.
             values = (self.Coupling/np.tan(theta_t))/self.dfdV - (self.Coupling/np.tan(theta_i))/self.dfdV
+
+        elif self.shape == PulseShape.COSINE:
+            tau = self.width
+            values = self.amplitude/2*(1-np.cos(2*np.pi*(t-t0+tau/2)/tau))
 
         # return pulse envelope
         return values
