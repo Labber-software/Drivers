@@ -213,6 +213,10 @@ class Pulse(object):
         elif self.shape == PulseShape.COSINE:
             tau = self.width
             values = self.amplitude/2*(1-np.cos(2*np.pi*(t-t0+tau/2)/tau))
+            # Some rounding error in the number of sample can occur
+            # so make sure that any points outside the cosine is 0
+            values[t<(t0-tau/2)] = 0
+            values[t>(t0+tau/2)] = 0
 
         # return pulse envelope
         return values

@@ -46,14 +46,14 @@ class CPMG(Sequence):
         else:
             truncation = 0.0
         # center pulses in add_gates mode; ensure sufficient pulse spacing in CPMG mode
-        t0 = self.first_delay + (self.pulses_1qb[0].width*2*truncation + self.pulses_1qb[0].plateau)*0.5
+        t0 = self.first_delay + self.pulses_1qb[0].total_duration()/2
         # select type of refocusing pi pulse
         gate_pi = Gate.Yp if pi_to_q else Gate.Xp
 
         # add pulses for all active qubits
         for n, pulse in enumerate(self.pulses_1qb[:self.n_qubit]):
             # get effective pulse durations, for timing purposes
-            width = (2*truncation*pulse.width + pulse.plateau) if edge_to_edge else 0.0
+            width = self.pulses_1qb[0].total_duration() if edge_to_edge else 0.0
             pulse_total = width * (n_pulse + 1)
 
             # special case for -1 pulses => T1 experiment
