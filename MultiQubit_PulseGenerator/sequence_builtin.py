@@ -160,7 +160,7 @@ class VZ(Sequence):
         """Generate sequence by adding gates/pulses to waveforms"""
         # get parameters
         duration = config['Sequence duration']
-        z_phase = config['Z Phase']*np.pi/180
+        z_angle = config['Z Phase']*np.pi/180
         edge_to_edge = config['Edge-to-edge pulses']
         self.virtual_z_gates = []
 
@@ -169,9 +169,8 @@ class VZ(Sequence):
             t0 = self.first_delay + self.pulses_1qb[n].total_duration()/2
             self.add_single_gate(n, Gate.X2p, t0)
 
-            vz = Pulse(shape=PulseShape.VZ, phase=z_phase)
+            vz = Pulse(shape=PulseShape.VZ, amplitude=z_angle)
             self.add_single_pulse(n, vz, t0+(duration+width)/2)
-            
             self.add_single_gate(n, Gate.X2p, t0+duration+width)
 
 

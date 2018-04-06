@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
 from enum import Enum
-
+# TODO Add gating here.
 
 class PulseShape(Enum):
     """Define possible qubit pulses shapes"""
