@@ -3,9 +3,9 @@ import numpy as np
 from copy import copy
 from sequence import Sequence
 from gates import Gate
-from pulse import PulseShape
+from pulse import PulseShape, Pulse
 
-# add logger, to allow logging to Labber's instrument log 
+# add logger, to allow logging to Labber's instrument log
 import logging
 log = logging.getLogger('LabberDriver')
 
@@ -127,15 +127,15 @@ class CZgates(Sequence):
         n_pulse = int(config['# of pulses, CZgates'])
 
         # create list with gates
-        gates = []        
+        gates = []
         for n in range(n_pulse):
             gate = Gate.CPh
-            # create list with same gate for all active qubits 
+            # create list with same gate for all active qubits
             gate_qubits = [gate for q in range(self.n_qubit)]
             # append to list of gates
             gates.append(gate_qubits)
 
-        # add list of gates to sequence 
+        # add list of gates to sequence
         self.add_gates(gates)
 
 
@@ -144,7 +144,7 @@ class CZecho(Sequence):
 
     def generate_sequence(self, config):
         """Generate sequence by adding gates/pulses to waveforms"""
-        
+
         # create list with gates
         self.add_single_gate(0, Gate.X2p, self.first_delay + self.period_1qb/2)
         self.add_single_gate(0, Gate.CPh, self.first_delay + self.period_1qb + self.period_2qb/2)
@@ -155,11 +155,25 @@ class CZecho(Sequence):
         self.add_single_gate(1, Gate.Xp, self.first_delay + 9*self.period_1qb/2 + 2*self.period_2qb)
 
 
+class VZ(Sequence):
+    def generate_sequence(self, config):
+        """Generate sequence by adding gates/pulses to waveforms"""
+        # get parameters
+        duration = config['Sequence duration']
+        z_phase = config['Z Phase']*np.pi/180
+        edge_to_edge = config['Edge-to-edge pulses']
+        self.virtual_z_gates = []
+
+        for n in range(self.n_qubit):
+            width = self.pulses_1qb[n].total_duration() if edge_to_edge else 0.0
+            t0 = self.first_delay + self.pulses_1qb[n].total_duration()/2
+            self.add_single_gate(n, Gate.X2p, t0)
+
+            vz = Pulse(shape=PulseShape.VZ, phase=z_phase)
+            self.add_single_pulse(n, vz, t0+(duration+width)/2)
+            
+            self.add_single_gate(n, Gate.X2p, t0+duration+width)
+
+
 if __name__ == '__main__':
     pass
-
-
-
-
-
-

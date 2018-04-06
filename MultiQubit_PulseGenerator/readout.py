@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import numpy as np
-
+from pulse import PulseShape, Pulse
 
 class Readout(object):
     """This class is used to generate and demodulate multi-tone qubit readout
@@ -11,12 +11,11 @@ class Readout(object):
         # define variables
         self.max_qubit = max_qubit
         self.n_readout = max_qubit
-        self.frequencies = np.zeros(self.max_qubit)
-        self.amplitudes = np.zeros(self.max_qubit)
-        self.duration = 0.0
         self.sample_rate = 1E9
+        self.n_pts = 1000
         self.match_main_size = False
         self.distribute_phases = False
+        self.frequencies = np.zeros(self.max_qubit)
         # predistortion
         self.predistort = False
         self.measured_rise = np.zeros(self.max_qubit)
@@ -42,20 +41,12 @@ class Readout(object):
             Configuration as defined by Labber driver configuration window
 
         """
-        # get frequencies and amplitudes
-        for n in range(self.max_qubit):
-            self.frequencies[n] = config.get('Readout frequency #%d' % (n + 1))
-            if config.get('Uniform readout amplitude') is True:
-                self.amplitudes[n] = config.get('Readout amplitude')
-            else:
-                self.amplitudes[n] = config.get('Readout amplitude #%d' % (n + 1))
 
         # get other parameters
-        self.duration = config.get('Readout duration')
-        self.sample_rate = config.get('Sample rate')
         self.n_readout = int(config.get('Number of readout tones'))
         self.match_main_size = config.get('Match main sequence waveform size')
         self.distribute_phases = config.get('Distribute readout phases')
+        self.n_pts = int(config.get('Number of points'))
         # predistortion
         self.predistort = config.get('Predistort readout waveform')
         if self.predistort:
@@ -65,6 +56,8 @@ class Readout(object):
                 self.measured_rise[n] = 1.0 / (2 * np.pi * linewidth)
                 self.target_rise[n] = config.get('Target rise time')
         # demodulation
+        for n in range(self.max_qubit):
+            self.frequencies[n] = config.get('Readout frequency #%d' % (n+1))
         self.demod_skip = config.get('Demodulation - Skip')
         self.demod_length = config.get('Demodulation - Length')
         self.freq_offset = config.get('Demodulation - Frequency offset')
@@ -88,24 +81,38 @@ class Readout(object):
             Complex waveforms with I/Q signal for qubit reaodut
 
         """
-        # create time and output waveform
-        n_pts = int(self.duration * self.sample_rate)
-        t = np.arange(n_pts, dtype=float) / self.sample_rate
-        waveform = np.zeros_like(t, dtype=complex)
 
-        # add readout for all waveforms
         for n in range(self.n_readout):
+            pulse = self.pulses_readout[n]
+
+            duration = pulse.total_duration()
+            # Pulse is referenced to center of oulse
+            t0 = t_start + duration / 2
+            # get the range of indices in use
+            indices = np.arange(
+                max(np.floor(t_start*self.sample_rate), 0),
+                min(np.ceil((t_start+duration)*self.sample_rate), self.n_pts),
+                dtype=int
+            )
+            # return directly if no indices
+            if len(indices) == 0:
+                continue
+
+            # calculate time values for the pulse indices
+            t = indices / self.sample_rate
+            # calculate the pulse envelope for the selected indices
+            y = pulse.calculate_envelope(t0, t)
+            waveform = np.zeros_like(t, dtype=complex)
+
+
             # get parameters
-            a = self.amplitudes[n]
-            omega = 2 * np.pi * self.frequencies[n]
+            omega = 2 * np.pi * pulse.frequency
             if self.distribute_phases:
                 # phi = 2 * np.pi * n / self.n_readout
                 # phi = 2 * np.pi * np.random.rand()
-                phi = self.phases[n]
+                phi = self.phases[n] + pulse.phase
             else:
-                phi = 0.0
-            # create square baseband waveform
-            y = np.ones_like(t, dtype=complex)
+                phi = pulse.phase
             # apply pre-distortion
             if self.predistort:
                 # add inverted exponential
@@ -114,15 +121,16 @@ class Readout(object):
 
             # remove phase drift due to LO-RF difference
             phi -= 2 * np.pi * self.freq_offset * t_start
+
             # add IQ skew
             phi_s = self.iq_skew
 
             # apply SSBM transform
-            waveform += a * (y.real * np.cos(omega * t - phi) +
-                             -y.imag * np.cos(omega * t - phi + np.pi / 2))
-            waveform += a * 1j * (y.real * np.sin(omega * t - phi + phi_s) +
-                                  -y.imag * np.sin(omega * t - phi + np.pi / 2
-                                                   + phi_s))
+            waveform += (y.real * np.cos(omega * t - phi) +
+                        -y.imag * np.cos(omega * t - phi + np.pi / 2))
+            waveform += 1j * (y.real * np.sin(omega * t - phi + phi_s) +
+                             -y.imag * np.sin(omega * t - phi + np.pi / 2
+                                              + phi_s))
 
         # apply SSBM transform
         if self.iq_ratio != 1.0:
