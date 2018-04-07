@@ -19,9 +19,6 @@ log = logging.getLogger('LabberDriver')
 MAX_QUBIT = 9
 # TODO (simon): Update two-qubit pulse to include phase correction,
 # compensation pulses to neighboring qubits, etc.
-# TODO (Andreas): Create a gate list class. Sequence?
-# TODO allow dt<0?
-
 
 class Sequence(object):
     """This class represents a multi-qubit control sequence
@@ -234,19 +231,13 @@ class Sequence(object):
                     Waveform for readout IQ control
 
         """
-        # start by initializing the waveforms
         self.init_waveforms()
-
-        # generate sequence
         self.generate_sequence(config)
-
-        # add tomography
-        self.add_tomography_pulses()
-        # read-out signals
-        self.generate_readout()
-
+        self.add_tomography()
+        self.add_readout()
         self.perform_virtual_z()
         self.generate_waveforms()
+
 
         # collapse all xy pulses to one waveform if no local XY control
         if not self.local_xy:
@@ -256,7 +247,6 @@ class Sequence(object):
             for n in range(1, self.n_qubits):
                 self.wave_xy[n][:] = 0.0
 
-        # cross-talk compensation
         self.perform_crosstalk_compensation()
 
         # trim waveforms, if wanted
@@ -446,7 +436,7 @@ class Sequence(object):
             self.time_pulse += period
 
 
-    def add_tomography_pulses(self):
+    def add_tomography(self):
         """Add tomography pulses at the end of the qubit xy waveforms.
 
         """
@@ -487,7 +477,7 @@ class Sequence(object):
                         subsequent_gate_dict['gate'] = subsequent_gate_dict['gate'].add_phase(gate.angle)
 
 
-    def generate_readout(self):
+    def add_readout(self):
         """Create read-out trig and waveform signals at the end of the sequence
 
         """
@@ -755,6 +745,8 @@ class Sequence(object):
         self.readout.set_parameters(config)
 
         # get readout pulse parameters
+        phases = 2 * np.pi * np.array([0.8847060, 0.2043214, 0.9426104,
+            0.6947334, 0.8752361, 0.2246747, 0.6503154, 0.7305004, 0.1309068])
         for n, pulse in enumerate(self.pulses_readout):
             # pulses are indexed from 1 in Labber
             m = n + 1
@@ -763,6 +755,7 @@ class Sequence(object):
             pulse.start_at_zero = config.get('Readout start at zero')
             pulse.iq_skew = config.get('Readout IQ skew')*np.pi/180
             pulse.iq_ratio = config.get('Readout I/Q ratio')
+            pulse.phase = phases[n]
 
             # if config.get('Uniform pulse shape'):
             #     pulse.width = config.get('Width')

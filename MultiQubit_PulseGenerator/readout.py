@@ -13,18 +13,13 @@ class Readout(object):
         self.n_readout = max_qubit
         self.sample_rate = 1E9
         self.n_pts = 1000
-        self.match_main_size = False
-        self.distribute_phases = False
         self.frequencies = np.zeros(self.max_qubit)
         # TODO this needs to move
         # predistortion
         self.predistort = False
         self.measured_rise = np.zeros(self.max_qubit)
         self.target_rise = np.zeros(self.max_qubit)
-        # quasi-random phases
-        # self.phases = 2 * np.pi * np.random.rand(max_qubit)
-        self.phases = 2 * np.pi * np.array([0.8847060, 0.2043214, 0.9426104,
-            0.6947334, 0.8752361, 0.2246747, 0.6503154, 0.7305004, 0.1309068])
+
         # demodulation
         self.demod_skip = 0.0
         self.demod_length = 1.0E-6
