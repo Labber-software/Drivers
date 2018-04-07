@@ -10,7 +10,6 @@ class PulseShape(Enum):
     RAMP = 'Ramp'
     CZ = 'CZ'
     COSINE = 'Cosine'
-    VZ = 'VZ'
 
 
 class PulseType(Enum):
@@ -40,7 +39,7 @@ class Pulse(object):
     phase : float
         Pulse phase, in radians.
 
-    shape : enum, {'Gaussian', 'Square', 'Ramp', 'CZ', 'Cosine', 'VZ'}
+    shape : enum, {'Gaussian', 'Square', 'Ramp', 'CZ', 'Cosine'}
         Pulse shape.
 
     use_drag : bool
@@ -52,21 +51,24 @@ class Pulse(object):
     truncation_range : float
         Truncation range, measured in units of the `width` parameter.
 
+    pulse_type : enum, {'XY', 'Z', 'Readout'}
+        What type of waveform the pulse is used for.
+
     start_at_zero : bool
         If True, forces the pulse to start at zero amplitude
 
-    z_pulse : bool
-        If True, the pulse will be used for qubit Z control.
-
-    readout_pulse : bool
-        If True, pulse will be used for qubit readout.
+    gated : bool
+        If True, generates a gate for the pulse. Can also be used as a trig.
 
     """
 
-    def __init__(self,F_Terms=1,Coupling=20E6,Offset=300E6,Lcoeff = np.array([0.3]),dfdV=0.5E9,period_2qb=50E-9, amplitude=0.5, width=10E-9, plateau=0.0,
+    def __init__(self,F_Terms=1,Coupling=20E6,Offset=300E6,
+                 Lcoeff = np.array([0.3]),dfdV=0.5E9,period_2qb=50E-9,
+                 amplitude=0.5, width=10E-9, plateau=0.0,
                  frequency=0.0, phase=0.0, shape=PulseShape.GAUSSIAN,
                  use_drag=False, drag_coefficient=0.0, truncation_range=5.0,
-                 pulse_type=PulseType.XY, start_at_zero=False):
+                 pulse_type=PulseType.XY, start_at_zero=False, gated=False,
+                 gate_delay=0, gate_amplitude=1, gate_duration=None):
         # set variables
         self.amplitude = amplitude
         self.width = width
@@ -80,7 +82,16 @@ class Pulse(object):
         self.start_at_zero = start_at_zero
         self.pulse_type = pulse_type
 
-        # For 2-qubit gates
+        # For gating of the pulse
+        self.gated = gated
+        self.gate_delay = gate_delay
+        self.gate_amplitude = gate_amplitude
+        if gate_duration is None:
+            self.gate_duration = self.total_duration()
+        else:
+            self.gate_duration = gate_duration
+
+        # For CZ pulses
         self.F_Terms = F_Terms
         self.Coupling = Coupling
         self.Offset = Offset
@@ -101,8 +112,6 @@ class Pulse(object):
             duration = self.width + self.plateau
         elif self.shape == PulseShape.COSINE:
             duration = self.width
-        elif self.shape == PulseShape.VZ:
-            duration = 0
         return duration
 
 
@@ -286,11 +295,13 @@ class Pulse(object):
             Array containing pulse gate.
 
         """
+        if not self.gated:
+            raise ValueError('Waveform is not defined as gated.')
         y = np.zeros_like(t)
         dt = t[1]-t[0]
-        start = np.ceil((t0-self.total_duration()/2)/dt)
-        stop = np.floor((t0+self.total_duration()/2)/dt)
-        y[start:stop] = 1
+        start = np.ceil((t0-self.total_duration()/2+self.gate_delay)/dt)
+        stop = start + np.floor(self.gate_duration/dt)
+        y[start:stop] = self.gate_amplitude
         return y
 
 

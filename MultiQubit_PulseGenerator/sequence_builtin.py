@@ -2,7 +2,7 @@
 import numpy as np
 from copy import copy
 from sequence import Sequence
-from gates import Gate
+from gates import Gate, VirtualZGate
 from pulse import PulseShape, Pulse
 
 # add logger, to allow logging to Labber's instrument log
@@ -20,13 +20,7 @@ class Rabi(Sequence):
         uniform_amplitude = config['Uniform pulse ampiltude for all qubits']
         # just add pi-pulses for the number of available qubits
         for n in range(self.n_qubit):
-            # get pulse to use
-            pulse = self.pulses_1qb[n]
-            # if using uniform amplitude, copy from pulse 1
-            if uniform_amplitude:
-                pulse.amplitude = self.pulses_1qb[0].amplitude
-            # add pulse to sequence
-            self.add_single_pulse(n, pulse, self.first_delay, align_left=True)
+            self.add_single_gate(n, Gate.Xp, self.first_delay, align_left=True)
 
 
 
@@ -40,11 +34,6 @@ class CPMG(Sequence):
         pi_to_q = config['Add pi pulses to Q']
         duration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
-        if self.pulses_1qb[0].shape == PulseShape.GAUSSIAN:
-            # Only gaussian pulses has a truncation range
-            truncation = config['Truncation range']
-        else:
-            truncation = 0.0
 
         max_width = np.max([p.total_duration() for p in self.pulses_1qb[:self.n_qubit]])
         # select type of refocusing pi pulse
@@ -64,10 +53,9 @@ class CPMG(Sequence):
             if n_pulse < 0:
                 # add pi pulse
                 self.add_single_gate(n, Gate.Xp, t0)
-                # delay the reaodut by creating a very small pulse
-                small_pulse = copy(pulse)
-                small_pulse.amplitude = 1E-6 * pulse.amplitude
-                self.add_single_pulse(n, small_pulse, t0 + duration)
+                # delay the reaodut by creating VZ gate with 0 angle
+                vz = VirtualZGate(angle=0)
+                self.add_single_gate(n, vz, t0 + duration)
                 continue
 
             # add the first and last pi/2 pulses
@@ -88,9 +76,6 @@ class CPMG(Sequence):
             # add pi pulses, one by one
             for t in time_pi:
                 self.add_single_gate(n, gate_pi, t)
-
-
-
 
 
 class PulseTrain(Sequence):
@@ -167,11 +152,13 @@ class VZ(Sequence):
         for n in range(self.n_qubit):
             width = self.pulses_1qb[n].total_duration() if edge_to_edge else 0.0
             t0 = self.first_delay + self.pulses_1qb[n].total_duration()/2
+
             self.add_single_gate(n, Gate.X2p, t0)
 
-            vz = Pulse(shape=PulseShape.VZ, amplitude=z_angle)
-            self.add_single_pulse(n, vz, t0+(duration+width)/2)
+            vz = VirtualZGate(angle=z_angle)
+            self.add_single_gate(n, vz, t0+(duration+width)/2)
             self.add_single_gate(n, Gate.X2p, t0+duration+width)
+
 
 
 if __name__ == '__main__':

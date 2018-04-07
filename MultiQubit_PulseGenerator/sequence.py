@@ -6,7 +6,7 @@ from pulse import PulseShape, Pulse, PulseType
 from predistortion import Predistortion
 from crosstalk import Crosstalk
 from readout import Readout
-from gates import Gate, ONE_QUBIT_GATES, TWO_QUBIT_GATES, BaseGate
+from gates import *
 from tomography import Tomography
 from enum import Enum
 
@@ -175,6 +175,9 @@ class Sequence(object):
             self.wave_gate[n] = np.zeros(self.n_pts, dtype=float)
             self.qubit_sequences[n] = []
 
+        # Universal time vector
+        self.t = np.arange(self.n_pts)/self.sample_rate
+
         # readout trig
         pts = self.n_pts if self.readout_trig_generate else 0
         self.readout_trig = np.zeros(pts, dtype=float)
@@ -238,8 +241,14 @@ class Sequence(object):
         self.add_tomography_pulses()
         # read-out signals
         self.generate_readout()
-        self.perform_virtual_z()
 
+        # sort the gates on t0. This makes it easier to do the VZ gates
+        for n in range(self.n_qubit):
+            temp = [(dict_['t0'], dict_) for dict_ in self.qubit_sequences[n]]
+            temp.sort()
+            self.qubit_sequences[n] = [dict_ for (key, dict_) in temp]
+
+        self.perform_virtual_z()
         self.generate_waveforms()
 
         # collapse all xy pulses to one waveform if no local XY control
@@ -274,22 +283,35 @@ class Sequence(object):
     def generate_waveforms(self):
         for n in range(self.n_qubit):
             for gate_dict in self.qubit_sequences[n]:
-                pulse = gate_dict.get('pulse', self.pulses_1qb[n])
+                pulse = gate_dict.get('pulse', None)
                 gate = gate_dict['gate']
                 t0 = gate_dict['t0']
+
                 # Virtual Z gate is special since it doesn't have a waveform
-                if pulse.shape == PulseShape.VZ:
+                if isinstance(gate, VirtualZGate):
+                    log.log(20, 'Cont')
                     continue
+                log.log(20, str(gate))
+
+                # Get the correct pulse if no pulse was provided
+                if pulse is None:
+                    if isinstance(gate, SingleQubitGate):
+                        pulse = self.pulses_1qb[n]
+                    elif isinstance(gate, TwoQubitGate):
+                        pulse = self.pulses_2qb[n]
+                    elif isinstance(gate, MeasurementGate):
+                        pulse = self.pulses_readout[n]
+                    else:
+                        raise ValueError('No pulse provided.')
+
                 if pulse.pulse_type == PulseType.Z:
                         waveform = self.wave_z[n]
                 elif pulse.pulse_type == PulseType.XY:
                         waveform = self.wave_xy[n]
                         gate_waveform = self.wave_gate
-                        gate_amplitude = 1
                 elif pulse.pulse_type == PulseType.READOUT:
                         waveform = self.readout_iq
                         gate_waveform = self.readout_trig
-                        gate_amplitude = self.readout_trig_amplitude
                 # calculate total length of pulse
                 duration = pulse.total_duration()
                 # shift time to mid point if user gave start point
@@ -308,15 +330,14 @@ class Sequence(object):
                 # calculate time values for the pulse indices
                 t = indices / self.sample_rate
                 # calculate the pulse waveform for the selected indices
-                log.log(20, str(gate))
-                log.log(20, str(indices))
-                log.log(20, str(gate.get_waveform(pulse, t0, t)))
                 waveform[indices] += gate.get_waveform(pulse, t0, t)
-                # if gate:
-                    # gate_waveform[indices] = gate_amplitude
+
+                if pulse.gated:
+                    gate_waveform += pulse.calculate_gate(t0, self.t)
 
 
     def add_single_pulse(self, qubit, pulse, t0, align_left=False):
+        # TODO This should/could be removed in future versions.
         """Add single qubit pulse to specified qubit
 
         Parameters
@@ -456,15 +477,15 @@ class Sequence(object):
     def perform_virtual_z(self):
         """Shifts the phase of pulses subsequent to virutal z gates
         """
-        # TODO Sort by time and then do vz gates
-        return
         for n in range(self.n_qubit):
-            for vz in [q for q in self.qubit_sequences[n] if q['pulse'].shape == PulseShape.VZ]:
-                for p in [g.pulse for g in self.qubit_sequences[n] if q['t0'] > vz['t0']]:
-                    # Readout pulses should be left alone
-                    if p.pulse_type == PulseType.READOUT:
-                        continue
-                    p.phase += vz['pulse'].phase
+            log.log(20, 'Time to VZ')
+            for m, gate_dict in enumerate(self.qubit_sequences[n]):
+                gate = gate_dict['gate']
+                log.log(20, str(gate))
+                if isinstance(gate, VirtualZGate):
+                    for subsequent_gate_dict in self.qubit_sequences[n][m+1:len(self.qubit_sequences[n])]:
+                        subsequent_gate_dict['gate'] = subsequent_gate_dict['gate'].add_phase(gate.angle)
+
 
 
     def find_range_of_sequence(self):
@@ -683,6 +704,7 @@ class Sequence(object):
             pulse.amplitude = config.get('Amplitude #%d' % m)
             pulse.frequency = config.get('Frequency #%d' % m)
             pulse.drag_coefficient = config.get('DRAG scaling #%d' % m)
+            pulse.gated = config.get('Generate gate')
 
         # two-qubit pulses
         for n, pulse in enumerate(self.pulses_2qb):
@@ -743,7 +765,6 @@ class Sequence(object):
         self.crosstalk.set_parameters(config)
 
         # gate switch waveform
-        self.generate_gate_switch = config.get('Generate gate')
         self.uniform_gate = config.get('Uniform gate')
         self.gate_delay = config.get('Gate delay')
         self.gate_overlap = config.get('Gate overlap')
@@ -762,6 +783,15 @@ class Sequence(object):
                 linewidth = config.get('Resonator linewidth')
                 self.measured_rise[n] = 1.0 / (2 * np.pi * linewidth)
                 self.target_rise[n] = config.get('Target rise time')
+
+        # readout settings
+        self.readout_iq_generate = config.get('Generate readout waveform')
+        self.readout_delay = config.get('Readout delay')
+        self.readout_iq_skew = config.get('Readout IQ skew')
+        self.readout_i_offset = config.get('Readout offset - I')
+        self.readout_q_offset = config.get('Readout offset - Q')
+        self.readout_trig_generate = config.get('Generate readout trig')
+        self.readout.set_parameters(config)
 
         # get readout pulse parameters
         for n, pulse in enumerate(self.pulses_readout):
@@ -787,23 +817,12 @@ class Sequence(object):
 
             pulse.width = config.get('Readout width')
             pulse.plateau = config.get('Readout duration')
+            pulse.gated = self.readout_trig_generate
+            pulse.gate_amplitude = config.get('Readout trig amplitude')
+            pulse.gate_duration = config.get('Readout trig duration')
 
-        # readout settings
-        self.readout_delay = config.get('Readout delay')
 
-        self.readout_trig_generate = config.get('Generate readout trig')
-        self.readout_trig_amplitude = config.get('Readout trig amplitude')
-        self.readout_trig_duration = config.get('Readout trig duration')
-
-        self.readout_iq_skew = config.get('Readout IQ skew')
-        self.readout_i_offset = config.get('Readout offset - I')
-        self.readout_q_offset = config.get('Readout offset - Q')
-
-        self.readout_iq_generate = config.get('Generate readout waveform')
-        self.readout.set_parameters(config)
 
 
 if __name__ == '__main__':
-    Sequence()
     pass
-    Pulse()

@@ -4,19 +4,34 @@ from enum import Enum
 import numpy as np
 from copy import copy
 
+# add logger, to allow logging to Labber's instrument log
+import logging
+log = logging.getLogger('LabberDriver')
+
 class BaseGate:
     def __init__(self):
-        pass
+        self.phase_shift = 0
+
+    def add_phase(self, shift):
+        return self
 
     def get_waveform(self, pulse, t0, t):
         pulse = copy(pulse)
+        pulse.phase += self.phase_shift
+        log.log(20, 'Phase shift the bastard {}'.format(pulse.phase))
         return pulse.calculate_waveform(t0, t)
 
 
 class SingleQubitGate(BaseGate):
     def __init__(self, axis, angle):
+        super().__init__()
         self.axis = axis
         self.angle = angle
+
+    def add_phase(self, shift):
+        new_gate = copy(self)
+        new_gate.phase_shift += shift
+        return new_gate
 
     def get_waveform(self, pulse, t0, t):
         pulse = copy(pulse)
@@ -29,23 +44,35 @@ class SingleQubitGate(BaseGate):
             pass
         # pi pulse should correspond to the full amplitude
         pulse.amplitude *= self.angle/np.pi
-        return super().get_waveform(pulse, t, t0)
+        return super().get_waveform(pulse, t0, t)
+
+
+class VirtualZGate(BaseGate):
+    def __init__(self, angle):
+        super().__init__()
+        self.angle = angle
 
 
 class TwoQubitGate(BaseGate):
-    pass
-    # Am I control or target?
-
-class MeasurementGate(BaseGate):
     def __init__(self):
-        pass
+        super().__init__()
 
     def get_waveform(self, pulse, t0, t):
         return super().get_waveform(pulse, t0, t)
 
+
+class MeasurementGate(BaseGate):
+    def __init__(self):
+        super().__init__()
+
+    def get_waveform(self, pulse, t0, t):
+        return super().get_waveform(pulse, t0, t)
+
+
 class CompositeGate:
     def __init__(self, gates=[], t=[]):
-        pass
+        super().__init__()
+
 
 class Gate(Enum):
     """Define possible qubit gates"""
@@ -60,7 +87,7 @@ class Gate(Enum):
     Y2m = SingleQubitGate(axis='Y', angle=-np.pi/2)
     Y2p = SingleQubitGate(axis='Y', angle=np.pi)
     # two-qubit gates
-    CPh = 8
+    CPh = TwoQubitGate()
 
 
 # define set of one- and two-qubit gates
