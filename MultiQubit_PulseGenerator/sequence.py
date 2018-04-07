@@ -269,31 +269,17 @@ class Sequence(object):
 
     def generate_waveforms(self):
         for n in range(self.n_qubits):
-            t_start = 0
-            t_end = 0
-            log.log(20, str(self.qubit_sequences[n]))
             for gate_dict in self.qubit_sequences[n]:
-                pulse = gate_dict.get('pulse', None)
+                pulse = gate_dict['pulse']
                 gate = gate_dict['gate']
                 dt = gate_dict['dt']
+                t_start = gate_dict['t_start']
+                t_middle = gate_dict['t_middle']
+                t_end = gate_dict['t_end']
 
-                t_start = t_end + dt
-
-                # Virtual Z gate is special since it has 0 duration and no waveform
+                # Virtual Z gate is special since it has no waveform
                 if isinstance(gate, VirtualZGate):
-                    t_end = t_start
                     continue
-
-                # Get the correct pulse if no pulse was provided
-                if pulse is None:
-                    if isinstance(gate, SingleQubitGate):
-                        pulse = self.pulses_1qb[n]
-                    elif isinstance(gate, TwoQubitGate):
-                        pulse = self.pulses_2qb[n]
-                    elif isinstance(gate, MeasurementGate):
-                        pulse = self.pulses_readout[n]
-                    else:
-                        raise ValueError('No pulse provided.')
 
                 if pulse.pulse_type == PulseType.Z:
                         waveform = self.wave_z[n]
@@ -304,15 +290,11 @@ class Sequence(object):
                         waveform = self.readout_iq
                         gate_waveform = self.readout_trig
 
-                # calculate total length and end of pulse
-                duration = pulse.total_duration()
-                t_end = t_start + duration
-                # Calculate the middle of the pulse
-                t0 = t_start+duration/2
+
                 # get the range of indices in use
                 indices = np.arange(
-                    max(np.floor((t0-duration/2)*self.sample_rate), 0),
-                    min(np.ceil((t0+duration/2)*self.sample_rate), self.n_pts),
+                    max(np.floor(t_start*self.sample_rate), 0),
+                    min(np.ceil(t_end*self.sample_rate), self.n_pts),
                     dtype=int
                 )
                 # return directly if no indices
@@ -322,12 +304,12 @@ class Sequence(object):
                 # calculate time values for the pulse indices
                 t = indices/self.sample_rate
                 # calculate the pulse waveform for the selected indices
-                waveform[indices] += gate.get_waveform(pulse, t0, t)
+                waveform[indices] += gate.get_waveform(pulse, t_middle, t)
 
                 if pulse.gated:
-                    gate_waveform += pulse.calculate_gate(t0, self.t)
+                    gate_waveform += pulse.calculate_gate(t_middle, self.t)
 
-    def add_single_pulse(self, qubit, pulse, dt=0, t0=None):
+    def add_single_pulse(self, qubit, pulse, t0=None, dt=0):
         """Add single qubit pulse to specified qubit
 
         Parameters
@@ -342,16 +324,10 @@ class Sequence(object):
             Pulse spacing, referenced to the previous pulse.
 
         """
+        log.log(20, str((self, qubit, BaseGate(), dt, t0, pulse)))
+        self.add_single_gate(qubit, BaseGate(), t0, dt, pulse)
 
-        g = {
-            'gate': BaseGate(),
-            'dt': dt,
-            'pulse': pulse,
-            't0': t0
-        }
-        self.qubit_sequences[qubit].append(g)
-
-    def add_single_gate(self, qubit, gate, dt=0, t0=None):
+    def add_single_gate(self, qubit, gate, t0=None, dt=0, pulse=None):
         """Add single gate to specified qubit waveform
 
         Parameters
@@ -366,6 +342,7 @@ class Sequence(object):
             Pulse spacing, referenced to the previous pulse.
 
         """
+
         if isinstance(gate, CompositeGate):
             if isinstance(qubit, int):
                 qubit = [qubit]
@@ -378,14 +355,51 @@ class Sequence(object):
                 gate_dict_list[0]['dt'] = dt
                 self.qubit_sequences[qubit[n]].extend(gate_dict_list)
             return
+
         if isinstance(gate, Enum):
             gate = gate.value
+
+        # Get the correct pulse if no pulse was provided
+        if pulse is None:
+            if isinstance(gate, SingleQubitGate):
+                pulse = self.pulses_1qb[qubit]
+            elif isinstance(gate, TwoQubitGate):
+                pulse = self.pulses_2qb[qubit]
+            elif isinstance(gate, MeasurementGate):
+                pulse = self.pulses_readout[qubit]
+            else:
+                raise ValueError('Please provide a pulse for this gate type.')
+
+        # calculate timings
+        duration = pulse.total_duration()
+        if t0 is None:
+            if len(self.qubit_sequences[qubit]) == 0:
+                t_start = self.first_delay
+            else:
+                log.log(20, str(self.qubit_sequences[qubit]))
+                t_start = self.qubit_sequences[qubit][-1]['t_end'] + dt
+
+            t_end = t_start + duration
+            t_middle = t_start+duration/2
+        else:
+            t_middle = t0
+            t_start = t_middle - duration/2
+            t_end = t_middle + duration/2
+
         g = {
             'gate': gate,
+            'pulse': pulse,
             'dt': dt,
-            't0': t0
+            't_start': t_start,
+            't_end': t_end,
+            't_middle': t_middle,
+            'duration': duration
         }
         self.qubit_sequences[qubit].append(g)
+
+        # If t0 was used as time reference, we need to make sure that the sequence is still sorted correctly
+        if t0 is not None:
+            self.sort_qubit_sequence(qubit)
 
 
     def add_gates(self, gates):
@@ -457,6 +471,13 @@ class Sequence(object):
         for n in range(n_wave):
             self.wave_xy[n] = self.predistortions[n].predistort(self.wave_xy[n])
 
+    def sort_qubit_sequence(self, qubit):
+        undecorated = self.qubit_sequences[qubit]
+        sort_on = "t_end"
+        decorated = [(dict_[sort_on], dict_) for dict_ in undecorated]
+        decorated.sort()
+        self.qubit_sequences[qubit] = [dict_ for (key, dict_) in decorated]
+
 
     def perform_crosstalk_compensation(self):
         """Compensate for Z-control crosstalk
@@ -485,7 +506,7 @@ class Sequence(object):
         for n in range(self.readout_n):
             if self.readout_iq_generate:
                 self.add_single_pulse(n, self.pulses_readout[n],
-                                      self.readout_delay)
+                                      dt=self.readout_delay)
 
     def add_microwave_gate(self, config):
         """Create waveform for gating microwave switch

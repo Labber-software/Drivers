@@ -73,7 +73,7 @@ class CompositeGate:
         self.n_qubits = n_qubits
         self.qubit_sequences = [[] for n in range(n_qubits)]
 
-    def add_gate(self, qubit, gate, dt=0, align_left=False):
+    def add_gate(self, qubit, gate, t0=None, dt=0):
         if isinstance(gate, Enum):
             gate = gate.value
         g = {
