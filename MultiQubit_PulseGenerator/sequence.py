@@ -749,7 +749,6 @@ class Sequence(object):
         # readout settings
         self.readout_iq_generate = config.get('Generate readout waveform')
         self.readout_delay = config.get('Readout delay')
-        self.readout_iq_skew = config.get('Readout IQ skew')
         self.readout_i_offset = config.get('Readout offset - I')
         self.readout_q_offset = config.get('Readout offset - Q')
         self.readout_trig_generate = config.get('Generate readout trig')
@@ -762,6 +761,8 @@ class Sequence(object):
             pulse.shape = PulseShape(config.get('Readout pulse type'))
             pulse.truncation_range = config.get('Readout truncation range')
             pulse.start_at_zero = config.get('Readout start at zero')
+            pulse.iq_skew = config.get('Readout IQ skew')*np.pi/180
+            pulse.iq_ratio = config.get('Readout I/Q ratio')
 
             # if config.get('Uniform pulse shape'):
             #     pulse.width = config.get('Width')

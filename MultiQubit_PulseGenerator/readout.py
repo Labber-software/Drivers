@@ -16,6 +16,7 @@ class Readout(object):
         self.match_main_size = False
         self.distribute_phases = False
         self.frequencies = np.zeros(self.max_qubit)
+        # TODO this needs to move
         # predistortion
         self.predistort = False
         self.measured_rise = np.zeros(self.max_qubit)
@@ -29,8 +30,6 @@ class Readout(object):
         self.demod_length = 1.0E-6
         self.freq_offset = 0.0
         self.use_phase_ref = False
-        self.iq_ratio = 1.0
-        self.iq_skew = 0
 
     def set_parameters(self, config={}):
         """Set base parameters using config from from Labber driver
@@ -66,77 +65,6 @@ class Readout(object):
         self.iq_skew = config.get('Readout IQ skew') * np.pi / 180
         # number of records, will be remoevd in later version
         self.n_records = config.get('Demodulation - Number of records', 1)
-
-    def create_waveform(self, t_start=0.0):
-        """Generate readout waveform
-
-        Parameters
-        ----------
-        t_start : float
-            Start time for readout waveform, relative to start of sequence
-
-        Returns
-        -------
-        waveform : complex numpy array
-            Complex waveforms with I/Q signal for qubit reaodut
-
-        """
-
-        for n in range(self.n_readout):
-            pulse = self.pulses_readout[n]
-
-            duration = pulse.total_duration()
-            # Pulse is referenced to center of oulse
-            t0 = t_start + duration / 2
-            # get the range of indices in use
-            indices = np.arange(
-                max(np.floor(t_start*self.sample_rate), 0),
-                min(np.ceil((t_start+duration)*self.sample_rate), self.n_pts),
-                dtype=int
-            )
-            # return directly if no indices
-            if len(indices) == 0:
-                continue
-
-            # calculate time values for the pulse indices
-            t = indices / self.sample_rate
-            # calculate the pulse envelope for the selected indices
-            y = pulse.calculate_envelope(t0, t)
-            waveform = np.zeros_like(t, dtype=complex)
-
-
-            # get parameters
-            omega = 2 * np.pi * pulse.frequency
-            if self.distribute_phases:
-                # phi = 2 * np.pi * n / self.n_readout
-                # phi = 2 * np.pi * np.random.rand()
-                phi = self.phases[n] + pulse.phase
-            else:
-                phi = pulse.phase
-            # apply pre-distortion
-            if self.predistort:
-                # add inverted exponential
-                y += ((self.measured_rise[n] / self.target_rise[n] - 1) *
-                      np.exp(-(t - t[0]) / self.target_rise[n]))
-
-            # remove phase drift due to LO-RF difference
-            phi -= 2 * np.pi * self.freq_offset * t_start
-
-            # add IQ skew
-            phi_s = self.iq_skew
-
-            # apply SSBM transform
-            waveform += (y.real * np.cos(omega * t - phi) +
-                        -y.imag * np.cos(omega * t - phi + np.pi / 2))
-            waveform += 1j * (y.real * np.sin(omega * t - phi + phi_s) +
-                             -y.imag * np.sin(omega * t - phi + np.pi / 2
-                                              + phi_s))
-
-        # apply SSBM transform
-        if self.iq_ratio != 1.0:
-            waveform.real *= self.iq_ratio
-
-        return waveform
 
     def demodulate(self, n, signal, ref=None):
         """Calculate complex signal from data and reference

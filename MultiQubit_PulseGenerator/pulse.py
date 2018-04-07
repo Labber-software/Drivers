@@ -68,7 +68,8 @@ class Pulse(object):
                  frequency=0.0, phase=0.0, shape=PulseShape.GAUSSIAN,
                  use_drag=False, drag_coefficient=0.0, truncation_range=5.0,
                  pulse_type=PulseType.XY, start_at_zero=False, gated=False,
-                 gate_delay=0, gate_amplitude=1, gate_duration=None):
+                 gate_delay=0, gate_amplitude=1, gate_duration=None,
+                 iq_ratio=1, iq_skew=0, i_offset=0, q_offset=0):
         # set variables
         self.amplitude = amplitude
         self.width = width
@@ -98,6 +99,12 @@ class Pulse(object):
         self.Lcoeff = Lcoeff
         self.dfdV = dfdV
         self.period_2qb = period_2qb
+
+        # For IQ mixer corrections
+        self.iq_ratio = iq_ratio
+        self.iq_skew = iq_skew
+        self.i_offset = i_offset
+        self.q_offset = q_offset
 
     def total_duration(self):
         """Calculate total pulse duration"""
@@ -271,10 +278,10 @@ class Pulse(object):
             # single-sideband mixing, get frequency
             omega = 2*np.pi*self.frequency
             # apply SSBM transform
-            data_i = (y.real * np.cos(omega*t-phase) +
+            data_i = self.iq_ratio*(y.real * np.cos(omega*t-phase) +
                       -y.imag * np.cos(omega*t-phase+np.pi/2))
-            data_q = (y.real * np.sin(omega*t-phase) +
-                      -y.imag * np.sin(omega*t-phase+np.pi/2))
+            data_q = (y.real * np.sin(omega*t-phase+self.iq_skew) +
+                      -y.imag * np.sin(omega*t-phase+self.iq_skew+np.pi/2))
             y = data_i + 1j*data_q
         return y
 
