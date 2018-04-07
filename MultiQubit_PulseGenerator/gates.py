@@ -18,7 +18,6 @@ class BaseGate:
     def get_waveform(self, pulse, t0, t):
         pulse = copy(pulse)
         pulse.phase += self.phase_shift
-        log.log(20, 'Phase shift the bastard {}'.format(pulse.phase))
         return pulse.calculate_waveform(t0, t)
 
 
@@ -54,6 +53,7 @@ class VirtualZGate(BaseGate):
 
 
 class TwoQubitGate(BaseGate):
+    # TODO Make this have two gates. I if nothing on the second waveform
     def __init__(self):
         super().__init__()
 
@@ -68,10 +68,23 @@ class MeasurementGate(BaseGate):
     def get_waveform(self, pulse, t0, t):
         return super().get_waveform(pulse, t0, t)
 
-
 class CompositeGate:
-    def __init__(self, gates=[], t=[]):
-        super().__init__()
+    def __init__(self, n_qubits=1):
+        self.n_qubits = n_qubits
+        self.qubit_sequences = [[] for n in range(n_qubits)]
+
+    def add_gate(self, qubit, gate, dt=0, align_left=False):
+        if isinstance(gate, Enum):
+            gate = gate.value
+        g = {
+            'gate': gate,
+            'dt': dt,
+            'align_left': align_left
+        }
+        self.qubit_sequences[qubit].append(g)
+
+    def get_gate_dict_list(self, qubit):
+        return copy(self.qubit_sequences[qubit])
 
 
 class Gate(Enum):
@@ -86,6 +99,7 @@ class Gate(Enum):
     Ym = SingleQubitGate(axis='Y', angle=-np.pi)
     Y2m = SingleQubitGate(axis='Y', angle=-np.pi/2)
     Y2p = SingleQubitGate(axis='Y', angle=np.pi)
+
     # two-qubit gates
     CPh = TwoQubitGate()
 

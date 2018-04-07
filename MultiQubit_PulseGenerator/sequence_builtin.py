@@ -2,14 +2,14 @@
 import numpy as np
 from copy import copy
 from sequence import Sequence
-from gates import Gate, VirtualZGate
+from gates import Gate, VirtualZGate, CompositeGate
 from pulse import PulseShape, Pulse
 
 # add logger, to allow logging to Labber's instrument log
 import logging
 log = logging.getLogger('LabberDriver')
 
-
+# TODO Move first delay to sequence
 
 class Rabi(Sequence):
     """Sequence for driving Rabi oscillations in multiple qubits"""
@@ -19,8 +19,8 @@ class Rabi(Sequence):
         # get parameters
         uniform_amplitude = config['Uniform pulse ampiltude for all qubits']
         # just add pi-pulses for the number of available qubits
-        for n in range(self.n_qubit):
-            self.add_single_gate(n, Gate.Xp, self.first_delay, align_left=True)
+        for n in range(self.n_qubits):
+            self.add_single_gate(n, Gate.Xp, self.first_delay)
 
 
 
@@ -35,47 +35,42 @@ class CPMG(Sequence):
         duration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
 
-        max_width = np.max([p.total_duration() for p in self.pulses_1qb[:self.n_qubit]])
+        max_width = np.max([p.total_duration() for p in self.pulses_1qb[:self.n_qubits]])
         # select type of refocusing pi pulse
         gate_pi = Gate.Yp if pi_to_q else Gate.Xp
 
         # add pulses for all active qubits
-        for n, pulse in enumerate(self.pulses_1qb[:self.n_qubit]):
-            # get effective pulse durations, for timing purposes
-            width = self.pulses_1qb[n].total_duration() if edge_to_edge else 0.0
-            pulse_total = width * (n_pulse + 1)
-            # center pulses in add_gates mode; ensure sufficient pulse spacing in CPMG mode
-            t0 = self.first_delay + self.pulses_1qb[n].total_duration()/2
-            # Align everything to the end of the last pulse of the one with the longest pulse width
-            t0 += (max_width - self.pulses_1qb[n].total_duration()) * (n_pulse + 1) if edge_to_edge else 0.0
-            t0 += (max_width - self.pulses_1qb[n].total_duration())
+        for n, pulse in enumerate(self.pulses_1qb[:self.n_qubits]):
             # special case for -1 pulses => T1 experiment
             if n_pulse < 0:
                 # add pi pulse
-                self.add_single_gate(n, Gate.Xp, t0)
+                self.add_single_gate(n, Gate.Xp, self.first_delay)
                 # delay the reaodut by creating VZ gate with 0 angle
                 vz = VirtualZGate(angle=0)
-                self.add_single_gate(n, vz, t0 + duration)
+                self.add_single_gate(n, vz, duration)
                 continue
 
-            # add the first and last pi/2 pulses
-            self.add_single_gate(n, Gate.X2p, t0)
-            self.add_single_gate(n, Gate.X2p, t0 + duration + pulse_total)
-            # add more pulses
-            if n_pulse == 0:
-                # no pulses = ramsey
-                time_pi = []
-            elif n_pulse == 1:
-                # one pulse, echo experiment
-                time_pi = [t0 + width + 0.5 * duration, ]
-            elif n_pulse > 1:
-                # figure out timing of pi pulses
-                period = duration / n_pulse
-                time_pi = (t0 + width + 0.5 * period +
-                           (period + width) * np.arange(n_pulse))
+            # Calculate the effective dt
+            if edge_to_edge:
+                # Duration is the total time between pulses
+                dt = duration/(n_pulse+1)
+            else:
+                # Duration is from center to center of pi/2 pulses
+                dt = duration/(n_pulse+1) - self.pulses_1qb[n].total_duration()
+            # Align everything to the end of the last pulse of the one with the longest pulse width
+            # t0 += (max_width - self.pulses_1qb[n].total_duration()) * (n_pulse + 1) if edge_to_edge else 0.0
+            # t0 += (max_width - self.pulses_1qb[n].total_duration())
+
+
+            # First pi/2 pulse
+            self.add_single_gate(n, Gate.X2p, self.first_delay)
+
             # add pi pulses, one by one
-            for t in time_pi:
-                self.add_single_gate(n, gate_pi, t)
+            for i in range(n_pulse):
+                self.add_single_gate(n, gate_pi, dt)
+
+            # add last pi/2 pulse
+            self.add_single_gate(n, Gate.X2p, dt)
 
 
 class PulseTrain(Sequence):
@@ -96,7 +91,7 @@ class PulseTrain(Sequence):
             else:
                 gate = Gate.Xp
             # create list with same gate for all active qubits
-            gate_qubits = [gate for q in range(self.n_qubit)]
+            gate_qubits = [gate for q in range(self.n_qubits)]
             # append to list of gates
             gates.append(gate_qubits)
 
@@ -116,7 +111,7 @@ class CZgates(Sequence):
         for n in range(n_pulse):
             gate = Gate.CPh
             # create list with same gate for all active qubits
-            gate_qubits = [gate for q in range(self.n_qubit)]
+            gate_qubits = [gate for q in range(self.n_qubits)]
             # append to list of gates
             gates.append(gate_qubits)
 
@@ -149,15 +144,18 @@ class VZ(Sequence):
         edge_to_edge = config['Edge-to-edge pulses']
         self.virtual_z_gates = []
 
-        for n in range(self.n_qubit):
+        for n in range(self.n_qubits):
             width = self.pulses_1qb[n].total_duration() if edge_to_edge else 0.0
             t0 = self.first_delay + self.pulses_1qb[n].total_duration()/2
 
             self.add_single_gate(n, Gate.X2p, t0)
 
             vz = VirtualZGate(angle=z_angle)
-            self.add_single_gate(n, vz, t0+(duration+width)/2)
-            self.add_single_gate(n, Gate.X2p, t0+duration+width)
+            c = CompositeGate(1)
+            c.add_gate(0, vz, t0+(duration+width)/2)
+            c.add_gate(0, Gate.X2p, t0+duration+width)
+            self.add_single_gate(n, c, t0+(duration+width)/2)
+
 
 
 
