@@ -392,7 +392,7 @@ class Sequence(object):
         # if t0 is not None:
         #     self.sort_qubit_sequence(qubit)
 
-    def add_gate(self, qubit, gate, t0=None, dt=None, align='right'):
+    def add_gate(self, qubit, gate, t0=None, dt=None, align='center'):
             # Composite gates consit of multiple gates. Add one by one.
             if isinstance(gate, CompositeGate):
                 if isinstance(qubit, int):
@@ -415,6 +415,8 @@ class Sequence(object):
                 qubit = [qubit]
             if not isinstance(gate, list):
                 gate = [gate]
+            log.log(20, str(len(qubit)))
+            log.log(20, str(len(gate)))
             if len(gate) != len(qubit):
                 raise ValueError('Length of qubit and gate list must be equal.')
 
@@ -509,19 +511,26 @@ class Sequence(object):
             raise Exception('The input must be a list of list with gates')
         # add gates sequence to waveforms
         for gates_qubits in gates:
-            # check if any two-qubit gates
-            two_qubit = np.any([g in TWO_QUBIT_GATES for g in gates_qubits])
-            # pulse period may be different for two-qubit gates
-            period = self.period_2qb if two_qubit else self.period_1qb
-            # go through all qubits
-            for n, g in enumerate(gates_qubits):
-                # ignore if gate is None
-                if g is None:
-                    continue
+            if self.spacing == 'period':
+                # check if any two-qubit gates
+                two_qubit = np.any([g in TWO_QUBIT_GATES for g in gates_qubits])
+                # pulse period may be different for two-qubit gates
+                period = self.period_2qb if two_qubit else self.period_1qb
+                # go through all qubits
+                for n, g in enumerate(gates_qubits):
+                    # ignore if gate is None
+                    if g is None:
+                        continue
+                    # add gate to specific qubit waveform
+                    self.add_single_gate(n, g, t0=self.time_pulse+period/2)
+                # after adding all pulses, increment current gate time
+                self.time_pulse += period
+            elif self.spacing == 'dt':
                 # add gate to specific qubit waveform
-                self.add_single_gate(n, g, t0=self.time_pulse+period/2)
-            # after adding all pulses, increment current gate time
-            self.time_pulse += period
+                log.log(20, str(np.arange(len(gates_qubits))))
+                log.log(20, str(gates_qubits))
+                self.add_gate([n for n in range(len(gates_qubits))], gates_qubits)
+
 
 
     def add_tomography(self):
@@ -579,11 +588,11 @@ class Sequence(object):
         """
         if self.readout_iq_generate:
             readout = MeasurementGate()
-            delay = IdentityGate(width=self.readout_delay-2*self.dt)
+            delay = IdentityGate(width=self.readout_delay)
             self.add_gate([n for n in range(self.readout_n)],
-                          [delay for n in range(self.readout_n)])
+                          [delay for n in range(self.readout_n)], dt=0)
             self.add_gate([n for n in range(self.readout_n)],
-                          [readout for n in range(self.readout_n)])
+                          [readout for n in range(self.readout_n)], dt=0)
 
     def add_microwave_gate(self, config):
         """Create waveform for gating microwave switch
@@ -723,6 +732,8 @@ class Sequence(object):
         self.n_qubit = d[config.get('Number of qubits')]
         self.period_1qb = config.get('Pulse period, 1-QB')
         self.period_2qb = config.get('Pulse period, 2-QB')
+        self.dt = config.get('Pulse spacing')
+        self.spacing = 'period' if config.get('Use pulse period') else 'dt'
         self.local_xy = config.get('Local XY control')
 
         # waveform parameters
