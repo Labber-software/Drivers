@@ -159,6 +159,7 @@ class VZ(Sequence):
         log.log(20, 'Adding c gate')
         self.add_gate([0, 1], c)
         self.add_gate([1, 0], c, dt=20e-9)
+        self.add_gate(0, Gate.Ry)
 
 
 

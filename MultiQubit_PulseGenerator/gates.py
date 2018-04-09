@@ -78,7 +78,7 @@ class TwoQubitGate(BaseGate):
         return super().get_waveform(pulse, t0, t)
 
 
-class MeasurementGate(BaseGate):
+class ReadoutGate(BaseGate):
     def __init__(self):
         super().__init__()
 
@@ -91,6 +91,8 @@ class CompositeGate:
         self.sequence = []
 
     def add_gate(self, gate, t0=None, dt=None, align='center'):
+        if not isinstance(gate, list):
+            gate = [gate]
         if t0 is not None:
             raise NotImplementedError('t0 alignment not implemented yet')
         if len(gate) != self.n_qubit:
@@ -108,7 +110,23 @@ class CompositeGate:
         return copy(self.sequence[i])
 
     def __len__(self):
-        return len(self.sequence[0])
+        return len(self.sequence)
+
+
+class SingleMeasurementGate(CompositeGate):
+    def __init__(self, axis='Z'):
+        super().__init__(n_qubit=1)
+        self.axis = axis
+        if self.axis == 'Z':
+            self.add_gate(IdentityGate())
+        elif self.axis == 'Y':
+            self.add_gate(SingleQubitGate(axis='X', angle=np.pi/2))
+        elif self.axis == 'X':
+            self.add_gate(SingleQubitGate(axis='Y', angle=-np.pi/2))
+        else:
+            raise ValueError('Axis must be X, Y, or Z.')
+        self.add_gate(ReadoutGate())
+
 
 
 class Gate(Enum):
@@ -127,15 +145,10 @@ class Gate(Enum):
     # two-qubit gates
     CPh = TwoQubitGate()
 
-
-# define set of one- and two-qubit gates
-ONE_QUBIT_GATES = (Gate.Xp, Gate.Xm, Gate.X2p, Gate.X2m,
-                   Gate.Yp, Gate.Ym, Gate.Y2p, Gate.Y2m,
-                   Gate.I)
-TWO_QUBIT_GATES = (Gate.CPh,)
-
-
-
+    # Readout
+    Rx = SingleMeasurementGate(axis='X')
+    Ry = SingleMeasurementGate(axis='Y')
+    Rz = SingleMeasurementGate(axis='Z')
 
 
 if __name__ == '__main__':

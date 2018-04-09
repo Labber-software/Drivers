@@ -37,12 +37,9 @@ class Step:
             gate = [gate]
         for i in range(len(gate)):
             # We need the gate object, not the enum
-            log.log(20, str(gate[i]))
             if isinstance(gate[i], Enum):
-                log.log(20, 'enum value')
                 self.gates[qubit[i]] = gate[i].value
             else:
-                log.log(20, 'no enum value')
                 self.gates[qubit[i]] = gate[i]
 
 
@@ -206,10 +203,10 @@ class Sequence(object):
         self.t = np.arange(self.n_pts)/self.sample_rate
 
         # readout trig
-        pts = self.n_pts if self.readout_trig_generate else 0
+        pts = self.n_pts
         self.readout_trig = np.zeros(pts, dtype=float)
         # readout i/q waveform
-        pts = self.n_pts if self.readout_iq_generate else 0
+        pts = self.n_pts
         self.readout_iq = np.zeros(pts, dtype=np.complex)
 
         # reset gate position counter
@@ -307,10 +304,9 @@ class Sequence(object):
                     pulse = self.pulses_1qb[qubit]
                 elif isinstance(gate, TwoQubitGate):
                     pulse = self.pulses_2qb[qubit]
-                elif isinstance(gate, MeasurementGate):
+                elif isinstance(gate, ReadoutGate):
                     pulse = self.pulses_readout[qubit]
                 else:
-                    log.log(20, str(gate))
                     raise ValueError('Please provide a pulse for this gate type.')
 
 
@@ -393,8 +389,12 @@ class Sequence(object):
         #     self.sort_qubit_sequence(qubit)
 
     def add_gate(self, qubit, gate, t0=None, dt=None, align='center'):
+            if isinstance(gate, Enum):
+                gate = gate.value
+            log.log(20, str(gate))
             # Composite gates consit of multiple gates. Add one by one.
             if isinstance(gate, CompositeGate):
+                log.log(20, 'Comp comp')
                 if isinstance(qubit, int):
                     qubit = [qubit]
                 if len(qubit) != gate.n_qubit:
@@ -415,8 +415,6 @@ class Sequence(object):
                 qubit = [qubit]
             if not isinstance(gate, list):
                 gate = [gate]
-            log.log(20, str(len(qubit)))
-            log.log(20, str(len(gate)))
             if len(gate) != len(qubit):
                 raise ValueError('Length of qubit and gate list must be equal.')
 
@@ -445,7 +443,7 @@ class Sequence(object):
                         pulse = None
                 elif isinstance(gate, TwoQubitGate):
                     pulse = self.pulses_2qb[qubit]
-                elif isinstance(gate, MeasurementGate):
+                elif isinstance(gate, ReadoutGate):
                     pulse = self.pulses_readout[qubit]
                 else:
                     raise ValueError('Please provide a pulse for this gate type.')
@@ -467,10 +465,6 @@ class Sequence(object):
             step.t_end = step.t_start+max_duration
             step.t_middle = step.t_start+max_duration/2
 
-            log.log(20, 'tstart {}'.format(t_start))
-            log.log(20, 'tend {}'.format(t_end))
-            log.log(20, 'step tstart {}'.format(step.t_start))
-            log.log(20, 'step tend {}'.format(step.t_end))
             self.sequences.append(step)
 
     def add_gate_to_all(self, gate, dt=0, align='right'):
@@ -527,8 +521,6 @@ class Sequence(object):
                 self.time_pulse += period
             elif self.spacing == 'dt':
                 # add gate to specific qubit waveform
-                log.log(20, str(np.arange(len(gates_qubits))))
-                log.log(20, str(gates_qubits))
                 self.add_gate([n for n in range(len(gates_qubits))], gates_qubits)
 
 
@@ -540,7 +532,7 @@ class Sequence(object):
         if not self.perform_tomography:
             return
         # Add pulses
-        self.tomography.add_pulses(self, dt=0)
+        self.tomography.add_pulses(self)
 
 
     def predistort_waveforms(self):
@@ -578,8 +570,6 @@ class Sequence(object):
                 gate = step.gates[qubit]
                 if isinstance(gate, VirtualZGate):
                     for subsequent_step in self.sequences[m+1:len(self.sequences)]:
-                        log.log(20, str("Phase shift"))
-                        log.log(20, str(subsequent_step.gates[qubit]))
                         subsequent_step.gates[qubit] = subsequent_step.gates[qubit].add_phase(gate.angle)
 
     def add_readout(self):
@@ -587,7 +577,7 @@ class Sequence(object):
 
         """
         if self.readout_iq_generate:
-            readout = MeasurementGate()
+            readout = ReadoutGate()
             delay = IdentityGate(width=self.readout_delay)
             self.add_gate([n for n in range(self.readout_n)],
                           [delay for n in range(self.readout_n)], dt=0)
