@@ -2,7 +2,7 @@
 import numpy as np
 from copy import copy
 from sequence import Sequence
-from gates import Gate, VirtualZGate, CompositeGate
+from gates import Gate, VirtualZGate, CompositeGate, IdentityGate
 from pulse import PulseShape, Pulse
 
 # add logger, to allow logging to Labber's instrument log
@@ -19,8 +19,7 @@ class Rabi(Sequence):
         # get parameters
         uniform_amplitude = config['Uniform pulse ampiltude for all qubits']
         # just add pi-pulses for the number of available qubits
-        for n in range(self.n_qubits):
-            self.add_single_gate(n, Gate.Xp)
+        self.add_gate_to_all(Gate.Xp)
 
 
 
@@ -35,19 +34,18 @@ class CPMG(Sequence):
         duration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
 
-        max_width = np.max([p.total_duration() for p in self.pulses_1qb[:self.n_qubits]])
+        max_width = np.max([p.total_duration() for p in self.pulses_1qb[:self.n_qubit]])
         # select type of refocusing pi pulse
         gate_pi = Gate.Yp if pi_to_q else Gate.Xp
 
         # add pulses for all active qubits
-        for n, pulse in enumerate(self.pulses_1qb[:self.n_qubits]):
+        for n, pulse in enumerate(self.pulses_1qb[:self.n_qubit]):
             # special case for -1 pulses => T1 experiment
             if n_pulse < 0:
                 # add pi pulse
                 self.add_single_gate(n, Gate.Xp)
-                # delay the reaodut by creating VZ gate with 0 angle
-                vz = VirtualZGate(angle=0)
-                self.add_single_gate(n, vz, dt=duration)
+                # delay the reaodut by adding an I gate
+                self.add_single_gate(n, IdentityGate(duration))
                 continue
 
             # Calculate the effective dt
@@ -92,7 +90,7 @@ class PulseTrain(Sequence):
             else:
                 gate = Gate.Xp
             # create list with same gate for all active qubits
-            gate_qubits = [gate for q in range(self.n_qubits)]
+            gate_qubits = [gate for q in range(self.n_qubit)]
             # append to list of gates
             gates.append(gate_qubits)
 
@@ -112,7 +110,7 @@ class CZgates(Sequence):
         for n in range(n_pulse):
             gate = Gate.CPh
             # create list with same gate for all active qubits
-            gate_qubits = [gate for q in range(self.n_qubits)]
+            gate_qubits = [gate for q in range(self.n_qubit)]
             # append to list of gates
             gates.append(gate_qubits)
 
@@ -145,17 +143,22 @@ class VZ(Sequence):
         edge_to_edge = config['Edge-to-edge pulses']
         self.virtual_z_gates = []
 
-        for n in range(self.n_qubits):
-            width = self.pulses_1qb[n].total_duration() if edge_to_edge else 0.0
-            t0 = self.pulses_1qb[n].total_duration()/2
 
-            self.add_single_gate(n, Gate.X2p, t0)
+        width = 0 if edge_to_edge else self.pulses_1qb[0].total_duration()
+        vz = VirtualZGate(angle=z_angle)
+        # self.add_gate(0, Gate.X2p)
+        # self.add_gate(0, vz)
+        # self.add_gate(0, Gate.X2p)
+        c = CompositeGate(2)
 
-            vz = VirtualZGate(angle=z_angle)
-            c = CompositeGate(1)
-            c.add_gate(0, vz, t0+(duration+width)/2)
-            c.add_gate(0, Gate.X2p, t0+duration+width)
-            self.add_single_gate(n, c, t0+(duration+width)/2)
+        c.add_gate([Gate.X2p, Gate.I])
+        c.add_gate([Gate.I, Gate.Yp], dt=10e-9)
+        c.add_gate([Gate.X2p, Gate.I])
+
+
+        log.log(20, 'Adding c gate')
+        self.add_gate([0, 1], c)
+        self.add_gate([1, 0], c, dt=20e-9)
 
 
 

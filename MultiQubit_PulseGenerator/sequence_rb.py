@@ -274,7 +274,7 @@ class SingleQubit_RB(Sequence):
             self.prev_interleave = interleave
 
             multi_gate_seq = []
-            for n in range(self.n_qubits):
+            for n in range(self.n_qubit):
                 #Generate 1QB RB sequence
                 single_gate_seq = []
                 for i in range(N_cliffords):
@@ -412,12 +412,12 @@ class TwoQubit_RB(Sequence):
             gate_seq_2.extend(recovery_seq_2)
 
             #Assign two qubit gate sequence to where we want
-            if (self.n_qubits > qubits_to_benchmark[0]):
+            if (self.n_qubit > qubits_to_benchmark[0]):
                 for i in range(qubits_to_benchmark[0]-1):
                     multi_gate_seq.append([None] * len(gate_seq_1))
                 multi_gate_seq.append(gate_seq_1)
                 multi_gate_seq.append(gate_seq_2)
-                for i in range(self.n_qubits - qubits_to_benchmark[1]):
+                for i in range(self.n_qubit - qubits_to_benchmark[1]):
                     multi_gate_seq.append([None] * len(gate_seq_1))
             else:
                 raise ValueError('"Number of qubits" should be bigger than "Qubits to Benchmark"')

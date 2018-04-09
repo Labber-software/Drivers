@@ -46,6 +46,19 @@ class SingleQubitGate(BaseGate):
         return super().get_waveform(pulse, t0, t)
 
 
+class IdentityGate(BaseGate):
+    def __init__(self, width=0):
+        super().__init__()
+        self.width = width
+
+    def get_waveform(self, pulse, t0, t):
+        pulse = copy(pulse)
+        pulse.amplitude = 0
+        pulse.width = self.width
+        pulse.plateau = 0
+        return super().get_waveform(pulse, t0, t)
+
+
 class VirtualZGate(BaseGate):
     def __init__(self, angle):
         super().__init__()
@@ -56,6 +69,10 @@ class TwoQubitGate(BaseGate):
     # TODO Make this have two gates. I if nothing on the second waveform
     def __init__(self):
         super().__init__()
+
+    def add_phase(self, shift):
+        # TODO Implement this!
+        pass
 
     def get_waveform(self, pulse, t0, t):
         return super().get_waveform(pulse, t0, t)
@@ -69,28 +86,35 @@ class MeasurementGate(BaseGate):
         return super().get_waveform(pulse, t0, t)
 
 class CompositeGate:
-    def __init__(self, n_qubits=1):
-        self.n_qubits = n_qubits
-        self.qubit_sequences = [[] for n in range(n_qubits)]
+    def __init__(self, n_qubit=1):
+        self.n_qubit = n_qubit
+        self.sequence = []
 
-    def add_gate(self, qubit, gate, t0=None, dt=0):
-        if isinstance(gate, Enum):
-            gate = gate.value
+    def add_gate(self, gate, t0=None, dt=None, align='center'):
+        if t0 is not None:
+            raise NotImplementedError('t0 alignment not implemented yet')
+        if len(gate) != self.n_qubit:
+            raise ValueError('Number of gates not equal to number of qubits')
+
         g = {
             'gate': gate,
             'dt': dt,
-            'align_left': align_left
+            'align': align
         }
-        self.qubit_sequences[qubit].append(g)
+        self.sequence.append(g)
 
-    def get_gate_dict_list(self, qubit):
-        return copy(self.qubit_sequences[qubit])
+
+    def get_gate_dict_at_index(self, i):
+        return copy(self.sequence[i])
+
+    def __len__(self):
+        return len(self.sequence[0])
 
 
 class Gate(Enum):
     """Define possible qubit gates"""
     # single-qubit gates
-    I = SingleQubitGate(axis='X', angle=0)
+    I = IdentityGate()
     Xp = SingleQubitGate(axis='X', angle=np.pi)
     Xm = SingleQubitGate(axis='X', angle=-np.pi)
     X2p = SingleQubitGate(axis='X', angle=np.pi/2)
