@@ -562,10 +562,10 @@ class Sequence(object):
         if self.readout_iq_generate:
             readout = ReadoutGate()
             delay = IdentityGate(width=self.readout_delay)
-            self.add_gate([n for n in range(self.readout_n)],
-                          [delay for n in range(self.readout_n)], dt=0)
-            self.add_gate([n for n in range(self.readout_n)],
-                          [readout for n in range(self.readout_n)], dt=0)
+            self.add_gate([n for n in range(self.n_qubit)],
+                          [delay for n in range(self.n_qubit)], dt=0)
+            self.add_gate([n for n in range(self.n_qubit)],
+                          [readout for n in range(self.n_qubit)], dt=0)
 
     def add_microwave_gate(self, config):
         """Create waveform for gating microwave switch
@@ -644,7 +644,6 @@ class Sequence(object):
 
         # waveform parameters
         self.sample_rate = config.get('Sample rate')
-        self.readout_noise = 0.0
         self.n_pts = int(config.get('Number of points'))
         self.first_delay = config.get('First pulse delay')
         self.trim_to_sequence = config.get('Trim waveform to sequence')
@@ -738,7 +737,6 @@ class Sequence(object):
         self.minimal_gate_time = config.get('Minimal gate time')
 
         # readout
-        self.readout_n = int(config.get('Number of readout tones'))
         self.readout_match_main_size = config.get('Match main sequence waveform size')
         self.readout_distribute_phases = config.get('Distribute readout phases')
 
