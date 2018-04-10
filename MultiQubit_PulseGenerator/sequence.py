@@ -134,8 +134,6 @@ class Sequence(object):
         self.trim_to_sequence = True
         self.trim_start = False
         self.align_to_end = False
-        # parameter for keeping track of current gate pulse time
-        self.time_pulse = 0.0
 
         self.sequences = []
 
@@ -144,6 +142,7 @@ class Sequence(object):
                         for n in range(MAX_QUBIT)]
         self.wave_z = [np.zeros(0) for n in range(MAX_QUBIT)]
         self.wave_gate = [np.zeros(0) for n in range(MAX_QUBIT)]
+
         # define pulses
         self.pulses_1qb = [Pulse() for n in range(MAX_QUBIT)]
         self.pulses_2qb = [Pulse() for n in range(MAX_QUBIT - 1)]
@@ -185,6 +184,7 @@ class Sequence(object):
         """Initialize waveforms according to sequence settings"""
         # create empty waveforms of the correct size
         if self.trim_to_sequence:
+            log.log(20, str(self.sequences[-1].t_end))
             self.n_pts = int(np.ceil(self.sequences[-1].t_end*self.sample_rate))+1
         for n in range(self.n_qubit):
             self.wave_xy[n] = np.zeros(self.n_pts, dtype=np.complex)
@@ -198,9 +198,6 @@ class Sequence(object):
         self.readout_trig = np.zeros(self.n_pts, dtype=float)
         # readout i/q waveform
         self.readout_iq = np.zeros(self.n_pts, dtype=np.complex)
-
-        # reset gate position counter
-        self.time_pulse = self.first_delay
 
 
     def generate_sequence(self, config):
@@ -247,10 +244,10 @@ class Sequence(object):
         """
         self.sequences = []
         self.generate_sequence(config)
-        self.init_waveforms()
         self.add_tomography()
         self.add_readout() # TODO Move to each sequence?
         self.perform_virtual_z()
+        self.init_waveforms()
         self.generate_waveforms()
 
 
@@ -263,9 +260,6 @@ class Sequence(object):
                 self.wave_xy[n][:] = 0.0
 
         self.perform_crosstalk_compensation()
-
-        # trim waveforms, if wanted
-        # self.trim_waveforms()
 
         # microwave gate switch waveform
         self.add_microwave_gate(config)
@@ -296,6 +290,8 @@ class Sequence(object):
                     pulse = self.pulses_2qb[qubit]
                 elif isinstance(gate, ReadoutGate):
                     pulse = self.pulses_readout[qubit]
+                elif isinstance(gate, CustomGate):
+                    pulse = gate.pulse
                 else:
                     raise ValueError('Please provide a pulse for this gate type.')
 
@@ -335,7 +331,7 @@ class Sequence(object):
                 if pulse.gated:
                     gate_waveform += pulse.calculate_gate(t0, self.t)
 
-    def add_single_pulse(self, qubit, pulse, t0=None, dt=0, align_left=False):
+    def add_single_pulse(self, qubit, pulse, t0=None, dt=None, align_left=False):
         """Add single qubit pulse to specified qubit
 
         Parameters
@@ -351,7 +347,11 @@ class Sequence(object):
 
         """
 
-        self.add_single_gate(qubit, BaseGate(), t0, dt, pulse)
+        gate = CustomGate(pulse)
+        if align_left is True:
+            self.add_gate(qubit, gate, t0, dt, 'left')
+        else:
+            self.add_gate(qubit, gate, t0, dt, 'center')
 
     def add_single_gate(self, qubit, gate, t0=None, dt=None, align_left=False):
         """Add single gate to specified qubit waveform
@@ -670,7 +670,7 @@ class Sequence(object):
             pulse.amplitude = config.get('Amplitude #%d' % m)
             pulse.frequency = config.get('Frequency #%d' % m)
             pulse.drag_coefficient = config.get('DRAG scaling #%d' % m)
-            pulse.gated = config.get('Generate gate')
+            pulse.gated = False #config.get('Generate gate')
 
         # two-qubit pulses
         for n, pulse in enumerate(self.pulses_2qb):
@@ -731,6 +731,7 @@ class Sequence(object):
         self.crosstalk.set_parameters(config)
 
         # gate switch waveform
+        self.generate_gate_switch = config.get('Generate gate')
         self.uniform_gate = config.get('Uniform gate')
         self.gate_delay = config.get('Gate delay')
         self.gate_overlap = config.get('Gate overlap')
@@ -738,7 +739,6 @@ class Sequence(object):
 
         # readout
         self.readout_match_main_size = config.get('Match main sequence waveform size')
-        self.readout_distribute_phases = config.get('Distribute readout phases')
 
         # predistortion
         self.predistort = config.get('Predistort readout waveform')
@@ -768,8 +768,10 @@ class Sequence(object):
             pulse.start_at_zero = config.get('Readout start at zero')
             pulse.iq_skew = config.get('Readout IQ skew')*np.pi/180
             pulse.iq_ratio = config.get('Readout I/Q ratio')
-            pulse.phase = phases[n]
-
+            if config.get('Distribute readout phases'):
+                pulse.phase = phases[n]
+            else:
+                pulse.phase = 0
             # if config.get('Uniform pulse shape'):
             #     pulse.width = config.get('Width')
             #     pulse.plateau = config.get('Plateau')

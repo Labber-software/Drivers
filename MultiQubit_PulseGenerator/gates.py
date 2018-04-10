@@ -85,6 +85,16 @@ class ReadoutGate(BaseGate):
     def get_waveform(self, pulse, t0, t):
         return super().get_waveform(pulse, t0, t)
 
+
+class CustomGate(BaseGate):
+        def __init__(self, pulse):
+            super().__init__()
+            self.pulse = pulse
+
+        def get_waveform(self, pulse, t0, t):
+            return super().get_waveform(self.pulse, t0, t)
+
+
 class CompositeGate:
     def __init__(self, n_qubit=1):
         self.n_qubit = n_qubit
