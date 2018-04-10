@@ -125,13 +125,21 @@ class CZecho(Sequence):
         """Generate sequence by adding gates/pulses to waveforms"""
 
         # create list with gates
-        self.add_single_gate(0, Gate.X2p, self.first_delay + self.period_1qb/2)
-        self.add_single_gate(0, Gate.CPh, self.first_delay + self.period_1qb + self.period_2qb/2)
-        self.add_single_gate(0, Gate.Xp, self.first_delay + 3*self.period_1qb/2 + self.period_2qb)
-        self.add_single_gate(1, Gate.Xp, self.first_delay + 5*self.period_1qb/2 + self.period_2qb)
-        self.add_single_gate(0, Gate.CPh, self.first_delay + 3*self.period_1qb + 3*self.period_2qb/2)
-        self.add_single_gate(0, Gate.X2p, self.first_delay + 7*self.period_1qb/2 + 2*self.period_2qb)
-        self.add_single_gate(1, Gate.Xp, self.first_delay + 9*self.period_1qb/2 + 2*self.period_2qb)
+        # self.add_single_gate(0, Gate.X2p, self.first_delay + self.period_1qb/2)
+        # self.add_single_gate(0, Gate.CPh, self.first_delay + self.period_1qb + self.period_2qb/2)
+        # self.add_single_gate(0, Gate.Xp, self.first_delay + 3*self.period_1qb/2 + self.period_2qb)
+        # self.add_single_gate(1, Gate.Xp, self.first_delay + 5*self.period_1qb/2 + self.period_2qb)
+        # self.add_single_gate(0, Gate.CPh, self.first_delay + 3*self.period_1qb + 3*self.period_2qb/2)
+        # self.add_single_gate(0, Gate.X2p, self.first_delay + 7*self.period_1qb/2 + 2*self.period_2qb)
+        # self.add_single_gate(1, Gate.Xp, self.first_delay + 9*self.period_1qb/2 + 2*self.period_2qb)
+
+        CZEchoGate = CompositeGate(n_qubit=2)
+        CZEchoGate.add_gate([Gate.X2p, Gate.I])
+        CZEchoGate.add_gate([Gate.CPh, Gate.I])
+        CZEchoGate.add_gate([Gate.Xp, Gate.Xp])
+        CZEchoGate.add_gate([Gate.CPh, Gate.I])
+        CZEchoGate.add_gate([Gate.X2p, Gate.Xp])
+        self.add_gate(qubit=[0, 1], gate=CZEchoGate)
 
 
 class VZ(Sequence):
@@ -157,8 +165,10 @@ class VZ(Sequence):
 
 
         log.log(20, 'Adding c gate')
+        # Handle qubit=[[0, 1], 2], gate=[c, Gate.X2p]
         self.add_gate([0, 1], c)
         self.add_gate([1, 0], c, dt=20e-9)
+        self.add_gate(2, Gate.Xm)
         self.add_gate(0, Gate.Ry)
 
 
