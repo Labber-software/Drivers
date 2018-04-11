@@ -20,6 +20,10 @@ class BaseGate:
         pulse.phase += self.phase_shift
         return pulse.calculate_waveform(t0, t)
 
+    def get_matrix(self):
+        # TODO Implement this for each type of gate
+        pass
+
 
 class SingleQubitGate(BaseGate):
     def __init__(self, axis, angle):
@@ -150,7 +154,7 @@ class Gate(Enum):
     Yp = SingleQubitGate(axis='Y', angle=np.pi)
     Ym = SingleQubitGate(axis='Y', angle=-np.pi)
     Y2m = SingleQubitGate(axis='Y', angle=-np.pi/2)
-    Y2p = SingleQubitGate(axis='Y', angle=np.pi)
+    Y2p = SingleQubitGate(axis='Y', angle=np.pi/2)
 
     # two-qubit gates
     CPh = TwoQubitGate()
