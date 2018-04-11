@@ -171,6 +171,7 @@ class Driver(LabberDriver):
                 # Reset waveform ID counter if this is the first sequence
                 if seq_no == 0:
                     self.i = 1  # WaveformID counter
+                    self.AWG.waveformFlush()
 
             for ch, updated in enumerate(self.lWaveUpdated):
                 if updated:

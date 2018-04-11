@@ -220,6 +220,7 @@ class Driver(LabberDriver):
             for nCh in lCh:
                 # channel number depens on hardware version
                 ch = self.getHwCh(nCh)
+                self.reportStatus('Acquiring traces {}%'.format(int(100*n/nCall)))
                 data = self.DAQread(self.dig, ch, nPts*nCycle, int(1000+self.timeout_ms/nCall))
                 # average, if wanted
                 scale = (self.getRange(nCh)/self.bitRange)
