@@ -250,6 +250,14 @@ class Sequence(object):
         self.init_waveforms()
         self.generate_waveforms()
 
+        if self.align_to_end:
+            for n in range(self.n_qubit):
+                self.wave_xy[n] = self.align_waveform_to_end(self.wave_xy[n])
+                self.wave_z[n] = self.align_waveform_to_end(self.wave_z[n])
+                self.wave_gate[n] = self.align_waveform_to_end(self.wave_gate[n])
+            self.readout_trig = self.align_waveform_to_end(self.readout_trig)
+            self.readout_iq = self.align_waveform_to_end(self.readout_iq)
+
 
         # collapse all xy pulses to one waveform if no local XY control
         if not self.local_xy:
@@ -625,6 +633,10 @@ class Sequence(object):
             # store results
             self.wave_gate[n] = gate
 
+    def align_waveform_to_end(self, waveform):
+        pts = int(len(waveform)-np.ceil(self.sequences[-1].t_end*self.sample_rate)-1)
+        return np.roll(waveform, pts)
+
 
     def set_parameters(self, config={}):
         """Set base parameters using config from from Labber driver
@@ -644,7 +656,7 @@ class Sequence(object):
 
         # waveform parameters
         self.sample_rate = config.get('Sample rate')
-        self.n_pts = int(config.get('Number of points'))
+        self.n_pts = int(config.get('Number of points', 0))
         self.first_delay = config.get('First pulse delay')
         self.trim_to_sequence = config.get('Trim waveform to sequence')
         self.trim_start = config.get('Trim both start and end')
