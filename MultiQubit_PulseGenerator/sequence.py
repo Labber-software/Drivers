@@ -474,9 +474,9 @@ class Sequence(object):
 
             self.sequences.append(step)
 
-    def add_gate_to_all(self, gate, dt=0, align='right'):
+    def add_gate_to_all(self, gate, dt=0, align='center'):
             self.add_gate([n for n in range(self.n_qubit)],
-                          [gate for n in range(self.n_qubit)])
+                          [gate for n in range(self.n_qubit)], align=align)
 
 
     def add_gates(self, gates):
@@ -573,7 +573,8 @@ class Sequence(object):
             self.add_gate([n for n in range(self.n_qubit)],
                           [delay for n in range(self.n_qubit)], dt=0)
             self.add_gate([n for n in range(self.n_qubit)],
-                          [readout for n in range(self.n_qubit)], dt=0)
+                          [readout for n in range(self.n_qubit)], dt=0,
+                          align='left')
 
     def add_microwave_gate(self, config):
         """Create waveform for gating microwave switch
@@ -678,8 +679,13 @@ class Sequence(object):
             else:
                 pulse.width = config.get('Width #%d' % m)
                 pulse.plateau = config.get('Plateau #%d' % m)
+
+            if config.get('Uniform amplitude'):
+                pulse.amplitude = config.get('Amplitude')
+            else:
+                pulse.amplitude = config.get('Amplitude #%d' % m)
+
             # pulse-specific parameters
-            pulse.amplitude = config.get('Amplitude #%d' % m)
             pulse.frequency = config.get('Frequency #%d' % m)
             pulse.drag_coefficient = config.get('DRAG scaling #%d' % m)
             pulse.gated = False #config.get('Generate gate')
@@ -780,26 +786,27 @@ class Sequence(object):
             pulse.start_at_zero = config.get('Readout start at zero')
             pulse.iq_skew = config.get('Readout IQ skew')*np.pi/180
             pulse.iq_ratio = config.get('Readout I/Q ratio')
+
             if config.get('Distribute readout phases'):
                 pulse.phase = phases[n]
             else:
                 pulse.phase = 0
-            # if config.get('Uniform pulse shape'):
-            #     pulse.width = config.get('Width')
-            #     pulse.plateau = config.get('Plateau')
-            # else:
-            #     pulse.width = config.get('Width #%d' % m)
-            #     pulse.plateau = config.get('Plateau #%d' % m)
-            # pulse-specific parameters
 
-            pulse.frequency = config.get('Readout frequency #%d' % m)
+            if config.get('Uniform readout pulse shape'):
+                pulse.width = config.get('Readout width')
+                pulse.plateau = config.get('Readout duration')
+            else:
+                pulse.width = config.get('Readout width #%d' % m)
+                pulse.plateau = config.get('Readout duration #%d' % m)
+
             if config.get('Uniform readout amplitude') is True:
                 pulse.amplitude = config.get('Readout amplitude')
             else:
                 pulse.amplitude = config.get('Readout amplitude #%d' % (n + 1))
 
-            pulse.width = config.get('Readout width')
-            pulse.plateau = config.get('Readout duration')
+            pulse.frequency = config.get('Readout frequency #%d' % m)
+
+            # Readout trig parameters
             pulse.gated = self.readout_trig_generate
             pulse.gate_amplitude = config.get('Readout trig amplitude')
             pulse.gate_duration = config.get('Readout trig duration')

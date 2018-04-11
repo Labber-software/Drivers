@@ -9,17 +9,13 @@ from pulse import PulseShape, Pulse
 import logging
 log = logging.getLogger('LabberDriver')
 
-# TODO Move first delay to sequence
-
 class Rabi(Sequence):
     """Sequence for driving Rabi oscillations in multiple qubits"""
 
     def generate_sequence(self, config):
         """Generate sequence by adding gates/pulses to waveforms"""
-        # get parameters
-        uniform_amplitude = config['Uniform pulse ampiltude for all qubits']
         # just add pi-pulses for the number of available qubits
-        self.add_gate_to_all(Gate.Xp)
+        self.add_gate_to_all(Gate.Xp, align='right')
 
 
 
@@ -123,7 +119,6 @@ class CZecho(Sequence):
 
     def generate_sequence(self, config):
         """Generate sequence by adding gates/pulses to waveforms"""
-
         # create list with gates
         # self.add_single_gate(0, Gate.X2p, self.first_delay + self.period_1qb/2)
         # self.add_single_gate(0, Gate.CPh, self.first_delay + self.period_1qb + self.period_2qb/2)
@@ -154,22 +149,10 @@ class VZ(Sequence):
 
         width = 0 if edge_to_edge else self.pulses_1qb[0].total_duration()
         vz = VirtualZGate(angle=z_angle)
-        # self.add_gate(0, Gate.X2p)
-        # self.add_gate(0, vz)
-        # self.add_gate(0, Gate.X2p)
-        c = CompositeGate(2)
+        self.add_gate(0, Gate.X2p)
+        self.add_gate(0, vz)
+        self.add_gate(0, Gate.X2p)
 
-        c.add_gate([Gate.X2p, Gate.I])
-        c.add_gate([Gate.I, Gate.Yp], dt=10e-9)
-        c.add_gate([Gate.X2p, Gate.I])
-
-
-        log.log(20, 'Adding c gate')
-        # Handle qubit=[[0, 1], 2], gate=[c, Gate.X2p]
-        self.add_gate([0, 1], c)
-        self.add_gate([1, 0], c, dt=20e-9)
-        self.add_gate(2, Gate.Xm)
-        self.add_gate(0, Gate.Ry)
 
 
 
