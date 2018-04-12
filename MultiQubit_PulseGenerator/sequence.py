@@ -134,6 +134,7 @@ class Sequence(object):
         self.trim_to_sequence = True
         self.trim_start = False
         self.align_to_end = False
+        self.round_to_nearest = False
 
         self.sequences = []
 
@@ -427,13 +428,14 @@ class Sequence(object):
 
             step = Step(self.n_qubit, align=align)
             step.add_gate(qubit, gate)
-            # Longest pulse in the step needed for correct timing
+
             if len(self.sequences) == 0:
                 t_start = self.first_delay-self.dt
             else:
                 t_start = self.sequences[-1].t_end
             t_end = t_start
 
+            # Longest pulse in the step needed for correct timing
             max_duration = 0
             for qubit, gate in enumerate(step.gates):
                 # Virtual Z gate is special since it has no length
@@ -462,17 +464,29 @@ class Sequence(object):
                     max_duration = duration
             if t0 is None:
                 if dt is None:
-                    step.t_start = t_end+self.dt
+                    if max_duration == 0:
+                        # This make sure that gates with zero time don't introduce 2*dt spacing
+                        step.t_start = t_end
+                    else:
+                        step.t_start = t_end+self.dt
                 else:
                     step.t_start = t_end+dt
-
             else:
                 step.t_start = t0-max_duration/2
-                step.t_end = t0+max_duration/2
-            step.t_end = step.t_start+max_duration
+            step.t_start = self.round_to_nearest_sample(step.t_start)
+            step.t_end = self.round_to_nearest_sample(step.t_start+max_duration)
             step.t_middle = step.t_start+max_duration/2
+            log.log(20, 'Start {}, middle {}, end {}'.format(step.t_start, step.t_middle, step.t_end))
+            log.log(20, 'Duration {}'.format(max_duration))
+
 
             self.sequences.append(step)
+
+    def round_to_nearest_sample(self, t):
+        if self.round_to_nearest is True:
+            return round(t*self.sample_rate)/self.sample_rate
+        else:
+            return t
 
     def add_gate_to_all(self, gate, dt=0, align='center'):
             self.add_gate([n for n in range(self.n_qubit)],
@@ -662,6 +676,7 @@ class Sequence(object):
         self.trim_to_sequence = config.get('Trim waveform to sequence')
         self.trim_start = config.get('Trim both start and end')
         self.align_to_end = config.get('Align pulses to end of waveform')
+        self.round_to_nearest = config.get('Round to nearest sample')
 
         # single-qubit pulses
         for n, pulse in enumerate(self.pulses_1qb):

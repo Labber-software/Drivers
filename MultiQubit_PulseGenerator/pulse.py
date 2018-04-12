@@ -190,10 +190,11 @@ class Pulse(object):
                         (t >= (t0 + self.plateau / 2)) *
                         np.exp(-(t - (t0 + self.plateau / 2))**2 / (2 * std**2))
                     )
-            values = values*self.amplitude
+
             if self.start_at_zero:
                 values = values - values.min()
-                values = values/values.max()*self.amplitude
+                values = values/values.max()
+            values = values*self.amplitude
 
         elif self.shape == PulseShape.CZ:
             # notation and calculations are based on the Paper "Fast adiabatic qubit gates using only sigma_z control" PRA 90, 022307 (2014)
@@ -244,10 +245,10 @@ class Pulse(object):
             values = self.amplitude/2*(1-np.cos(2*np.pi*(t-t0+tau/2)/tau))
             # Some rounding error in the number of sample can occur
             # so make sure that any points outside the cosine is 0
-            values[t<(t0-tau/2)] = 0
-            values[t>(t0+tau/2)] = 0
 
-        # return pulse envelope
+        # Make sure the waveform is zero outside the pulse
+        values[t<(t0-self.total_duration()/2)] = 0
+        values[t>(t0+self.total_duration()/2)] = 0
         return values
 
     def calculate_waveform(self, t0, t):
