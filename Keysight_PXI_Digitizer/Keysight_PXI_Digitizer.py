@@ -117,7 +117,7 @@ class Driver(LabberDriver):
             self.dig.channelInputConfig(self.getHwCh(ch), rang, imp, coup)
         return value
 
-        
+
     def performGetValue(self, quant, options={}):
         """Perform the Set Value instrument operation. This function should
         return the actual value set by the instrument"""
@@ -139,7 +139,7 @@ class Driver(LabberDriver):
         else:
             # for all others, return local value
             value = quant.getValue()
-            
+
         return value
 
 
@@ -216,11 +216,11 @@ class Driver(LabberDriver):
         for n in range(nCall):
             # number of cycles for this call, could be fewer for last call
             nCycle = min(nCyclePerCall, nCycleTotal-(n*nCyclePerCall))
+            self.reportStatus('Acquiring traces {}%'.format(int(100*n/nCall)))
             # capture traces one by one
             for nCh in lCh:
                 # channel number depens on hardware version
                 ch = self.getHwCh(nCh)
-                self.reportStatus('Acquiring traces {}%'.format(int(100*n/nCall)))
                 data = self.DAQread(self.dig, ch, nPts*nCycle, int(1000+self.timeout_ms/nCall))
                 # average, if wanted
                 scale = (self.getRange(nCh)/self.bitRange)
@@ -246,7 +246,7 @@ class Driver(LabberDriver):
         """Get channel range, as voltage.  Index start at 0"""
         rang = float(self.getCmdStringFromValue('Ch%d - Range' % (ch + 1)))
         return rang
-        
+
 
     def DAQread(self, dig, nDAQ, nPoints, timeOut):
         """Read data diretly to numpy array"""
