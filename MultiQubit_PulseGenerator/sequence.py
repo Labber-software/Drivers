@@ -276,6 +276,9 @@ class Sequence(object):
         # I/Q waveform predistortion
         self.predistort_waveforms()
 
+        # Apply offsets
+        self.readout_iq += self.readout_i_offset + 1j*self.readout_q_offset
+
         # create and return dictionary with waveforms
         data = dict()
         data['wave_xy'] = self.wave_xy

@@ -25,7 +25,7 @@ class BaseGate:
         pass
 
 
-class SingleQubitGate(BaseGate):
+class SingleQubitGate(BaseGate): # TODO SingleQubitRotation
     def __init__(self, axis, angle):
         super().__init__()
         self.axis = axis
@@ -44,6 +44,8 @@ class SingleQubitGate(BaseGate):
             pulse.phase += np.pi/2
         elif self.axis == 'Z':
             # Z pulses are real valued, i.e. no phase
+            # TODO Implement this
+            # TODO Button for Z or VZ
             pass
         # pi pulse should correspond to the full amplitude
         pulse.amplitude *= self.angle/np.pi
@@ -51,15 +53,16 @@ class SingleQubitGate(BaseGate):
 
 
 class IdentityGate(BaseGate):
-    def __init__(self, width=0):
+    def __init__(self, width=None):
         super().__init__()
         self.width = width
 
     def get_waveform(self, pulse, t0, t):
         pulse = copy(pulse)
         pulse.amplitude = 0
-        pulse.width = self.width
-        pulse.plateau = 0
+        if self.width is not None:
+            pulse.width = self.width
+            pulse.plateau = 0
         return super().get_waveform(pulse, t0, t)
 
 
