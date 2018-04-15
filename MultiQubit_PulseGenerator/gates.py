@@ -47,6 +47,8 @@ class SingleQubitGate(BaseGate): # TODO SingleQubitRotation
             # TODO Implement this
             # TODO Button for Z or VZ
             pass
+        else:
+            raise ValueError('Axis must be X, Y, or Z.')
         # pi pulse should correspond to the full amplitude
         pulse.amplitude *= self.angle/np.pi
         return super().get_waveform(pulse, t0, t)
@@ -131,17 +133,26 @@ class CompositeGate:
 
 
 class SingleMeasurementGate(CompositeGate):
-    def __init__(self, axis='Z'):
+    def __init__(self, axis='Z', sign='P'):
+        # TODO Ask Morten about conventions here
         super().__init__(n_qubit=1)
-        self.axis = axis
-        if self.axis == 'Z':
-            self.add_gate(IdentityGate())
-        elif self.axis == 'Y':
-            self.add_gate(SingleQubitGate(axis='X', angle=np.pi/2))
-        elif self.axis == 'X':
-            self.add_gate(SingleQubitGate(axis='Y', angle=-np.pi/2))
+
+        if axis == 'Z' and sign == 'P':
+            gate = IdentityGate()
+        elif axis == 'Z' and sign == 'M':
+            gate = SingleQubitGate(axis='X', angle=np.pi)
+        elif axis == 'Y' and sign == 'P':
+            gate = SingleQubitGate(axis='X', angle=np.pi/2)
+        elif axis == 'X' and sign == 'P':
+            gate = SingleQubitGate(axis='Y', angle=-np.pi/2)
+        elif axis == 'Y' and sign == 'M':
+            gate = SingleQubitGate(axis='X', angle=-np.pi/2)
+        elif axis == 'X' and sign == 'M':
+            gate = SingleQubitGate(axis='Y', angle=np.pi/2)
         else:
-            raise ValueError('Axis must be X, Y, or Z.')
+            raise ValueError('Axis must be X, Y or Z, and sign must be P or M.')
+
+        self.add_gate(gate)
         self.add_gate(ReadoutGate())
 
 
@@ -163,9 +174,12 @@ class Gate(Enum):
     CPh = TwoQubitGate()
 
     # Readout
-    Rx = SingleMeasurementGate(axis='X')
-    Ry = SingleMeasurementGate(axis='Y')
-    Rz = SingleMeasurementGate(axis='Z')
+    Rxp = SingleMeasurementGate(axis='X', sign='P')
+    Ryp = SingleMeasurementGate(axis='Y', sign='P')
+    Rzp = SingleMeasurementGate(axis='Z', sign='P')
+    Rxm = SingleMeasurementGate(axis='X', sign='M')
+    Rym = SingleMeasurementGate(axis='Y', sign='M')
+    Rzm = SingleMeasurementGate(axis='Z', sign='M')
 
 
 if __name__ == '__main__':
