@@ -57,52 +57,39 @@ class Tomography(object):
         ----------
         sequence : :obj: `Sequence`
             Sequence to which add tomography pulses
-
-        time : float
-            Time of tomography pulse
-
         """
         if self.nQubits == 1:
             qubitID = self.singleQBtomoID - 1
             if self.tomography_index == 'Z':
-                sequence.add_single_gate(qubitID, Gate.I) # measure Z polarization
+                gate = Gate.Rzp # measure Z polarization
             elif self.tomography_index == 'Y':
-                sequence.add_single_gate(qubitID, Gate.X2p) # measure Y polarization
+                gate = Gate.Ryp # measure Y polarization
             elif self.tomography_index == 'X':
-                sequence.add_single_gate(qubitID, Gate.Y2m) # measure X polarization
+                gate = Gate.Rxp # measure X polarization
+            sequence.add_gate(qubitID, gate)
 
         elif self.nQubits == 2:
             qubitID1 = self.twoQBtomoID1 - 1
             qubitID2 = self.twoQBtomoID2 - 1
             if self.tomography_index == 'XX':
-                sequence.add_single_gate(qubitID1,Gate.Y2m)
-                sequence.add_single_gate(qubitID2,Gate.Y2m)
+                gate = [Gate.Rxp, Gate.Rxp]
             elif self.tomography_index == 'YX':
-                sequence.add_single_gate(qubitID1,Gate.X2p)
-                sequence.add_single_gate(qubitID2,Gate.Y2m)
+                gate = [Gate.Ryp, Gate.Rxp]
             elif self.tomography_index == 'ZX':
-                sequence.add_single_gate(qubitID1,Gate.I)
-                sequence.add_single_gate(qubitID2,Gate.Y2m)
+                gate = [Gate.Rzp, Gate.Rxp]
             elif self.tomography_index == 'XY':
-                sequence.add_single_gate(qubitID1,Gate.Y2m)
-                sequence.add_single_gate(qubitID2,Gate.X2p)
+                gate = [Gate.Rxp, Gate.Ryp]
             elif self.tomography_index == 'YY':
-                sequence.add_single_gate(qubitID1,Gate.X2p)
-                sequence.add_single_gate(qubitID2,Gate.X2p)
+                gate = [Gate.Ryp, Gate.Ryp]
             elif self.tomography_index == 'ZY':
-                sequence.add_single_gate(qubitID1,Gate.I)
-                sequence.add_single_gate(qubitID2,Gate.X2p)
+                gate = [Gate.Rzp, Gate.Ryp]
             elif self.tomography_index == 'XZ':
-                sequence.add_single_gate(qubitID1,Gate.Y2m)
-                sequence.add_single_gate(qubitID2,Gate.I)
+                gate = [Gate.Rxp, Gate.Rzp]
             elif self.tomography_index == 'YZ':
-                sequence.add_single_gate(qubitID1,Gate.X2p)
-                sequence.add_single_gate(qubitID2,Gate.I)
+                gate = [Gate.Ryp, Gate.Rzp]
             elif self.tomography_index == 'ZZ':
-                sequence.add_single_gate(qubitID1,Gate.I)
-                sequence.add_single_gate(qubitID2,Gate.I)
-        pass
-
+                gate = [Gate.Rzp, Gate.Rzp]
+            sequence.add_gate([qubitID1, qubitID2], gate)
 
 
 if __name__ == '__main__':
