@@ -49,13 +49,14 @@ class Pulse(object):
         DRAG coefficient scaling.
 
     truncation_range : float
-        Truncation range, measured in units of the `width` parameter.
+        Truncation range for Gaussian pulses,
+        measured in units of the `width` parameter.
 
     pulse_type : enum, {'XY', 'Z', 'Readout'}
         What type of waveform the pulse is used for.
 
     start_at_zero : bool
-        If True, forces the pulse to start at zero amplitude
+        If True, forces the pulse to start at zero amplitude.
 
     gated : bool
         If True, generates a gate for the pulse. Can also be used as a trig.

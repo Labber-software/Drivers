@@ -26,6 +26,7 @@ def add_singleQ_clifford(index, gate_seq):
         gate_seq.append(Gate.Xp)
         gate_seq.append(Gate.Yp)
         gate_seq.append(Gate.I) # auxiliary
+
     ### 2pi/3 rotations
     elif index == 4:
         gate_seq.append(Gate.Y2p)
@@ -59,6 +60,7 @@ def add_singleQ_clifford(index, gate_seq):
         gate_seq.append(Gate.X2m)
         gate_seq.append(Gate.Y2m)
         gate_seq.append(Gate.I) # auxiliary
+
     ### pi/2 rotations
     elif index == 12:
         gate_seq.append(Gate.X2p)
@@ -84,6 +86,7 @@ def add_singleQ_clifford(index, gate_seq):
         gate_seq.append(Gate.X2p)
         gate_seq.append(Gate.Y2m)
         gate_seq.append(Gate.X2m)
+        
     ### Hadamard-Like
     elif index == 18:
         gate_seq.append(Gate.Y2p)
