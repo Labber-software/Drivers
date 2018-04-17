@@ -86,7 +86,7 @@ def add_singleQ_clifford(index, gate_seq):
         gate_seq.append(Gate.X2p)
         gate_seq.append(Gate.Y2m)
         gate_seq.append(Gate.X2m)
-        
+
     ### Hadamard-Like
     elif index == 18:
         gate_seq.append(Gate.Y2p)

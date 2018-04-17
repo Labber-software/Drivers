@@ -72,7 +72,6 @@ class SingleQubitRotation(BaseGate):
         elif self.axis == 'Z':
             # Z pulses are real valued, i.e. no phase
             # TODO Implement this
-            # TODO Button for Z or VZ
             pass
         else:
             raise ValueError('Axis must be X, Y, or Z.')
@@ -121,7 +120,7 @@ class TwoQubitGate(BaseGate):
 
 class ReadoutGate(BaseGate):
     """
-    Readouts the qubit state/
+    Readouts the qubit state.
     """
     def __init__(self):
         super().__init__()
@@ -154,6 +153,7 @@ class CompositeGate:
         """
         Adds gate to the composite gate.
         """
+        # TODO Remove dt etc
         if not isinstance(gate, list):
             gate = [gate]
         if t0 is not None:

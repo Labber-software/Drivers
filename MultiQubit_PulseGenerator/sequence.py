@@ -37,8 +37,12 @@ class Step:
         if not isinstance(gate, list):
             gate = [gate]
         for i in range(len(gate)):
-            # We need the gate object, not the enum
+
+            if gate[i] == None:
+                # Replace Nones with Identity gate
+                gate[i] = Gate.I
             if isinstance(gate[i], Enum):
+                # We need the gate object, not the enum
                 self.gates[qubit[i]] = gate[i].value
             else:
                 self.gates[qubit[i]] = gate[i]
@@ -296,7 +300,9 @@ class Sequence(object):
                     pulse = gate.pulse
                 else:
                     raise ValueError('Please provide a pulse for this gate type.')
-
+                log.log(20, 'Pulse')
+                log.log(20, str(gate))
+                log.log(20, str(pulse.pulse_type))
                 if pulse.pulse_type == PulseType.Z:
                         waveform = self.wave_z[qubit]
                 elif pulse.pulse_type == PulseType.XY:
@@ -402,35 +408,28 @@ class Sequence(object):
         # Keep track of its length in steps and time, then add matching I gates to compoensate
         # How to handle multiple composite gates?
         # Composite gates consit of multiple gates. Add one by one.
+        # For now, force CompositeGates to have the same length
         # Test with 2 Rx gates
         if isinstance(gate, CompositeGate):
-            if isinstance(qubit, int):
-                qubit = [qubit]
-            if len(qubit) != gate.n_qubit:
-                raise ValueError('For composite gates the length of the qubit \
-                list must match the number of qubits in the composite gate.')
-
-            comp_start = 0
-            comp_end = 0
-            for i in range(len(gate)):
-                kwargs = gate.get_gate_dict_at_index(i)
-                if i == 0 and dt is not None:
-                    if kwargs['dt'] is None:
-                        kwargs['dt'] = dt
-                    else:
-                        kwargs['dt'] += dt
-                self.add_gate(qubit, **kwargs)
-                if i == 0:
-                    comp_start = self.sequences[-1].t_start
-            comp_end = self.sequences[-1].t_end
+            self.add_composite_gate(qubit, gate, t0, dt, align)
             return
-
         if not isinstance(qubit, list):
             qubit = [qubit]
         if not isinstance(gate, list):
             gate = [gate]
         if len(gate) != len(qubit):
             raise ValueError('Length of qubit and gate list must be equal.')
+
+        # If any of the gates is a composite gate, special care is needed
+        for g in gate:
+            log.log(20, str(g))
+            if isinstance(g, Enum):
+                g = g.value
+                log.log(20, str(g))
+            if isinstance(g, CompositeGate):
+                log.log(20, 'Multiple')
+                self.add_multiple_composite_gates(qubit, gate, t0, dt, align)
+                return
 
         step = Step(self.n_qubit, align=align)
         step.add_gate(qubit, gate)
@@ -485,6 +484,56 @@ class Sequence(object):
 
         self.sequences.append(step)
 
+    def add_composite_gate(self, qubit, gate, t0=None, dt=None, align='center'):
+        if isinstance(qubit, int):
+            qubit = [qubit]
+        if len(qubit) != gate.n_qubit:
+            raise ValueError('For composite gates the length of the qubit \
+            list must match the number of qubits in the composite gate.')
+
+        for i in range(len(gate)):
+            kwargs = gate.get_gate_dict_at_index(i)
+            if i == 0 and dt is not None:
+                if kwargs['dt'] is None:
+                    kwargs['dt'] = dt
+                else:
+                    kwargs['dt'] += dt
+            self.add_gate(qubit, **kwargs)
+
+    def add_multiple_composite_gates(self, qubit, gate, t0=None, dt=None, align='center'):
+        gate_length = 0
+        log.log(20, 'Hi from mulitple')
+        for i, g in enumerate(gate):
+            if isinstance(g, Enum):
+                g = g.value
+            if isinstance(g, CompositeGate):
+                if gate_length == 0:
+                    gate_length = len(g)
+                elif gate_length != len(g):
+                    raise ValueError('For now, composite gates added at the same time needs to have the same length')
+
+        sequence = []
+        log.log(20, str(gate))
+        for i in range(gate_length):
+            step = [Gate.I for n in range(self.n_qubit)]
+            for j, g in enumerate(gate):
+                if isinstance(g, Enum):
+                    g = g.value
+                if isinstance(g, CompositeGate):
+                    kwargs = g.get_gate_dict_at_index(i)
+                    for k, G in enumerate(kwargs['gate']):
+                        if isinstance(qubit[j], int):
+                            qubit[j] = [qubit[j]]
+                        step[qubit[j][k]] = G
+                else:
+                    if j == 0:
+                        step[qubit[j]] = g
+            sequence.append(step)
+        log.log(20, 'Add these gates')
+        log.log(20, str(sequence))
+        self.add_gates(sequence)
+
+
     def round_to_nearest_sample(self, t):
         """
         Rounds the given time t to the nearest sample point.
@@ -527,7 +576,6 @@ class Sequence(object):
             have the same length as number of qubits in the sequence.
 
         """
-        # TODO Fix None gates here
         # make sure we have correct input
         if not isinstance(gates, (list, tuple)):
             raise Exception('The input must be a list of list with gates')
@@ -571,6 +619,7 @@ class Sequence(object):
     def perform_virtual_z(self):
         """Shifts the phase of pulses subsequent to virutal z gates
         """
+        # TODO Not for Readout
         for qubit in range(self.n_qubit):
             for m, step in enumerate(self.sequences):
                 gate = step.gates[qubit]
@@ -714,7 +763,7 @@ class Sequence(object):
             s = ' #%d%d' % (n + 1, n + 2)
             # global parameters
             pulse.shape = PulseShape(config.get('Pulse type, 2QB'))
-            pulse.z_pulse = True
+            pulse.pulse_type = PulseType.Z
             if config.get('Pulse type, 2QB') == 'CZ':
                 pulse.F_Terms = d[config.get('Fourier terms, 2QB')]
                 if config.get('Uniform 2QB pulses'):

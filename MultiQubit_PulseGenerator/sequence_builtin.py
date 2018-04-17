@@ -136,7 +136,6 @@ class CZecho(Sequence):
         CZEchoGate.add_gate([Gate.X2p, Gate.Xp])
         self.add_gate(qubit=[0, 1], gate=CZEchoGate)
 
-
 class VZ(Sequence):
     def generate_sequence(self, config):
         """Generate sequence by adding gates/pulses to waveforms"""
@@ -146,12 +145,11 @@ class VZ(Sequence):
         edge_to_edge = config['Edge-to-edge pulses']
         self.virtual_z_gates = []
 
-
         width = 0 if edge_to_edge else self.pulses_1qb[0].total_duration()
         vz = VirtualZGate(angle=z_angle)
-        self.add_gate(0, Gate.X2p)
-        self.add_gate(0, vz)
-        self.add_gate(0, Gate.X2p)
+        self.add_gate_to_all(Gate.X2p)
+        self.add_gate_to_all(vz)
+        self.add_gate_to_all(Gate.X2p)
 
 
 
