@@ -300,9 +300,6 @@ class Sequence(object):
                     pulse = gate.pulse
                 else:
                     raise ValueError('Please provide a pulse for this gate type.')
-                log.log(20, 'Pulse')
-                log.log(20, str(gate))
-                log.log(20, str(pulse.pulse_type))
                 if pulse.pulse_type == PulseType.Z:
                         waveform = self.wave_z[qubit]
                 elif pulse.pulse_type == PulseType.XY:
@@ -422,12 +419,9 @@ class Sequence(object):
 
         # If any of the gates is a composite gate, special care is needed
         for g in gate:
-            log.log(20, str(g))
             if isinstance(g, Enum):
                 g = g.value
-                log.log(20, str(g))
             if isinstance(g, CompositeGate):
-                log.log(20, 'Multiple')
                 self.add_multiple_composite_gates(qubit, gate, t0, dt, align)
                 return
 
@@ -485,6 +479,9 @@ class Sequence(object):
         self.sequences.append(step)
 
     def add_composite_gate(self, qubit, gate, t0=None, dt=None, align='center'):
+        """
+        Adds a composite gate to the sequence.
+        """
         if isinstance(qubit, int):
             qubit = [qubit]
         if len(qubit) != gate.n_qubit:
@@ -501,8 +498,12 @@ class Sequence(object):
             self.add_gate(qubit, **kwargs)
 
     def add_multiple_composite_gates(self, qubit, gate, t0=None, dt=None, align='center'):
+        """
+        Adds multiple composite gates to the sequence. The composite gates need
+        to have the same length. Single qubit gates are also allowed, and will
+        be padded with I gates to have the same length as the composite gate.
+        """
         gate_length = 0
-        log.log(20, 'Hi from mulitple')
         for i, g in enumerate(gate):
             if isinstance(g, Enum):
                 g = g.value
@@ -513,7 +514,6 @@ class Sequence(object):
                     raise ValueError('For now, composite gates added at the same time needs to have the same length')
 
         sequence = []
-        log.log(20, str(gate))
         for i in range(gate_length):
             step = [Gate.I for n in range(self.n_qubit)]
             for j, g in enumerate(gate):
@@ -529,8 +529,6 @@ class Sequence(object):
                     if j == 0:
                         step[qubit[j]] = g
             sequence.append(step)
-        log.log(20, 'Add these gates')
-        log.log(20, str(sequence))
         self.add_gates(sequence)
 
 
