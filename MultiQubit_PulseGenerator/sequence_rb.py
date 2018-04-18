@@ -409,6 +409,13 @@ class TwoQubit_RB(Sequence):
                     if interleaved_gate == '2-QB Gate,CZ':
                         gate_seq_1.append(Gate.I)
                         gate_seq_2.append(Gate.CPh)
+                    elif interleaved_gate == '2-QB Gate,CZEcho':
+                        # CZEcho is a composite gate, so get each gate
+                        gate = Gate.CZEcho.value
+                        for g in gate.sequence:
+                            gate_seq_1.append(g[0])
+                            gate_seq_2.append(g[1])
+
 
             #get recovery gate seq
             (recovery_seq_1, recovery_seq_2) = self.get_recovery_gate(gate_seq_1, gate_seq_2)
@@ -419,8 +426,8 @@ class TwoQubit_RB(Sequence):
             if (self.n_qubit > qubits_to_benchmark[0]):
                 for i in range(qubits_to_benchmark[0]-1):
                     multi_gate_seq.append([None] * len(gate_seq_1))
-                multi_gate_seq.append(gate_seq_1)
                 multi_gate_seq.append(gate_seq_2)
+                multi_gate_seq.append(gate_seq_1)
                 for i in range(self.n_qubit - qubits_to_benchmark[1]):
                     multi_gate_seq.append([None] * len(gate_seq_1))
             else:

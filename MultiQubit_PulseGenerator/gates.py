@@ -153,33 +153,24 @@ class CompositeGate:
         """
         Adds gate to the composite gate.
         """
-        # TODO Remove dt etc
         if not isinstance(gate, list):
             gate = [gate]
-        if t0 is not None:
-            raise NotImplementedError('t0 alignment not implemented yet')
         if len(gate) != self.n_qubit:
             raise ValueError('Number of gates not equal to number of qubits')
 
-        g = {
-            'gate': gate,
-            'dt': dt,
-            'align': align
-        }
-        self.sequence.append(g)
+        self.sequence.append(gate)
 
-
-    def get_gate_dict_at_index(self, i):
+    def get_gate_at_index(self, i):
         """
         Returns the gates at a given index in the sequence.
         """
-        return copy(self.sequence[i])
+        return self.sequence[i]
 
     def __len__(self):
         return len(self.sequence)
 
 
-class SingleMeasurementGate(CompositeGate):
+class MeasurementGate(CompositeGate):
     """
     Measures the qubit along the specified axis.
     Axis should be X, Y, or Z. The sign is either positive (P) or negative (M).
@@ -224,12 +215,21 @@ class Gate(Enum):
     CPh = TwoQubitGate()
 
     # Readout
-    Rxp = SingleMeasurementGate(axis='X', sign='P')
-    Ryp = SingleMeasurementGate(axis='Y', sign='P')
-    Rzp = SingleMeasurementGate(axis='Z', sign='P')
-    Rxm = SingleMeasurementGate(axis='X', sign='M')
-    Rym = SingleMeasurementGate(axis='Y', sign='M')
-    Rzm = SingleMeasurementGate(axis='Z', sign='M')
+    Rxp = MeasurementGate(axis='X', sign='P')
+    Ryp = MeasurementGate(axis='Y', sign='P')
+    Rzp = MeasurementGate(axis='Z', sign='P')
+    Rxm = MeasurementGate(axis='X', sign='M')
+    Rym = MeasurementGate(axis='Y', sign='M')
+    Rzm = MeasurementGate(axis='Z', sign='M')
+
+    # Composite gates
+    CZEcho = CompositeGate(n_qubit=2)
+    CZEcho.add_gate([X2p, I])
+    CZEcho.add_gate([CPh, I])
+    CZEcho.add_gate([Xp, Xp])
+    CZEcho.add_gate([CPh, I])
+    CZEcho.add_gate([X2p, Xp])
+
 
 
 if __name__ == '__main__':

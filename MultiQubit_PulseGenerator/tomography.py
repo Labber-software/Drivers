@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 from gates import Gate
 from copy import copy
 

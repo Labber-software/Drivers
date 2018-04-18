@@ -23,7 +23,7 @@ class Step:
     """
     This class represents one step in the qubit sequences.
     """
-    def __init__(self, n_qubit=MAX_QUBIT, t_start=0, t_end=0, align='right'):
+    def __init__(self, n_qubit=MAX_QUBIT, t_start=0, t_end=0, align='center'):
         self.n_qubit = n_qubit
         self.gates = [Gate.I.value for n in range(self.n_qubit)]
         self.align = align
@@ -37,7 +37,6 @@ class Step:
         if not isinstance(gate, list):
             gate = [gate]
         for i in range(len(gate)):
-
             if gate[i] == None:
                 # Replace Nones with Identity gate
                 gate[i] = Gate.I
@@ -109,9 +108,6 @@ class Sequence(object):
     readout_delay : float
         Readout trig delay.
 
-    readout_iq_generate : bool
-        If True, generate complex waveform with multi-qubit I/Q readout signals.
-
     compensate_crosstalk : bool
         If True, Z-control waveforms will be compensated for cross-talk.
 
@@ -168,7 +164,6 @@ class Sequence(object):
         self.readout_trig_generate = False
 
         # readout wave object and settings
-        self.readout_iq_generate = False
         self.readout_delay = 0.0
         self.readout = Readout(max_qubit=MAX_QUBIT)
         self.readout_trig = np.array([], dtype=float)
@@ -238,7 +233,16 @@ class Sequence(object):
         self.sequences = []
         self.generate_sequence(config)
         self.add_tomography()
-        self.add_readout() # TODO Move to each sequence?
+        # If there is no readout present in the sequence, add it.
+        add_readout = True
+        for g in self.sequences[-1].gates:
+            if isinstance(g, ReadoutGate):
+                add_readout = False
+        if add_readout:
+            self.add_readout()
+        # Make sure readout starts at the same time for each qubit
+        self.sequences[-1].align = 'left'
+
         self.perform_virtual_z()
         self.init_waveforms()
         self.generate_waveforms()
@@ -489,13 +493,7 @@ class Sequence(object):
             list must match the number of qubits in the composite gate.')
 
         for i in range(len(gate)):
-            kwargs = gate.get_gate_dict_at_index(i)
-            if i == 0 and dt is not None:
-                if kwargs['dt'] is None:
-                    kwargs['dt'] = dt
-                else:
-                    kwargs['dt'] += dt
-            self.add_gate(qubit, **kwargs)
+            self.add_gate(qubit, gate.get_gate_at_index(i))
 
     def add_multiple_composite_gates(self, qubit, gate, t0=None, dt=None, align='center'):
         """
@@ -520,8 +518,7 @@ class Sequence(object):
                 if isinstance(g, Enum):
                     g = g.value
                 if isinstance(g, CompositeGate):
-                    kwargs = g.get_gate_dict_at_index(i)
-                    for k, G in enumerate(kwargs['gate']):
+                    for k, G in enumerate(g.get_gate_at_index(i)):
                         if isinstance(qubit[j], int):
                             qubit[j] = [qubit[j]]
                         step[qubit[j][k]] = G
@@ -623,20 +620,16 @@ class Sequence(object):
                 gate = step.gates[qubit]
                 if isinstance(gate, VirtualZGate):
                     for subsequent_step in self.sequences[m+1:len(self.sequences)]:
-                        subsequent_step.gates[qubit] = subsequent_step.gates[qubit].add_phase(gate.angle)
+                        if not isinstance(subsequent_step.gates[qubit], ReadoutGate):
+                            subsequent_step.gates[qubit] = subsequent_step.gates[qubit].add_phase(gate.angle)
 
     def add_readout(self):
         """Create read-out trig and waveform signals at the end of the sequence
 
         """
-        if self.readout_iq_generate:
-            readout = ReadoutGate()
-            delay = IdentityGate(width=self.readout_delay)
-            self.add_gate([n for n in range(self.n_qubit)],
-                          [delay for n in range(self.n_qubit)], dt=0)
-            self.add_gate([n for n in range(self.n_qubit)],
-                          [readout for n in range(self.n_qubit)], dt=0,
-                          align='left')
+        delay = IdentityGate(width=self.readout_delay)
+        self.add_gate_to_all(delay, dt=0)
+        self.add_gate_to_all(ReadoutGate(), dt=0, align='left')
 
     def add_microwave_gate(self, config):
         """Create waveform for gating microwave switch
@@ -833,7 +826,6 @@ class Sequence(object):
                 self.target_rise[n] = config.get('Target rise time')
 
         # readout settings
-        self.readout_iq_generate = config.get('Generate readout waveform')
         self.readout_delay = config.get('Readout delay')
         self.readout_i_offset = config.get('Readout offset - I')
         self.readout_q_offset = config.get('Readout offset - Q')
