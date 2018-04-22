@@ -204,7 +204,7 @@ class AlazarTechDigitizer():
 
 
     #RETURN_CODE AlazarSetRecordCount( HANDLE h, U32 Count);
-    def AlazarSetRecordCount(self, nRecord, nAverage):
+    def AlazarSetRecordCount(self, nRecord, nAverage=1):
         self.nRecord = int(nRecord)
         self.nAverage = int(nAverage)
         self.callFunc('AlazarSetRecordCount', self.handle, U32(nRecord*nAverage))
