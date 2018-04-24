@@ -439,7 +439,7 @@ class Sequence(object):
         t_end = t_start
 
         # Longest pulse in the step needed for correct timing
-        max_duration = 0
+        max_duration = -np.inf
         for qubit, gate in enumerate(step.gates):
             # Virtual Z gate is special since it has no length
             if isinstance(gate, VirtualZGate):
@@ -479,6 +479,8 @@ class Sequence(object):
         step.t_start = self.round_to_nearest_sample(step.t_start)
         step.t_end = self.round_to_nearest_sample(step.t_start+max_duration)
         step.t_middle = step.t_start+max_duration/2
+        log.log(20, 't_start:{}'.format(step.t_start))
+        log.log(20, 't_end:{}'.format(step.t_end))
 
         self.sequences.append(step)
 
@@ -546,7 +548,7 @@ class Sequence(object):
         """
 
         self.add_gate([n for n in range(self.n_qubit)],
-                      [gate for n in range(self.n_qubit)], align=align)
+                      [gate for n in range(self.n_qubit)], dt=dt, align=align)
 
 
     def add_gates(self, gates):
