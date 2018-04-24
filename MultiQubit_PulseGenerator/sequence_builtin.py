@@ -2,7 +2,7 @@
 import numpy as np
 from copy import copy
 from sequence import Sequence
-from gates import Gate, VirtualZGate, CompositeGate, IdentityGate
+from gates import Gate, VirtualZGate, CompositeGate, IdentityGate, CustomGate
 from pulse import PulseShape, Pulse
 
 # add logger, to allow logging to Labber's instrument log
@@ -136,6 +136,30 @@ class VZ(Sequence):
         self.add_gate_to_all(Gate.X2p)
         self.add_gate_to_all(vz)
         self.add_gate_to_all(Gate.X2p)
+
+
+class Timing(Sequence):
+    def generate_sequence(self, config):
+        """Generate sequence by adding gates/pulses to waveforms"""
+        # get parameters
+        duration = config['Timing - Delay']
+        self.add_gate_to_all(Gate.Zp, t0=self.first_delay)
+        self.add_gate_to_all(Gate.Xp, t0=self.first_delay-duration)
+
+
+class Anharmonicty(Sequence):
+    def generate_sequence(self, config):
+        self.add_gate_to_all(Gate.Xp)
+        pulse12 = copy(self.pulses_1qb_xy[0])
+        pulse12.shape = PulseShape(config.get('Anharmonicty - Pulse type'))
+        pulse12.amplitude = config.get('Anharmonicty - Amplitude')
+        pulse12.width = config.get('Anharmonicty - Width')
+        pulse12.plateau = config.get('Anharmonicty - Plateau')
+        pulse12.frequency = config.get('Anharmonicty - Frequency')
+        pulse12.truncation_range = config.get('Anharmonicty - Truncation range')
+        gate = CustomGate(pulse12)
+        self.add_gate_to_all(gate)
+        self.add_gate_to_all(Gate.Xp)
 
 
 

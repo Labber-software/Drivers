@@ -442,9 +442,10 @@ class Sequence(object):
         for qubit, gate in enumerate(step.gates):
             # Virtual Z gate is special since it has no length
             if isinstance(gate, VirtualZGate):
-                continue
+                duration = 0
+                pulse = None
             # Get the corresponding pulse
-            if isinstance(gate, SingleQubitRotation):
+            elif isinstance(gate, SingleQubitRotation):
                 if gate.axis in ('X', 'Y'):
                     pulse = self.pulses_1qb_xy[qubit]
                 elif gate.axis == 'Z':
@@ -459,6 +460,8 @@ class Sequence(object):
                 pulse = self.pulses_2qb[qubit]
             elif isinstance(gate, ReadoutGate):
                 pulse = self.pulses_readout[qubit]
+            elif isinstance(gate, CustomGate):
+                pulse = gate.pulse
             else:
                 raise ValueError('Please provide a pulse for this gate type.')
 
@@ -481,6 +484,9 @@ class Sequence(object):
         step.t_start = self.round_to_nearest_sample(step.t_start)
         step.t_end = self.round_to_nearest_sample(step.t_start+max_duration)
         step.t_middle = step.t_start+max_duration/2
+        log.log(20, 'max duration{}'.format(max_duration))
+        log.log(20, 't_start:{}'.format(step.t_start))
+        log.log(20, 't_end:{}'.format(step.t_end))
 
         self.sequences.append(step)
 
@@ -541,14 +547,15 @@ class Sequence(object):
         else:
             return t
 
-    def add_gate_to_all(self, gate, dt=None, align='center'):
+    def add_gate_to_all(self, gate, t0=None, dt=None, align='center'):
         """
         Add a single gate to all the qubits. Pulses are added at the end
         of the sequence, with the gate spacing set by the spacing parameter.
         """
 
         self.add_gate([n for n in range(self.n_qubit)],
-                      [gate for n in range(self.n_qubit)], dt=dt, align=align)
+                      [gate for n in range(self.n_qubit)], t0=t0, dt=dt,
+                      align=align)
 
 
     def add_gates(self, gates):
