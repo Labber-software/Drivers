@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import numpy as np
 from enum import Enum
-# TODO Add gating here.
+import logging
+log = logging.getLogger('LabberDriver')
 
 class PulseShape(Enum):
     """Define possible qubit pulses shapes"""
@@ -311,8 +312,10 @@ class Pulse(object):
             raise ValueError('Waveform is not defined as gated.')
         y = np.zeros_like(t)
         dt = t[1]-t[0]
-        start = np.ceil((t0-self.total_duration()/2+self.gate_delay)/dt)
-        stop = start + np.floor(self.gate_duration/dt)
+        start = int(np.ceil((t0-self.total_duration()/2+self.gate_delay)/dt))
+        stop = int(start + np.floor(self.gate_duration/dt))
+        log.log(20, 'Start index {}'.format(start))
+        log.log(20, 'Stop index {}'.format(stop))
         y[start:stop] = self.gate_amplitude
         return y
 

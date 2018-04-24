@@ -7,7 +7,8 @@ class Tomography(object):
 
     """
 
-    def __init__(self,tomography_index=0,nQubits = 1, singleQBtomoID = 0, twoQBtomoID1=0, twoQBtomoID2=1):
+    def __init__(self,tomography_index=0,nQubits = 1, singleQBtomoID = 0,
+                 twoQBtomoID1=0, twoQBtomoID2=1):
         # define variables
         self.tomography_index = tomography_index
         self.nQubits = nQubits
@@ -29,8 +30,19 @@ class Tomography(object):
             return
 
         # First figure out how many qubits we're dealing with:
-        dnQubitsTranslate = {'One': int(1), 'Two': int(2), 'Three': int(3), 'Four': int(4), 'Five': int(5), 'Six': int(6), 'Seven': int(7), 'Eight': int(8), 'Nine': int(9)}
-        self.nQubits = dnQubitsTranslate[config.get('Qubits for tomography')]# nQubits now contain number of qubits as an integer
+        dnQubitsTranslate = {
+            'One': int(1),
+            'Two': int(2),
+            'Three': int(3),
+            'Four': int(4),
+            'Five': int(5),
+            'Six': int(6),
+            'Seven': int(7),
+            'Eight': int(8),
+            'Nine': int(9)
+        }
+        self.nQubits = dnQubitsTranslate[config.get('Qubits for tomography')]
+        # nQubits now contain number of qubits as an integer
 
         # depending on 1 or 2 QB tomography:
         if self.nQubits == 1:
@@ -38,14 +50,28 @@ class Tomography(object):
             self.singleQBtomoID = dnQubitsTranslate[config.get('Qubit for tomography')]
 
             # Index into string identifying which pauli-matrix prefactor we're measuring:
-            dictToPulse1QB = {'0 - Z': 'Z', '1 - Y': 'Y', '2 - X': 'X'}
+            dictToPulse1QB = {
+                '0 - Z': 'Z',
+                '1 - Y': 'Y', 
+                '2 - X': 'X'
+            }
             self.tomography_index = dictToPulse1QB[config.get('Tomography pulse index 1-QB')]
 
         elif self.nQubits ==  2:
             self.twoQBtomoID1 = dnQubitsTranslate[config.get('Qubit 1 # tomography')]
             self.twoQBtomoID2 = dnQubitsTranslate[config.get('Qubit 2 # tomography')]
 
-            dictToPulse2QB = {'1 - XX': 'XX', '2 - YX': 'YX', '3 - ZX': 'ZX', '4 - XY': 'XY', '5 - YY': 'YY', '6 - ZY': 'ZY', '7 - XZ': 'XZ', '8 - YZ': 'YZ', '9 - ZZ': 'ZZ'}
+            dictToPulse2QB = {
+                '1 - XX': 'XX',
+                '2 - YX': 'YX',
+                '3 - ZX': 'ZX',
+                '4 - XY': 'XY',
+                '5 - YY': 'YY',
+                '6 - ZY': 'ZY',
+                '7 - XZ': 'XZ',
+                '8 - YZ': 'YZ',
+                '9 - ZZ': 'ZZ'
+            }
             self.tomography_index = dictToPulse2QB[config.get('Tomography pulse index 2-QB')]
         pass
 

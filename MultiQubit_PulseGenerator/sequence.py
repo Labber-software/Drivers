@@ -136,6 +136,9 @@ class Sequence(object):
         self.wave_z = [np.zeros(0) for n in range(MAX_QUBIT)]
         self.wave_gate = [np.zeros(0) for n in range(MAX_QUBIT)]
 
+        self.wave_xy_delays = np.zeros(MAX_QUBIT)
+        self.wave_z_delays = np.zeros(MAX_QUBIT)
+
         # define pulses
         self.pulses_1qb_xy = [Pulse() for n in range(MAX_QUBIT)]
         self.pulses_1qb_z = [Pulse() for n in range(MAX_QUBIT)]
@@ -173,9 +176,23 @@ class Sequence(object):
 
     def init_waveforms(self):
         """Initialize waveforms according to sequence settings"""
+        # To keep the first pulse delay, find the smallest delay and use that as a time reference.
+        log.log(20, 'XY Delays {}'.format(self.wave_xy_delays))
+        log.log(20, 'Z Delays {}'.format(self.wave_z_delays))
+        min_delay = np.min([self.wave_xy_delays[:self.n_qubit],
+                           self.wave_z_delays[:self.n_qubit]])
+        self.wave_xy_delays -= min_delay
+        self.wave_z_delays -= min_delay
+        max_delay = np.max([self.wave_xy_delays[:self.n_qubit],
+                            self.wave_z_delays[:self.n_qubit]])
+        log.log(20, 'Min delay {}'.format(min_delay))
+        log.log(20, 'Max delay {}'.format(max_delay))
+        log.log(20, 'XY Delays {}'.format(self.wave_xy_delays))
+        log.log(20, 'Z Delays {}'.format(self.wave_z_delays))
         # create empty waveforms of the correct size
+        end = self.sequences[-1].t_end + max_delay
         if self.trim_to_sequence:
-            self.n_pts = int(np.ceil(self.sequences[-1].t_end*self.sample_rate))+1
+            self.n_pts = int(np.ceil(end*self.sample_rate))+1
         for n in range(self.n_qubit):
             self.wave_xy[n] = np.zeros(self.n_pts, dtype=np.complex)
             self.wave_z[n] = np.zeros(self.n_pts, dtype=float)
@@ -245,6 +262,7 @@ class Sequence(object):
         self.sequences[-1].align = 'left'
 
         self.perform_virtual_z()
+
         self.init_waveforms()
         self.generate_waveforms()
 
@@ -311,17 +329,26 @@ class Sequence(object):
                     raise ValueError('Please provide a pulse for this gate type.')
                 if pulse.pulse_type == PulseType.Z:
                         waveform = self.wave_z[qubit]
+                        delay = self.wave_z_delays[qubit]
                 elif pulse.pulse_type == PulseType.XY:
                         waveform = self.wave_xy[qubit]
                         gate_waveform = self.wave_gate
+                        delay = self.wave_xy_delays[qubit]
                 elif pulse.pulse_type == PulseType.READOUT:
                         waveform = self.readout_iq
                         gate_waveform = self.readout_trig
+                        delay = 0
 
                 # get the range of indices in use
+                start = self.round_to_nearest_sample(step.t_start + delay)
+                middle = self.round_to_nearest_sample(step.t_middle + delay)
+                end = self.round_to_nearest_sample(step.t_end + delay)
+                log.log(20, 'Start {}'.format(start))
+                log.log(20, 'Middle {}'.format(middle))
+                log.log(20, 'End {}'.format(end))
                 indices = np.arange(
-                    max(np.floor(step.t_start*self.sample_rate), 0),
-                    min(np.ceil(step.t_end*self.sample_rate), self.n_pts),
+                    max(np.floor(start*self.sample_rate), 0),
+                    min(np.ceil(end*self.sample_rate), self.n_pts),
                     dtype=int
                 )
                 # return directly if no indices
@@ -330,14 +357,16 @@ class Sequence(object):
 
                 # calculate time values for the pulse indices
                 t = indices/self.sample_rate
-                max_duration = step.t_end - step.t_start
+                max_duration = end-start
                 if step.align == 'center':
-                    t0 = step.t_middle
+                    t0 = middle
                 elif step.align == 'left':
-                    t0 = step.t_middle - (max_duration-pulse.total_duration())/2
+                    t0 = middle - (max_duration-pulse.total_duration())/2
                 elif step.align == 'right':
-                    t0 = step.t_middle + (max_duration-pulse.total_duration())/2
+                    t0 = middle + (max_duration-pulse.total_duration())/2
                 # calculate the pulse waveform for the selected indices
+
+                log.log(20, 't0 {}'.format(t0))
                 waveform[indices] += gate.get_waveform(pulse, t0, t)
 
                 if pulse.gated:
@@ -705,6 +734,8 @@ class Sequence(object):
         pts = int(len(waveform)-np.ceil(self.sequences[-1].t_end*self.sample_rate)-1)
         return np.roll(waveform, pts)
 
+
+
     def set_parameters(self, config={}):
         """Set base parameters using config from from Labber driver
 
@@ -864,6 +895,7 @@ class Sequence(object):
         self.readout_trig_generate = config.get('Generate readout trig')
         self.readout.set_parameters(config)
 
+        # TODO Check pulses readout
         # get readout pulse parameters
         phases = 2 * np.pi * np.array([0.8847060, 0.2043214, 0.9426104,
             0.6947334, 0.8752361, 0.2246747, 0.6503154, 0.7305004, 0.1309068])
@@ -899,6 +931,18 @@ class Sequence(object):
             pulse.gated = self.readout_trig_generate
             pulse.gate_amplitude = config.get('Readout trig amplitude')
             pulse.gate_duration = config.get('Readout trig duration')
+
+        # Delays
+        self.wave_xy_delays = np.zeros(self.n_qubit)
+        self.wave_z_delays = np.zeros(self.n_qubit)
+        for n in range(self.n_qubit):
+            m = n+1
+            log.log(20, 'Get {}'.format(config.get('Qubit %d XY Delay' % m)))
+            log.log(20, 'Qubit %d XY Delay' % m)
+            self.wave_xy_delays[n] = config.get('Qubit %d XY Delay' % m)
+            self.wave_z_delays[n] = config.get('Qubit %d Z Delay' % m)
+
+
 
 
 

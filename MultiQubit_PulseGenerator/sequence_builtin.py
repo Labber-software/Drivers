@@ -149,6 +149,7 @@ class Timing(Sequence):
 
 class Anharmonicty(Sequence):
     def generate_sequence(self, config):
+        """Generate sequence by adding gates/pulses to waveforms"""
         self.add_gate_to_all(Gate.Xp)
         pulse12 = copy(self.pulses_1qb_xy[0])
         pulse12.shape = PulseShape(config.get('Anharmonicty - Pulse type'))
