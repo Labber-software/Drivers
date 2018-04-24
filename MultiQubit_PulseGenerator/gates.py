@@ -210,6 +210,10 @@ class Gate(Enum):
     Ym = SingleQubitRotation(axis='Y', angle=-np.pi)
     Y2m = SingleQubitRotation(axis='Y', angle=-np.pi/2)
     Y2p = SingleQubitRotation(axis='Y', angle=np.pi/2)
+    Zp = SingleQubitRotation(axis='Z', angle=np.pi)
+    Z2p = SingleQubitRotation(axis='Z', angle=np.pi/2)
+    Zm = SingleQubitRotation(axis='Z', angle=-np.pi)
+    Z2m = SingleQubitRotation(axis='Z', angle=-np.pi/2)
 
     # two-qubit gates
     CPh = TwoQubitGate()

@@ -137,7 +137,8 @@ class Sequence(object):
         self.wave_gate = [np.zeros(0) for n in range(MAX_QUBIT)]
 
         # define pulses
-        self.pulses_1qb = [Pulse() for n in range(MAX_QUBIT)]
+        self.pulses_1qb_xy = [Pulse() for n in range(MAX_QUBIT)]
+        self.pulses_1qb_z = [Pulse() for n in range(MAX_QUBIT)]
         self.pulses_2qb = [Pulse() for n in range(MAX_QUBIT - 1)]
         self.pulses_readout = [Pulse(pulse_type = PulseType.READOUT) for n in range(MAX_QUBIT)]
 
@@ -292,10 +293,14 @@ class Sequence(object):
                 # Virtual Z gate is special since it has no waveform
                 if isinstance(gate, VirtualZGate):
                     continue
-
                 # Get the corresponding pulse
-                if isinstance(gate, (IdentityGate, SingleQubitRotation)):
-                    pulse = self.pulses_1qb[qubit]
+                if isinstance(gate, IdentityGate):
+                    pulse = self.pulses_1qb_xy[qubit]
+                elif isinstance(gate, SingleQubitRotation):
+                    if gate.axis in ('X', 'Y'):
+                        pulse = self.pulses_1qb_xy[qubit]
+                    elif gate.axis == 'Z':
+                        pulse = self.pulses_1qb_z[qubit]
                 elif isinstance(gate, TwoQubitGate):
                     pulse = self.pulses_2qb[qubit]
                 elif isinstance(gate, ReadoutGate):
@@ -405,12 +410,6 @@ class Sequence(object):
         if isinstance(gate, Enum):
             gate = gate.value
         log.log(20, str(gate))
-        # If any of the gates is a composite gate, find it and add it first.
-        # Keep track of its length in steps and time, then add matching I gates to compoensate
-        # How to handle multiple composite gates?
-        # Composite gates consit of multiple gates. Add one by one.
-        # For now, force CompositeGates to have the same length
-        # Test with 2 Rx gates
         if isinstance(gate, CompositeGate):
             self.add_composite_gate(qubit, gate, t0, dt, align)
             return
@@ -446,10 +445,13 @@ class Sequence(object):
                 continue
             # Get the corresponding pulse
             if isinstance(gate, SingleQubitRotation):
-                pulse = self.pulses_1qb[qubit]
+                if gate.axis in ('X', 'Y'):
+                    pulse = self.pulses_1qb_xy[qubit]
+                elif gate.axis == 'Z':
+                    pulse = self.pulses_1qb_z[qubit]
             elif isinstance(gate, IdentityGate):
                 if gate.width is None:
-                    pulse = self.pulses_1qb[qubit]
+                    pulse = self.pulses_1qb_xy[qubit]
                 else:
                     duration = gate.width
                     pulse = None
@@ -479,8 +481,6 @@ class Sequence(object):
         step.t_start = self.round_to_nearest_sample(step.t_start)
         step.t_end = self.round_to_nearest_sample(step.t_start+max_duration)
         step.t_middle = step.t_start+max_duration/2
-        log.log(20, 't_start:{}'.format(step.t_start))
-        log.log(20, 't_end:{}'.format(step.t_end))
 
         self.sequences.append(step)
 
@@ -541,7 +541,7 @@ class Sequence(object):
         else:
             return t
 
-    def add_gate_to_all(self, gate, dt=0, align='center'):
+    def add_gate_to_all(self, gate, dt=None, align='center'):
         """
         Add a single gate to all the qubits. Pulses are added at the end
         of the sequence, with the gate spacing set by the spacing parameter.
@@ -723,8 +723,8 @@ class Sequence(object):
         self.align_to_end = config.get('Align pulses to end of waveform')
         self.round_to_nearest = config.get('Round to nearest sample')
 
-        # single-qubit pulses
-        for n, pulse in enumerate(self.pulses_1qb):
+        # single-qubit pulses XY
+        for n, pulse in enumerate(self.pulses_1qb_xy):
             # pulses are indexed from 1 in Labber
             m = n + 1
             # global parameters
@@ -732,6 +732,7 @@ class Sequence(object):
             pulse.truncation_range = config.get('Truncation range')
             pulse.start_at_zero = config.get('Start at zero')
             pulse.use_drag = config.get('Use DRAG')
+            pulse.pulse_type = PulseType.XY
             # pulse shape
             if config.get('Uniform pulse shape'):
                 pulse.width = config.get('Width')
@@ -749,6 +750,28 @@ class Sequence(object):
             pulse.frequency = config.get('Frequency #%d' % m)
             pulse.drag_coefficient = config.get('DRAG scaling #%d' % m)
             pulse.gated = False #config.get('Generate gate')
+
+        # single-qubit pulses Z
+        for n, pulse in enumerate(self.pulses_1qb_z):
+            # pulses are indexed from 1 in Labber
+            m = n + 1
+            # global parameters
+            pulse.shape = PulseShape(config.get('Pulse type, Z'))
+            pulse.truncation_range = config.get('Truncation range, Z')
+            pulse.start_at_zero = config.get('Start at zero, Z')
+            pulse.pulse_type = PulseType.Z
+            # pulse shape
+            if config.get('Uniform pulse shape, Z'):
+                pulse.width = config.get('Width, Z')
+                pulse.plateau = config.get('Plateau, Z')
+            else:
+                pulse.width = config.get('Width #%d, Z' % m)
+                pulse.plateau = config.get('Plateau #%d, Z' % m)
+
+            if config.get('Uniform amplitude, Z'):
+                pulse.amplitude = config.get('Amplitude, Z')
+            else:
+                pulse.amplitude = config.get('Amplitude #%d, Z' % m)
 
         # two-qubit pulses
         for n, pulse in enumerate(self.pulses_2qb):

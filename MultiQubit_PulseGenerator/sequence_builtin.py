@@ -130,7 +130,6 @@ class VZ(Sequence):
         duration = config['Sequence duration']
         z_angle = config['Z Phase']*np.pi/180
         edge_to_edge = config['Edge-to-edge pulses']
-        self.virtual_z_gates = []
 
         width = 0 if edge_to_edge else self.pulses_1qb[0].total_duration()
         vz = VirtualZGate(angle=z_angle)
