@@ -145,6 +145,12 @@ class Driver(LabberDriver):
 
     def performArm(self, quant_names, options={}):
         """Perform the instrument arm operation"""
+        # make sure we are arming for reading traces, if not return
+        signal_names = ['Ch%d - Signal' % (n + 1) for n in range(4)]
+        signal_arm = [name in signal_names for name in quant_names]
+        if not np.any(signal_arm):
+            return
+
         # arm by calling get traces
         if self.isHardwareLoop(options):
             # in hardware looping, number of records is set by the hardware looping
@@ -216,7 +222,9 @@ class Driver(LabberDriver):
         for n in range(nCall):
             # number of cycles for this call, could be fewer for last call
             nCycle = min(nCyclePerCall, nCycleTotal-(n*nCyclePerCall))
+
             self.reportStatus('Acquiring traces {}%'.format(int(100*n/nCall)))
+
             # capture traces one by one
             for nCh in lCh:
                 # channel number depens on hardware version
@@ -237,6 +245,11 @@ class Driver(LabberDriver):
                     self.lTrace[nCh] = data*scale
                 else:
                     self.lTrace[nCh] += data*scale
+
+            # break if stopped from outside
+            if self.isStopped():
+                break
+
 #                lT.append('N: %d, Tot %.1f ms' % (n, 1000*(time.clock()-t0)))
 #        # log timing info
 #        self.log(': '.join(lT))
