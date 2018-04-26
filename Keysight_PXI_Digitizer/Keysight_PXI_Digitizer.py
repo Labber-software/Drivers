@@ -62,7 +62,7 @@ class Driver(LabberDriver):
         self.log('HW:', hw_version)
 
 
-    def get_hw_ch(self, n):
+    def getHwCh(self, n):
         """Get hardware channel number for channel n. n starts at 0"""
         return n + self.ch_index_zero
 
@@ -73,7 +73,7 @@ class Driver(LabberDriver):
         try:
             # flush all memory
             for n in range(self.nCh):
-                self.log('Close ch:', n, self.dig.DAQflush(self.get_hw_ch(n)))
+                self.log('Close ch:', n, self.dig.DAQflush(self.getHwCh(n)))
             # close instrument
             self.dig.close()
         except:
@@ -108,16 +108,16 @@ class Driver(LabberDriver):
             trigCh = self.getValueIndex('Analog Trig Channel')
             mod = int(self.getCmdStringFromValue('Analog Trig Config'))
             threshold = self.getValue('Trig Threshold')
-            self.dig.channelTriggerConfig(self.get_hw_ch(trigCh), mod, threshold)
+            self.dig.channelTriggerConfig(self.getHwCh(trigCh), mod, threshold)
         elif name in ('Range', 'Impedance', 'Coupling'):
             # set range, impedance, coupling at once
             rang = self.getRange(ch)
             imp = int(self.getCmdStringFromValue('Ch%d - Impedance' % (ch + 1)))
             coup = int(self.getCmdStringFromValue('Ch%d - Coupling' % (ch + 1)))
-            self.dig.channelInputConfig(self.get_hw_ch(ch), rang, imp, coup)
+            self.dig.channelInputConfig(self.getHwCh(ch), rang, imp, coup)
         return value
 
-        
+
     def performGetValue(self, quant, options={}):
         """Perform the Set Value instrument operation. This function should
         return the actual value set by the instrument"""
@@ -128,6 +128,8 @@ class Driver(LabberDriver):
         else:
             ch, name = None, ''
         if name == 'Signal':
+            if self.isHardwareLoop(options):
+                return self.getSignalHardwareLoop(ch, quant, options)
             # get traces if first call
             if self.isFirstCall(options):
                 # don't arm if in hardware trig mode
@@ -137,17 +139,28 @@ class Driver(LabberDriver):
         else:
             # for all others, return local value
             value = quant.getValue()
-            
+
         return value
 
 
     def performArm(self, quant_names, options={}):
         """Perform the instrument arm operation"""
+        # make sure we are arming for reading traces, if not return
+        signal_names = ['Ch%d - Signal' % (n + 1) for n in range(4)]
+        signal_arm = [name in signal_names for name in quant_names]
+        if not np.any(signal_arm):
+            return
+
         # arm by calling get traces
-        self.getTraces(bArm=True, bMeasure=False)
+        if self.isHardwareLoop(options):
+            # in hardware looping, number of records is set by the hardware looping
+            (seq_no, n_seq) = self.getHardwareLoopIndex(options)
+            self.getTraces(bArm=True, bMeasure=False, n_seq=n_seq)
+        else:
+            self.getTraces(bArm=True, bMeasure=False)
 
 
-    def getTraces(self, bArm=True, bMeasure=True):
+    def getTraces(self, bArm=True, bMeasure=True, n_seq=0):
         """Get all active traces"""
         # test timing
 #        import time
@@ -163,7 +176,11 @@ class Driver(LabberDriver):
                 iChMask += 2**n
         # get current settings
         nPts = int(self.getValue('Number of samples'))
-        nSeg = int(self.getValue('Number of records'))
+        # If in hardware loop mode, ignore records and use number of sequences
+        if n_seq > 0:
+            nSeg = n_seq
+        else:
+            nSeg = int(self.getValue('Number of records'))
         nAv = int(self.getValue('Number of averages'))
         # trigger delay is in 1/sample rate
         nTrigDelay = int(self.getValue('Trig Delay')/self.dt)
@@ -172,7 +189,7 @@ class Driver(LabberDriver):
             # configure trigger for all active channels
             for nCh in lCh:
                 # channel number depens on hardware version
-                ch = self.get_hw_ch(nCh)
+                ch = self.getHwCh(nCh)
                 # extra config for trig mode
                 if self.getValue('Trig Mode') == 'Digital trigger':
                     extSource = int(self.getCmdStringFromValue('External Trig Source'))
@@ -189,7 +206,6 @@ class Driver(LabberDriver):
                 # config daq and trig mode
                 trigMode = int(self.getCmdStringFromValue('Trig Mode'))
                 self.dig.DAQconfig(ch, nPts, nSeg*nAv, nTrigDelay, trigMode)
-            #
             # start acquiring data
             self.dig.DAQstartMultiple(iChMask)
 #        lT.append('Start %.1f ms' % (1000*(time.clock()-t0)))
@@ -206,11 +222,14 @@ class Driver(LabberDriver):
         for n in range(nCall):
             # number of cycles for this call, could be fewer for last call
             nCycle = min(nCyclePerCall, nCycleTotal-(n*nCyclePerCall))
+
+            self.reportStatus('Acquiring traces {}%'.format(int(100*n/nCall)))
+
             # capture traces one by one
             for nCh in lCh:
                 # channel number depens on hardware version
-                ch = self.get_hw_ch(nCh)
-                data = self.DAQread(self.dig, ch, nPts*nCycle, int(self.timeout_ms/nCall))
+                ch = self.getHwCh(nCh)
+                data = self.DAQread(self.dig, ch, nPts*nCycle, int(1000+self.timeout_ms/nCall))
                 # average, if wanted
                 scale = (self.getRange(nCh)/self.bitRange)
                 if nAv > 1 and data.size>0:
@@ -226,6 +245,11 @@ class Driver(LabberDriver):
                     self.lTrace[nCh] = data*scale
                 else:
                     self.lTrace[nCh] += data*scale
+
+            # break if stopped from outside
+            if self.isStopped():
+                break
+
 #                lT.append('N: %d, Tot %.1f ms' % (n, 1000*(time.clock()-t0)))
 #        # log timing info
 #        self.log(': '.join(lT))
@@ -235,7 +259,7 @@ class Driver(LabberDriver):
         """Get channel range, as voltage.  Index start at 0"""
         rang = float(self.getCmdStringFromValue('Ch%d - Range' % (ch + 1)))
         return rang
-        
+
 
     def DAQread(self, dig, nDAQ, nPoints, timeOut):
         """Read data diretly to numpy array"""
@@ -251,6 +275,26 @@ class Driver(LabberDriver):
                 return keysightSD1.SD_Error.INVALID_VALUE
         else:
             return keysightSD1.SD_Error.MODULE_NOT_OPENED
+
+    def getSignalHardwareLoop(self, ch, quant, options):
+        """Get data from round-robin type averaging"""
+        (seq_no, n_seq) = self.getHardwareLoopIndex(options)
+        nSample = int(self.getValue('Number of samples'))
+        # if first sequence call, get data
+        if seq_no == 0 and self.isFirstCall(options):
+            # show status before starting acquisition
+            self.reportStatus('Digitizer - Waiting for signal')
+            # get data
+            # self.getTracesHardware(n_seq)
+            self.getTraces(bArm=False, bMeasure=True, n_seq=n_seq)
+            # re-shape data and place in trace buffer
+            self.reshaped_traces = []
+            for trace in self.lTrace:
+                if len(trace) > 0:
+                    trace = trace.reshape((n_seq, nSample))
+                self.reshaped_traces.append(trace)
+        # after getting data, pick values to return
+        return quant.getTraceDict(self.reshaped_traces[ch][seq_no], dt=self.dt)
 
 
 if __name__ == '__main__':

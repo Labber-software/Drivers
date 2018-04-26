@@ -264,6 +264,12 @@ class Driver(InstrumentDriver.InstrumentWorker):
 
     def performArm(self, quant_names, options={}):
         """Perform the instrument arm operation"""
+        # make sure we are arming for reading traces, if not return
+        signal_names = ['Ch%d - Data' % (n + 1) for n in range(2)]
+        signal_arm = [name in signal_names for name in quant_names]
+        if not np.any(signal_arm):
+            return
+
         # start acquisition
         if self.isHardwareLoop(options):
             (seq_no, n_seq) = self.getHardwareLoopIndex(options)
