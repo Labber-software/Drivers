@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import numpy as np
 from enum import Enum
-
+import logging
+log = logging.getLogger('LabberDriver')
 
 class PulseShape(Enum):
     """Define possible qubit pulses shapes"""
@@ -10,6 +11,13 @@ class PulseShape(Enum):
     RAMP = 'Ramp'
     CZ = 'CZ'
     COSINE = 'Cosine'
+
+
+class PulseType(Enum):
+    """Define possible qubit pulse types"""
+    XY = 'XY'
+    Z = 'Z'
+    READOUT = 'Readout'
 
 class Pulse(object):
     """This class represents a pulse for qubit rotations.
@@ -32,7 +40,7 @@ class Pulse(object):
     phase : float
         Pulse phase, in radians.
 
-    shape : enum, {'Gaussian', 'Square', 'Ramp'}
+    shape : enum, {'Gaussian', 'Square', 'Ramp', 'CZ', 'Cosine'}
         Pulse shape.
 
     use_drag : bool
@@ -42,20 +50,28 @@ class Pulse(object):
         DRAG coefficient scaling.
 
     truncation_range : float
-        Truncation range, measured in units of the `width` parameter.
+        Truncation range for Gaussian pulses,
+        measured in units of the `width` parameter.
+
+    pulse_type : enum, {'XY', 'Z', 'Readout'}
+        What type of waveform the pulse is used for.
 
     start_at_zero : bool
-        If True, forces the pulse to start at zero amplitude
+        If True, forces the pulse to start at zero amplitude.
 
-    z_pulse : bool
-        If True, the pulse will be used for qubit Z control.
+    gated : bool
+        If True, generates a gate for the pulse. Can also be used as a trig.
 
     """
 
-    def __init__(self,F_Terms=1,Coupling=20E6,Offset=300E6,Lcoeff = np.array([0.3]),dfdV=0.5E9,period_2qb=50E-9, amplitude=0.5, width=10E-9, plateau=0.0,
+    def __init__(self,F_Terms=1,Coupling=20E6,Offset=300E6,
+                 Lcoeff = np.array([0.3]),dfdV=0.5E9,period_2qb=50E-9,
+                 amplitude=0.5, width=10E-9, plateau=0.0,
                  frequency=0.0, phase=0.0, shape=PulseShape.GAUSSIAN,
                  use_drag=False, drag_coefficient=0.0, truncation_range=5.0,
-                 z_pulse=False, start_at_zero=False):
+                 pulse_type=PulseType.XY, start_at_zero=False, gated=False,
+                 gate_delay=0, gate_amplitude=1, gate_duration=None,
+                 iq_ratio=1, iq_skew=0, i_offset=0, q_offset=0):
         # set variables
         self.amplitude = amplitude
         self.width = width
@@ -66,16 +82,31 @@ class Pulse(object):
         self.use_drag = use_drag
         self.drag_coefficient = drag_coefficient
         self.truncation_range = truncation_range
-        self.z_pulse = z_pulse
         self.start_at_zero = start_at_zero
+        self.pulse_type = pulse_type
 
-        # For 2-qubit gates
+        # For gating of the pulse
+        self.gated = gated
+        self.gate_delay = gate_delay
+        self.gate_amplitude = gate_amplitude
+        if gate_duration is None:
+            self.gate_duration = self.total_duration()
+        else:
+            self.gate_duration = gate_duration
+
+        # For CZ pulses
         self.F_Terms = F_Terms
         self.Coupling = Coupling
         self.Offset = Offset
         self.Lcoeff = Lcoeff
         self.dfdV = dfdV
         self.period_2qb = period_2qb
+
+        # For IQ mixer corrections
+        self.iq_ratio = iq_ratio
+        self.iq_skew = iq_skew
+        self.i_offset = i_offset
+        self.q_offset = q_offset
 
     def total_duration(self):
         """Calculate total pulse duration"""
@@ -89,7 +120,7 @@ class Pulse(object):
         elif self.shape == PulseShape.CZ:
             duration = self.width + self.plateau
         elif self.shape == PulseShape.COSINE:
-            duration = self.width
+            duration = self.width + self.plateau
         return duration
 
 
@@ -161,10 +192,11 @@ class Pulse(object):
                         (t >= (t0 + self.plateau / 2)) *
                         np.exp(-(t - (t0 + self.plateau / 2))**2 / (2 * std**2))
                     )
-            values = values*self.amplitude
+
             if self.start_at_zero:
                 values = values - values.min()
-                values = values/values.max()*self.amplitude
+                values = values/values.max()
+            values = values*self.amplitude
 
         elif self.shape == PulseShape.CZ:
             # notation and calculations are based on the Paper "Fast adiabatic qubit gates using only sigma_z control" PRA 90, 022307 (2014)
@@ -212,14 +244,80 @@ class Pulse(object):
 
         elif self.shape == PulseShape.COSINE:
             tau = self.width
-            values = self.amplitude/2*(1-np.cos(2*np.pi*(t-t0+tau/2)/tau))
-            # Some rounding error in the number of sample can occur
-            # so make sure that any points outside the cosine is 0
-            values[t<(t0-tau/2)] = 0
-            values[t>(t0+tau/2)] = 0
+            if self.plateau == 0:
+                values = self.amplitude/2*(1-np.cos(2*np.pi*(t-t0+tau/2)/tau))
+            else:
+                values = np.ones_like(t) * self.amplitude
+                values[t<t0-self.plateau/2] = self.amplitude/2*(1-np.cos(2*np.pi*(t[t<t0-self.plateau/2]-t0-self.plateau/2+tau/2)/tau))
+                values[t>t0+self.plateau/2] = self.amplitude/2*(1-np.cos(2*np.pi*(t[t>t0+self.plateau/2]-t0+self.plateau/2+tau/2)/tau))
 
-        # return pulse envelope
+        # Make sure the waveform is zero outside the pulse
+        values[t<(t0-self.total_duration()/2)] = 0
+        values[t>(t0+self.total_duration()/2)] = 0
         return values
+
+    def calculate_waveform(self, t0, t):
+        """Calculate pulse waveform including phase shifts and SSB-mixing.
+
+        Parameters
+        ----------
+        t0 : float
+            Pulse position, referenced to center of pulse.
+
+        t : numpy array
+            Array with time values for which to calculate the pulse waveform.
+
+        Returns
+        -------
+        waveform : numpy array
+            Array containing pulse waveform.
+
+        """
+        y = self.calculate_envelope(t0, t)
+        if self.use_drag:
+            beta = self.drag_coefficient/(t[1]-t[0])
+            y = y + 1j*beta*np.gradient(y)
+
+        if self.pulse_type in (PulseType.XY, PulseType.READOUT):
+            # Apply phase and SSB
+            phase = self.phase
+            # single-sideband mixing, get frequency
+            omega = 2*np.pi*self.frequency
+            # apply SSBM transform
+            data_i = self.iq_ratio*(y.real * np.cos(omega*t-phase) +
+                      -y.imag * np.cos(omega*t-phase+np.pi/2))
+            data_q = (y.real * np.sin(omega*t-phase+self.iq_skew) +
+                      -y.imag * np.sin(omega*t-phase+self.iq_skew+np.pi/2))
+            y = data_i + 1j*data_q
+        return y
+
+    def calculate_gate(self, t0, t):
+        """Calculate pulse gate
+
+        Parameters
+        ----------
+        t0 : float
+            Pulse position, referenced to center of pulse.
+
+        t : numpy array
+            Array with time values for which to calculate the pulse gate.
+
+        Returns
+        -------
+        waveform : numpy array
+            Array containing pulse gate.
+
+        """
+        if not self.gated:
+            raise ValueError('Waveform is not defined as gated.')
+        y = np.zeros_like(t)
+        dt = t[1]-t[0]
+        start = int(np.ceil((t0-self.total_duration()/2+self.gate_delay)/dt))
+        stop = int(start + np.floor(self.gate_duration/dt))
+        log.log(20, 'Start index {}'.format(start))
+        log.log(20, 'Stop index {}'.format(stop))
+        y[start:stop] = self.gate_amplitude
+        return y
 
 
 if __name__ == '__main__':

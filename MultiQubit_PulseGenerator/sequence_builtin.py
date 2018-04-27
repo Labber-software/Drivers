@@ -2,31 +2,20 @@
 import numpy as np
 from copy import copy
 from sequence import Sequence
-from gates import Gate
-from pulse import PulseShape
+from gates import Gate, VirtualZGate, CompositeGate, IdentityGate, CustomGate
+from pulse import PulseShape, Pulse
 
-# add logger, to allow logging to Labber's instrument log 
+# add logger, to allow logging to Labber's instrument log
 import logging
 log = logging.getLogger('LabberDriver')
-
-
 
 class Rabi(Sequence):
     """Sequence for driving Rabi oscillations in multiple qubits"""
 
     def generate_sequence(self, config):
         """Generate sequence by adding gates/pulses to waveforms"""
-        # get parameters
-        uniform_amplitude = config['Uniform pulse ampiltude for all qubits']
         # just add pi-pulses for the number of available qubits
-        for n in range(self.n_qubit):
-            # get pulse to use
-            pulse = self.pulses_1qb[n]
-            # if using uniform amplitude, copy from pulse 1
-            if uniform_amplitude:
-                pulse.amplitude = self.pulses_1qb[0].amplitude
-            # add pulse to sequence
-            self.add_single_pulse(n, pulse, self.first_delay, align_left=True)
+        self.add_gate_to_all(Gate.Xp, align='right')
 
 
 
@@ -40,11 +29,6 @@ class CPMG(Sequence):
         pi_to_q = config['Add pi pulses to Q']
         duration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
-        if self.pulses_1qb[0].shape == PulseShape.GAUSSIAN:
-            # Only gaussian pulses has a truncation range
-            truncation = config['Truncation range']
-        else:
-            truncation = 0.0
 
         max_width = np.max([p.total_duration() for p in self.pulses_1qb[:self.n_qubit]])
         # select type of refocusing pi pulse
@@ -52,45 +36,36 @@ class CPMG(Sequence):
 
         # add pulses for all active qubits
         for n, pulse in enumerate(self.pulses_1qb[:self.n_qubit]):
-            # get effective pulse durations, for timing purposes
-            width = self.pulses_1qb[n].total_duration() if edge_to_edge else 0.0
-            pulse_total = width * (n_pulse + 1)
-            # center pulses in add_gates mode; ensure sufficient pulse spacing in CPMG mode
-            t0 = self.first_delay + self.pulses_1qb[n].total_duration()/2
-            # Align everything to the end of the last pulse of the one with the longest pulse width
-            t0 += (max_width - self.pulses_1qb[n].total_duration()) * (n_pulse + 1) if edge_to_edge else 0.0
-            t0 += (max_width - self.pulses_1qb[n].total_duration())
             # special case for -1 pulses => T1 experiment
             if n_pulse < 0:
                 # add pi pulse
-                self.add_single_gate(n, Gate.Xp, t0)
-                # delay the reaodut by creating a very small pulse
-                small_pulse = copy(pulse)
-                small_pulse.amplitude = 1E-6 * pulse.amplitude
-                self.add_single_pulse(n, small_pulse, t0 + duration)
+                self.add_single_gate(n, Gate.Xp)
+                # delay the reaodut by adding an I gate
+                self.add_single_gate(n, IdentityGate(duration))
                 continue
 
-            # add the first and last pi/2 pulses
-            self.add_single_gate(n, Gate.X2p, t0)
-            self.add_single_gate(n, Gate.X2p, t0 + duration + pulse_total)
-            # add more pulses
-            if n_pulse == 0:
-                # no pulses = ramsey
-                time_pi = []
-            elif n_pulse == 1:
-                # one pulse, echo experiment
-                time_pi = [t0 + width + 0.5 * duration, ]
-            elif n_pulse > 1:
-                # figure out timing of pi pulses
-                period = duration / n_pulse
-                time_pi = (t0 + width + 0.5 * period +
-                           (period + width) * np.arange(n_pulse))
+            # Calculate the effective dt
+            if edge_to_edge:
+                # Duration is the total time between pulses
+                dt = duration/(n_pulse+1)
+            else:
+                # Duration is from center to center of pi/2 pulses
+                dt = duration/(n_pulse+1) - self.pulses_1qb[n].total_duration()
+            # TODO Fix this
+            # Align everything to the end of the last pulse of the one with the longest pulse width
+            # t0 += (max_width - self.pulses_1qb[n].total_duration()) * (n_pulse + 1) if edge_to_edge else 0.0
+            # t0 += (max_width - self.pulses_1qb[n].total_duration())
+
+
+            # First pi/2 pulse
+            self.add_single_gate(n, Gate.X2p)
+
             # add pi pulses, one by one
-            for t in time_pi:
-                self.add_single_gate(n, gate_pi, t)
+            for i in range(n_pulse):
+                self.add_single_gate(n, gate_pi, dt=dt)
 
-
-
+            # add last pi/2 pulse
+            self.add_single_gate(n, Gate.X2p, dt=dt)
 
 
 class PulseTrain(Sequence):
@@ -127,15 +102,15 @@ class CZgates(Sequence):
         n_pulse = int(config['# of pulses, CZgates'])
 
         # create list with gates
-        gates = []        
+        gates = []
         for n in range(n_pulse):
             gate = Gate.CPh
-            # create list with same gate for all active qubits 
+            # create list with same gate for all active qubits
             gate_qubits = [gate for q in range(self.n_qubit)]
             # append to list of gates
             gates.append(gate_qubits)
 
-        # add list of gates to sequence 
+        # add list of gates to sequence
         self.add_gates(gates)
 
 
@@ -144,22 +119,52 @@ class CZecho(Sequence):
 
     def generate_sequence(self, config):
         """Generate sequence by adding gates/pulses to waveforms"""
-        
         # create list with gates
-        self.add_single_gate(0, Gate.X2p, self.first_delay + self.period_1qb/2)
-        self.add_single_gate(0, Gate.CPh, self.first_delay + self.period_1qb + self.period_2qb/2)
-        self.add_single_gate(0, Gate.Xp, self.first_delay + 3*self.period_1qb/2 + self.period_2qb)
-        self.add_single_gate(1, Gate.Xp, self.first_delay + 5*self.period_1qb/2 + self.period_2qb)
-        self.add_single_gate(0, Gate.CPh, self.first_delay + 3*self.period_1qb + 3*self.period_2qb/2)
-        self.add_single_gate(0, Gate.X2p, self.first_delay + 7*self.period_1qb/2 + 2*self.period_2qb)
-        self.add_single_gate(1, Gate.Xp, self.first_delay + 9*self.period_1qb/2 + 2*self.period_2qb)
+
+        self.add_gate(qubit=[0, 1], gate=Gate.CZEcho)
+
+class VZ(Sequence):
+    def generate_sequence(self, config):
+        """Generate sequence by adding gates/pulses to waveforms"""
+        # get parameters
+        duration = config['Sequence duration']
+        z_angle = config['Z Phase']*np.pi/180
+        edge_to_edge = config['Edge-to-edge pulses']
+
+        width = 0 if edge_to_edge else self.pulses_1qb[0].total_duration()
+        vz = VirtualZGate(angle=z_angle)
+        self.add_gate_to_all(Gate.X2p)
+        self.add_gate_to_all(vz)
+        self.add_gate_to_all(Gate.X2p)
+
+
+class Timing(Sequence):
+    def generate_sequence(self, config):
+        """Generate sequence by adding gates/pulses to waveforms"""
+        # get parameters
+        duration = config['Timing - Delay']
+        self.add_gate_to_all(Gate.Zp, t0=self.first_delay)
+        self.add_gate_to_all(Gate.Xp, t0=self.first_delay-duration)
+
+
+class Anharmonicty(Sequence):
+    def generate_sequence(self, config):
+        """Generate sequence by adding gates/pulses to waveforms"""
+        self.add_gate_to_all(Gate.Xp)
+        pulse12 = copy(self.pulses_1qb_xy[0])
+        pulse12.shape = PulseShape(config.get('Anharmonicty - Pulse type'))
+        pulse12.amplitude = config.get('Anharmonicty - Amplitude')
+        pulse12.width = config.get('Anharmonicty - Width')
+        pulse12.plateau = config.get('Anharmonicty - Plateau')
+        pulse12.frequency = config.get('Anharmonicty - Frequency')
+        pulse12.truncation_range = config.get('Anharmonicty - Truncation range')
+        gate = CustomGate(pulse12)
+        self.add_gate_to_all(gate)
+        self.add_gate_to_all(Gate.Xp)
+
+
+
 
 
 if __name__ == '__main__':
     pass
-
-
-
-
-
-
