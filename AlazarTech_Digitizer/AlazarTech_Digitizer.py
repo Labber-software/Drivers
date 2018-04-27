@@ -79,6 +79,10 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # arming is only implemented for DMA reaoud
         if self.getModel() in ('9870',):
             return
+        # make sure we are arming for reading traces, if not return
+        signals = [name in self.lSignalNames for name in quant_names]
+        if not np.any(signals):
+            return
         # get config
         bGetCh1 = bool(self.getValue('Ch1 - Enabled'))
         bGetCh2 = bool(self.getValue('Ch2 - Enabled'))

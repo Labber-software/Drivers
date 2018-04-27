@@ -219,12 +219,12 @@ class Gate(Enum):
     CPh = TwoQubitGate()
 
     # Readout
-    Rxp = MeasurementGate(axis='X', sign='P')
-    Ryp = MeasurementGate(axis='Y', sign='P')
-    Rzp = MeasurementGate(axis='Z', sign='P')
-    Rxm = MeasurementGate(axis='X', sign='M')
-    Rym = MeasurementGate(axis='Y', sign='M')
-    Rzm = MeasurementGate(axis='Z', sign='M')
+    Mxp = MeasurementGate(axis='X', sign='P')
+    Myp = MeasurementGate(axis='Y', sign='P')
+    Mzp = MeasurementGate(axis='Z', sign='P')
+    Mxm = MeasurementGate(axis='X', sign='M')
+    Mym = MeasurementGate(axis='Y', sign='M')
+    Mzm = MeasurementGate(axis='Z', sign='M')
 
     # Composite gates
     CZEcho = CompositeGate(n_qubit=2)

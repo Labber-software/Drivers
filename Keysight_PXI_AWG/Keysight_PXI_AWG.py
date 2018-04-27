@@ -100,7 +100,6 @@ class Driver(LabberDriver):
         if self.isFirstCall(options):
             self.lWaveUpdated = [False]*self.nCh
             # Stop all channels
-            self.log('First call, stop all')
             self.AWG.AWGstopMultiple(int(2**self.nCh - 1))
         # start with setting current quant value
         quant.setValue(value)
@@ -171,6 +170,7 @@ class Driver(LabberDriver):
                 # Reset waveform ID counter if this is the first sequence
                 if seq_no == 0:
                     self.i = 1  # WaveformID counter
+                    self.AWG.waveformFlush()
 
             for ch, updated in enumerate(self.lWaveUpdated):
                 if updated:
@@ -181,7 +181,6 @@ class Driver(LabberDriver):
                         self.reportStatus('Sending waveform (%d/%d)'
                                           % (seq_no+1, n_seq))
                     self.sendWaveform(ch, self.i)
-                    self.log('Sent waveform {} to channel {}'.format(self.i, ch))
                     self.i += 1
 
 
@@ -215,7 +214,6 @@ class Driver(LabberDriver):
 
     def performArm(self, quant_names, options={}):
         """Perform the instrument arm operation"""
-        self.log('Arm, stop all')
         # Stop all channels
         self.AWG.AWGstopMultiple(int(2**self.nCh - 1))
 
@@ -251,7 +249,8 @@ class Driver(LabberDriver):
         if len(data) < 30:
             data = np.pad(data, (0, 30-len(data)), 'constant')
         # granularity of the awg is 10
-        data = np.pad(data, (0, 10-(len(data) % 10)), 'constant')
+        if len(data) % 10 > 0:
+            data = np.pad(data, (0, 10-(len(data) % 10)), 'constant')
         # scale to range
         amp = self.getChannelValue(ch, 'Amplitude')
         dataNorm = data / amp
