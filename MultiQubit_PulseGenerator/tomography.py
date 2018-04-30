@@ -10,13 +10,14 @@ class ProcessTomography(object):
 
     """
     def __init__(self, prepulse_index=0, nQubits=1, qubit1ID=0, qubit2ID=1,
-        nProcessTomoQubits=1):
+        nProcessTomoQubits=1, tomoscheme='Single qubit'):
 
         self.prepulse_index = prepulse_index
         self.nQubits = nQubits
         self. qubit1ID = qubit1ID
         self.qubit2ID = qubit2ID
         self.nProcessTomoQubits = nProcessTomoQubits
+        self.tomography_scheme = tomoscheme
 
     def set_parameters(self, config={}):
         """ set base parameters using config from Labber driver.
@@ -32,8 +33,9 @@ class ProcessTomography(object):
             return
 
         # determine which tomography scheme is in use
-        self.nProcessTomoQubits = 1 if config.get('Tomography scheme') \
-            is 'Single qubit' else 2
+        self.tomography_scheme = config.get('Tomography scheme')
+        self.nProcessTomoQubits = 1 if self.tomography_scheme \
+            == 'Single qubit' else 2
 
         # Prep dictionary to translate string 'one' into int(1) etc.:
         dnQubitsTranslate = {
@@ -55,11 +57,10 @@ class ProcessTomography(object):
             self.prepulse_index = config.get(
                 'Process tomography prepulse index 1-QB')
         elif self.nProcessTomoQubits is 2:
-            # Placeholder for when I update the 
             self.qubit1ID = dnQubitsTranslate[
                 config.get('Qubit 1 # tomography')]
             self.qubit2ID = dnQubitsTranslate[
-                config.get('Qubit 2 tomography')]
+                config.get('Qubit 2 # tomography')]
             self.prepulse_index = config.get(
                 'Process tomography prepulse index 2-QB')
 
