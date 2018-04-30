@@ -116,19 +116,17 @@ class Tomography(object):
             # log.log(20,'test')
             # log.log(20,self.tomography_index)
 
-        elif self.tomography_scheme == 'Two qubit (9 pulse set)':
-            self.tomography_index = config.get('Tomography pulse index 2-QB (9 pulse set)')
-            self.twoQBtomoID1 = dnQubitsTranslate[config.get('Qubit 1 # tomography (9 pulse set)')]
-            self.twoQBtomoID2 = dnQubitsTranslate[config.get('Qubit 2 # tomography (9 pulse set)')]
+        elif self.tomography_scheme in ['Two qubit (9 pulse set)',
+                                        'Two qubit (30 pulse set)',
+                                        'Two qubit (36 pulse set)']:
+            self.twoQBtomoID1 = dnQubitsTranslate[config.get('Qubit 1 # tomography')]
+            self.twoQBtomoID2 = dnQubitsTranslate[config.get('Qubit 2 # tomography')]
 
-        elif self.tomography_scheme == 'Two qubit (30 pulse set)':
-            self.tomography_index = config.get('Tomography pulse index 2-QB (30 pulse set)')
-            self.twoQBtomoID1 = dnQubitsTranslate[config.get('Qubit 1 # tomography (30 pulse set)')]
-            self.twoQBtomoID2 = dnQubitsTranslate[config.get('Qubit 2 # tomography (30 pulse set)')]
-        elif self.tomography_scheme == 'Two qubit (36 pulse set)':
-            self.tomography_index = config.get('Tomography pulse index 2-QB (36 pulse set)')
-            self.twoQBtomoID1 = dnQubitsTranslate[config.get('Qubit 1 # tomography (36 pulse set)')]
-            self.twoQBtomoID2 = dnQubitsTranslate[config.get('Qubit 2 # tomography (36 pulse set)')]
+            # Format: Tomography pulse index 2-QB (n pulse set)
+            pulseCall = 'Tomography pulse index 2-QB' + \
+                        self.tomography_scheme[9:]
+
+            self.tomography_index = config.get(pulseCall)
 
         pass
 
