@@ -2,7 +2,7 @@
 from sequence import Gate, Sequence
 import random as rnd
 import numpy as np
-# add logger, to allow logging to Labber's instrument log 
+# add logger, to allow logging to Labber's instrument log
 import logging
 log = logging.getLogger('LabberDriver')
 
@@ -26,6 +26,7 @@ def add_singleQ_clifford(index, gate_seq):
         gate_seq.append(Gate.Xp)
         gate_seq.append(Gate.Yp)
         gate_seq.append(Gate.I) # auxiliary
+
     ### 2pi/3 rotations
     elif index == 4:
         gate_seq.append(Gate.Y2p)
@@ -59,6 +60,7 @@ def add_singleQ_clifford(index, gate_seq):
         gate_seq.append(Gate.X2m)
         gate_seq.append(Gate.Y2m)
         gate_seq.append(Gate.I) # auxiliary
+
     ### pi/2 rotations
     elif index == 12:
         gate_seq.append(Gate.X2p)
@@ -84,6 +86,7 @@ def add_singleQ_clifford(index, gate_seq):
         gate_seq.append(Gate.X2p)
         gate_seq.append(Gate.Y2m)
         gate_seq.append(Gate.X2m)
+
     ### Hadamard-Like
     elif index == 18:
         gate_seq.append(Gate.Y2p)
@@ -182,8 +185,8 @@ def add_singleQ_based_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
 
 def add_CNOT_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
     """add CNOT like two Qubit Clifford(24*24*3*3 = 5184) (gate_seq_1: gate seq. of qubit #1, gate_seq_t: gate seq. of qubit #2)"""
-    index_1 = index % 3 #randomly sample from S1 (3) 
-    index_2 = (index // 3) % 3 #randomly sample from S1 (3) 
+    index_1 = index % 3 #randomly sample from S1 (3)
+    index_2 = (index // 3) % 3 #randomly sample from S1 (3)
     index_3 = (index // 3 // 3) % 24 #randomly sample from single qubit cliffords (24)
     index_4 = (index // 3 // 3 // 24) % 24 #randomly sample from single qubit cliffords (24)
 
@@ -257,12 +260,12 @@ class SingleQubit_RB(Sequence):
     def generate_sequence(self, config):
         """Generate sequence by adding gates/pulses to waveforms"""
         # get parameters
-        sequence = config['Sequence'] 
+        sequence = config['Sequence']
         N_cliffords = int(config['Number of Cliffords']) # Number of Cliffords to generate
-        randomize = config['Randomize'] 
+        randomize = config['Randomize']
         interleave = config['Interleave 1-QB Gate']
         if interleave == True:
-            interleaved_gate = config['Interleaved 1-QB Gate'] 
+            interleaved_gate = config['Interleaved 1-QB Gate']
         else:
             interleaved_gate =  -999.999
         # generate new randomized clifford gates only if configuration changes
@@ -272,15 +275,16 @@ class SingleQubit_RB(Sequence):
             self.prev_randomize = randomize
             self.prev_N_cliffords = N_cliffords
             self.prev_interleave = interleave
+            self.prev_sequence = sequence
 
             multi_gate_seq = []
             for n in range(self.n_qubit):
-                #Generate 1QB RB sequence 
+                #Generate 1QB RB sequence
                 single_gate_seq = []
                 for i in range(N_cliffords):
                     rndnum  = rnd.randint(0, 23)
                     add_singleQ_clifford(rndnum, single_gate_seq)
-                    #If interleave gate, 
+                    #If interleave gate,
                     if interleave == True:
                         self.prev_interleaved_gate = interleaved_gate
 
@@ -343,7 +347,7 @@ class SingleQubit_RB(Sequence):
         qubit_state = np.matrix('1; 0') # initial state: ground state (Following the QC community's convention, )
         qubit_state =  np.matmul(self.evalulate_seq(gate_seq), qubit_state)
         #find recovery gate which makes qubit_state return to the initial state
-        if (np.abs(np.linalg.norm(qubit_state.item((0, 0))) - 1) < 0.1): # ground state -> I 
+        if (np.abs(np.linalg.norm(qubit_state.item((0, 0))) - 1) < 0.1): # ground state -> I
              recovery_gate = Gate.I
         elif (np.abs(np.linalg.norm(qubit_state.item((1, 0))) - 1) < 0.1): # excited state -> X Pi
              recovery_gate = Gate.Xp
@@ -373,13 +377,13 @@ class TwoQubit_RB(Sequence):
     def generate_sequence(self, config):
         """Generate sequence by adding gates/pulses to waveforms"""
         # get parameters
-        sequence = config['Sequence'] 
-        qubits_to_benchmark = np.fromstring(config['Qubits to Benchmark'], dtype=int, sep='-')  
+        sequence = config['Sequence']
+        qubits_to_benchmark = np.fromstring(config['Qubits to Benchmark'], dtype=int, sep='-')
         N_cliffords = int(config['Number of Cliffords']) # Number of Cliffords to generate
-        randomize = config['Randomize'] 
+        randomize = config['Randomize']
         interleave = config['Interleave 2-QB Gate']
         if interleave == True:
-            interleaved_gate = config['Interleaved 2-QB Gate'] 
+            interleaved_gate = config['Interleaved 2-QB Gate']
         else:
             interleaved_gate =  -999.999
         # log.log(msg='Hi0', level =10)
@@ -393,18 +397,25 @@ class TwoQubit_RB(Sequence):
 
             multi_gate_seq = []
             # log.log(msg=str(qubits_to_benchmark), level =10)
-            #Generate 2QB RB sequence 
+            #Generate 2QB RB sequence
             gate_seq_1 = []
             gate_seq_2 = []
             for i in range(N_cliffords):
                 rndnum  = rnd.randint(0, 11519)
                 add_twoQ_clifford(rndnum, gate_seq_1, gate_seq_2)
-                #If interleave gate, 
+                #If interleave gate,
                 if interleave == True:
                     self.prev_interleaved_gate = interleaved_gate
                     if interleaved_gate == '2-QB Gate,CZ':
                         gate_seq_1.append(Gate.I)
                         gate_seq_2.append(Gate.CPh)
+                    elif interleaved_gate == '2-QB Gate,CZEcho':
+                        # CZEcho is a composite gate, so get each gate
+                        gate = Gate.CZEcho.value
+                        for g in gate.sequence:
+                            gate_seq_1.append(g[0])
+                            gate_seq_2.append(g[1])
+
 
             #get recovery gate seq
             (recovery_seq_1, recovery_seq_2) = self.get_recovery_gate(gate_seq_1, gate_seq_2)
@@ -415,8 +426,8 @@ class TwoQubit_RB(Sequence):
             if (self.n_qubit > qubits_to_benchmark[0]):
                 for i in range(qubits_to_benchmark[0]-1):
                     multi_gate_seq.append([None] * len(gate_seq_1))
-                multi_gate_seq.append(gate_seq_1)
                 multi_gate_seq.append(gate_seq_2)
+                multi_gate_seq.append(gate_seq_1)
                 for i in range(self.n_qubit - qubits_to_benchmark[1]):
                     multi_gate_seq.append([None] * len(gate_seq_1))
             else:
