@@ -6,7 +6,7 @@ from predistortion import Predistortion
 from crosstalk import Crosstalk
 from readout import Readout
 from gates import *
-from tomography import Tomography
+from tomography import ProcessTomography, Tomography
 from enum import Enum
 
 # add logger, to allow logging to Labber's instrument log
@@ -84,6 +84,10 @@ class Sequence(object):
         If True, tomography pulses will be added to the end of the qubit xy
         control waveforms.
 
+    perform_process_tomography : bool
+        If True, process tomography prepulses will be added to the
+        beginning of the qubit xy control waveforms.
+
     perform_predistortion : bool
         If True, the control waveforms will be pre-distorted.
 
@@ -144,6 +148,10 @@ class Sequence(object):
         self.pulses_1qb_z = [Pulse() for n in range(MAX_QUBIT)]
         self.pulses_2qb = [Pulse() for n in range(MAX_QUBIT - 1)]
         self.pulses_readout = [Pulse(pulse_type = PulseType.READOUT) for n in range(MAX_QUBIT)]
+
+        # process tomography
+        self.perform_process_tomography = False
+        self.processTomo = ProcessTomography()
 
         # tomography
         self.perform_tomography = False
@@ -249,6 +257,7 @@ class Sequence(object):
 
         """
         self.sequences = []
+        self.add_process_tomography()
         self.generate_sequence(config)
         self.add_tomography()
         # If there is no readout present in the sequence, add it.
@@ -621,6 +630,15 @@ class Sequence(object):
             # add gate to specific qubit waveform
             self.add_gate([n for n in range(len(gates_qubits))], gates_qubits)
 
+    def add_process_tomography(self):
+        """Add process tomography gates to the beginning of the waveforms
+
+        """
+        if not self.perform_process_tomography:
+            return
+
+        self.processTomo.add_pulses(self)
+
     def add_tomography(self):
         """Add tomography pulses at the end of the qubit xy waveforms.
 
@@ -854,6 +872,11 @@ class Sequence(object):
                     pulse.plateau = config.get('Plateau, 2QB' + s)
                 # pulse-specific parameters
                 pulse.amplitude = config.get('Amplitude, 2QB' + s)
+
+        # process tomography prepulses
+        self.perform_process_tomography = \
+            config.get('Generate process tomography prepulse', False)
+        self.processTomo.set_parameters(config)
 
         # tomography
         self.perform_tomography = config.get('Generate tomography pulse', False)
