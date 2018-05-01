@@ -314,8 +314,6 @@ class Pulse(object):
         dt = t[1]-t[0]
         start = int(np.ceil((t0-self.total_duration()/2+self.gate_delay)/dt))
         stop = int(start + np.floor(self.gate_duration/dt))
-        log.log(20, 'Start index {}'.format(start))
-        log.log(20, 'Stop index {}'.format(stop))
         y[start:stop] = self.gate_amplitude
         return y
 

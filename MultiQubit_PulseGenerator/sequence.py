@@ -317,6 +317,8 @@ class Sequence(object):
                 # Get the corresponding pulse
                 if isinstance(gate, IdentityGate):
                     pulse = self.pulses_1qb_xy[qubit]
+                    # No drag prevents a bug for short I gates
+                    pulse.use_drag = False
                 elif isinstance(gate, SingleQubitRotation):
                     if gate.axis in ('X', 'Y'):
                         pulse = self.pulses_1qb_xy[qubit]
@@ -865,7 +867,7 @@ class Sequence(object):
         self.processTomo.set_parameters(config)
 
         # tomography
-        self.perform_tomography = config.get('Generate tomography pulse', False)
+        self.perform_tomography = config.get('Generate tomography postpulse', False)
         self.tomography.set_parameters(config)
 
         # predistortion
@@ -904,7 +906,6 @@ class Sequence(object):
         self.readout_trig_generate = config.get('Generate readout trig')
         self.readout.set_parameters(config)
 
-        # TODO Check pulses readout
         # get readout pulse parameters
         phases = 2 * np.pi * np.array([0.8847060, 0.2043214, 0.9426104,
             0.6947334, 0.8752361, 0.2246747, 0.6503154, 0.7305004, 0.1309068])
