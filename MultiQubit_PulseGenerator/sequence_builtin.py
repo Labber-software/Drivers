@@ -147,7 +147,7 @@ class Timing(Sequence):
         self.add_gate_to_all(Gate.Xp, t0=self.first_delay-duration)
 
 
-class Anharmonicty(Sequence):
+class Anharmonicity(Sequence):
     def generate_sequence(self, config):
         """Generate sequence by adding gates/pulses to waveforms"""
         self.add_gate_to_all(Gate.Xp)
