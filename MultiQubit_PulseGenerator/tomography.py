@@ -9,11 +9,10 @@ class ProcessTomography(object):
     """This class handles qubit control prepulses for process tomography
 
     """
-    def __init__(self, prepulse_index=0, nQubits=1, qubit1ID=0, qubit2ID=1,
+    def __init__(self, prepulse_index=0, qubit1ID=0, qubit2ID=1,
         nProcessTomoQubits=1, tomoscheme='Single qubit'):
 
         self.prepulse_index = prepulse_index
-        self.nQubits = nQubits
         self. qubit1ID = qubit1ID
         self.qubit2ID = qubit2ID
         self.nProcessTomoQubits = nProcessTomoQubits
@@ -124,11 +123,10 @@ class Tomography(object):
 
     """
 
-    def __init__(self,tomography_index=0,nQubits = 1, singleQBtomoID = 0,
+    def __init__(self,tomography_index=0, singleQBtomoID = 0,
                  twoQBtomoID1=0, twoQBtomoID2=1, tomography_scheme = 'Single qubit'):
         # define variables
         self.tomography_index = tomography_index
-        self.nQubits = nQubits
         self.singleQBtomoID = 0
         self.twoQBtomoID1 = 0
         self.twoQBtomoID2 = 1
