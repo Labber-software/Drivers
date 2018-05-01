@@ -29,43 +29,57 @@ class CPMG(Sequence):
         pi_to_q = config['Add pi pulses to Q']
         duration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
+        if self.pulses_1qb_xy[0].shape == PulseShape.GAUSSIAN:
+            # Only gaussian pulses has a truncation range
+            truncation = config['Truncation range']
+        else:
+            truncation = 0.0
 
-        max_width = np.max([p.total_duration() for p in self.pulses_1qb[:self.n_qubit]])
+        max_width = np.max([p.total_duration() for p in self.pulses_1qb_xy[:self.n_qubit]])
         # select type of refocusing pi pulse
         gate_pi = Gate.Yp if pi_to_q else Gate.Xp
 
         # add pulses for all active qubits
-        for n, pulse in enumerate(self.pulses_1qb[:self.n_qubit]):
+        for n, pulse in enumerate(self.pulses_1qb_xy[:self.n_qubit]):
+            # get effective pulse durations, for timing purposes
+            width = self.pulses_1qb_xy[n].total_duration() if edge_to_edge else 0.0
+            pulse_total = width * (n_pulse + 1)
+            # center pulses in add_gates mode; ensure sufficient pulse spacing in CPMG mode
+            t0 = self.first_delay + self.pulses_1qb_xy[n].total_duration()/2
+            # Align everything to the end of the last pulse of the one with the longest pulse width
+            t0 += (max_width - self.pulses_1qb_xy[n].total_duration()) * (n_pulse + 1) if edge_to_edge else 0.0
+            t0 += (max_width - self.pulses_1qb_xy[n].total_duration())
             # special case for -1 pulses => T1 experiment
             if n_pulse < 0:
                 # add pi pulse
-                self.add_single_gate(n, Gate.Xp)
-                # delay the reaodut by adding an I gate
-                self.add_single_gate(n, IdentityGate(duration))
+                self.add_single_gate(n, Gate.Xp, t0)
+                # delay the reaodut by creating a very small pulse
+                small_pulse = copy(pulse)
+                small_pulse.amplitude = 1E-6 * pulse.amplitude
+                self.add_single_pulse(n, small_pulse, t0 + duration)
                 continue
 
-            # Calculate the effective dt
-            if edge_to_edge:
-                # Duration is the total time between pulses
-                dt = duration/(n_pulse+1)
-            else:
-                # Duration is from center to center of pi/2 pulses
-                dt = duration/(n_pulse+1) - self.pulses_1qb[n].total_duration()
-            # TODO Fix this
-            # Align everything to the end of the last pulse of the one with the longest pulse width
-            # t0 += (max_width - self.pulses_1qb[n].total_duration()) * (n_pulse + 1) if edge_to_edge else 0.0
-            # t0 += (max_width - self.pulses_1qb[n].total_duration())
+            # add the first pi/2 pulses
+            self.add_single_gate(n, Gate.X2p, t0)
 
-
-            # First pi/2 pulse
-            self.add_single_gate(n, Gate.X2p)
-
+            # add more pulses
+            if n_pulse == 0:
+                # no pulses = ramsey
+                time_pi = []
+            elif n_pulse == 1:
+                # one pulse, echo experiment
+                time_pi = [t0 + width + 0.5 * duration, ]
+            elif n_pulse > 1:
+                # figure out timing of pi pulses
+                period = duration / n_pulse
+                time_pi = (t0 + width + 0.5 * period +
+                           (period + width) * np.arange(n_pulse))
             # add pi pulses, one by one
-            for i in range(n_pulse):
-                self.add_single_gate(n, gate_pi, dt=dt)
+            for t in time_pi:
+                self.add_single_gate(n, gate_pi, t)
 
-            # add last pi/2 pulse
-            self.add_single_gate(n, Gate.X2p, dt=dt)
+            # add the last pi/2 pulses
+            self.add_single_gate(n, Gate.X2p, t0 + duration + pulse_total)
 
 
 class PulseTrain(Sequence):
@@ -147,17 +161,17 @@ class Timing(Sequence):
         self.add_gate_to_all(Gate.Xp, t0=self.first_delay-duration)
 
 
-class Anharmonicty(Sequence):
+class Anharmonicity(Sequence):
     def generate_sequence(self, config):
         """Generate sequence by adding gates/pulses to waveforms"""
         self.add_gate_to_all(Gate.Xp)
         pulse12 = copy(self.pulses_1qb_xy[0])
-        pulse12.shape = PulseShape(config.get('Anharmonicty - Pulse type'))
-        pulse12.amplitude = config.get('Anharmonicty - Amplitude')
-        pulse12.width = config.get('Anharmonicty - Width')
-        pulse12.plateau = config.get('Anharmonicty - Plateau')
-        pulse12.frequency = config.get('Anharmonicty - Frequency')
-        pulse12.truncation_range = config.get('Anharmonicty - Truncation range')
+        pulse12.shape = PulseShape(config.get('Anharmonicity - Pulse type'))
+        pulse12.amplitude = config.get('Anharmonicity - Amplitude')
+        pulse12.width = config.get('Anharmonicity - Width')
+        pulse12.plateau = config.get('Anharmonicity - Plateau')
+        pulse12.frequency = config.get('Anharmonicity - Frequency')
+        pulse12.truncation_range = config.get('Anharmonicity - Truncation range')
         gate = CustomGate(pulse12)
         self.add_gate_to_all(gate)
         self.add_gate_to_all(Gate.Xp)
