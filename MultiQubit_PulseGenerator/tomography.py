@@ -5,16 +5,128 @@ from copy import copy
 import logging
 log = logging.getLogger('LabberDriver')
 
+class ProcessTomography(object):
+    """This class handles qubit control prepulses for process tomography
+
+    """
+    def __init__(self, prepulse_index=0, qubit1ID=0, qubit2ID=1,
+        nProcessTomoQubits=1, tomoscheme='Single qubit'):
+
+        self.prepulse_index = prepulse_index
+        self. qubit1ID = qubit1ID
+        self.qubit2ID = qubit2ID
+        self.nProcessTomoQubits = nProcessTomoQubits
+        self.tomography_scheme = tomoscheme
+
+    def set_parameters(self, config={}):
+        """ set base parameters using config from Labber driver.
+
+        Parameters
+        ----------
+        config: dict
+            Configuration as defined by Labber driver configuration window
+        """
+
+        # Double-check that we want to do process tomography
+        if not config.get('Generate process tomography prepulse'):
+            return
+
+        # determine which tomography scheme is in use
+        self.tomography_scheme = config.get('Tomography scheme')
+        self.nProcessTomoQubits = 1 if self.tomography_scheme \
+            == 'Single qubit' else 2
+
+        # Prep dictionary to translate string 'one' into int(1) etc.:
+        dnQubitsTranslate = {
+            'One': int(1),
+            'Two': int(2),
+            'Three': int(3),
+            'Four': int(4),
+            'Five': int(5),
+            'Six': int(6),
+            'Seven': int(7),
+            'Eight': int(8),
+            'Nine': int(9)
+        }
+
+        # Update which-qubit variable
+        if self.nProcessTomoQubits is 1:
+            self.qubit1ID = dnQubitsTranslate[
+                config.get('Qubit for tomography')]
+            self.prepulse_index = config.get(
+                'Process tomography prepulse index 1-QB')
+        elif self.nProcessTomoQubits is 2:
+            self.qubit1ID = dnQubitsTranslate[
+                config.get('Qubit 1 # tomography')]
+            self.qubit2ID = dnQubitsTranslate[
+                config.get('Qubit 2 # tomography')]
+            self.prepulse_index = config.get(
+                'Process tomography prepulse index 2-QB')
+
+    def add_pulses(self, sequence):
+        """Add prepulses to the sequencer
+
+        Parameters
+        ----------
+        sequence: :obj: `Sequence`
+            Sequence to which to add the prepulses
+        """
+
+        if self.tomography_scheme == 'Single qubit':
+            qubitID1 = self.qubit1ID - 1
+            gate = [None]
+
+            whichGate = self.prepulse_index[0]
+            gate = self.gate_from_index(whichGate)
+
+            sequence.add_gate(qubitID1, gate)
+
+        elif self.tomography_scheme in ['Two qubit (9 pulse set)',
+                                        'Two qubit (30 pulse set)',
+                                        'Two qubit (36 pulse set)']:
+            qubitID1 = self.qubit1ID - 1
+            qubitID2 = self.qubit2ID - 1
+            gate = [None, None]
+
+            whichGate = self.prepulse_index[:2]
+            gate = self.gate_from_index(whichGate)
+
+            sequence.add_gate([qubitID1, qubitID2], gate)
+
+    def gate_from_index(self, whichGate):
+        """Helper function to translate prepulse index into gate
+
+        Parameters
+        ----------
+        whichGate: str
+            Elements of list should be in ['0', '1', 'X', 'Y'],
+            indicating which state to prepare
+        """
+
+        indices = list(whichGate)
+        gates = []
+        for index in indices:
+            if index == '0':
+                gates.append(Gate.I)
+            elif index == '1':
+                gates.append(Gate.Xp)
+            elif index == 'X':
+                gates.append(Gate.Y2p)
+            elif index == 'Y':
+                gates.append(Gate.X2m)
+
+        return gates
+
+
 class Tomography(object):
     """This class handles qubit control pulses for tomography
 
     """
 
-    def __init__(self,tomography_index=0,nQubits = 1, singleQBtomoID = 0,
+    def __init__(self,tomography_index=0, singleQBtomoID = 0,
                  twoQBtomoID1=0, twoQBtomoID2=1, tomography_scheme = 'Single qubit'):
         # define variables
         self.tomography_index = tomography_index
-        self.nQubits = nQubits
         self.singleQBtomoID = 0
         self.twoQBtomoID1 = 0
         self.twoQBtomoID2 = 1
@@ -49,7 +161,6 @@ class Tomography(object):
             'Nine': int(9)
         }
 
-
         # depending on 1 or 2 QB tomography:
         if self.tomography_scheme == 'Single qubit':
             # Determine which qubit to route 1QB tomo signal to:
@@ -58,19 +169,17 @@ class Tomography(object):
             # log.log(20,'test')
             # log.log(20,self.tomography_index)
 
-        elif self.tomography_scheme == 'Two qubit (9 pulse set)':
-            self.tomography_index = config.get('Tomography pulse index 2-QB (9 pulse set)')
-            self.twoQBtomoID1 = dnQubitsTranslate[config.get('Qubit 1 # tomography (9 pulse set)')]
-            self.twoQBtomoID2 = dnQubitsTranslate[config.get('Qubit 2 # tomography (9 pulse set)')]
+        elif self.tomography_scheme in ['Two qubit (9 pulse set)',
+                                        'Two qubit (30 pulse set)',
+                                        'Two qubit (36 pulse set)']:
+            self.twoQBtomoID1 = dnQubitsTranslate[config.get('Qubit 1 # tomography')]
+            self.twoQBtomoID2 = dnQubitsTranslate[config.get('Qubit 2 # tomography')]
 
-        elif self.tomography_scheme == 'Two qubit (30 pulse set)':
-            self.tomography_index = config.get('Tomography pulse index 2-QB (30 pulse set)')
-            self.twoQBtomoID1 = dnQubitsTranslate[config.get('Qubit 1 # tomography (30 pulse set)')]
-            self.twoQBtomoID2 = dnQubitsTranslate[config.get('Qubit 2 # tomography (30 pulse set)')]
-        elif self.tomography_scheme == 'Two qubit (36 pulse set)':
-            self.tomography_index = config.get('Tomography pulse index 2-QB (36 pulse set)')
-            self.twoQBtomoID1 = dnQubitsTranslate[config.get('Qubit 1 # tomography (36 pulse set)')]
-            self.twoQBtomoID2 = dnQubitsTranslate[config.get('Qubit 2 # tomography (36 pulse set)')]
+            # Format: Tomography pulse index 2-QB (n pulse set)
+            pulseCall = 'Tomography pulse index 2-QB' + \
+                        self.tomography_scheme[9:]
+
+            self.tomography_index = config.get(pulseCall)
 
         pass
 
