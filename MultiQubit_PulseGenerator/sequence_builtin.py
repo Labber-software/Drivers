@@ -157,8 +157,11 @@ class Timing(Sequence):
         """Generate sequence by adding gates/pulses to waveforms"""
         # get parameters
         duration = config['Timing - Delay']
-        self.add_gate_to_all(Gate.Zp, t0=self.first_delay)
-        self.add_gate_to_all(Gate.Xp, t0=self.first_delay-duration)
+        max_width = np.max([[p.total_duration() for p in self.pulses_1qb_xy[:self.n_qubit]],
+                           [p.total_duration() for p in self.pulses_1qb_z[:self.n_qubit]]])
+        first_delay = self.first_delay+max_width/2
+        self.add_gate_to_all(Gate.Zp, t0=first_delay)
+        self.add_gate_to_all(Gate.Xp, t0=first_delay-duration)
 
 
 class Anharmonicity(Sequence):

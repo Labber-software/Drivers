@@ -425,9 +425,6 @@ class Sequence(object):
             self.add_gate(qubit, gate, t0, dt, 'left')
         else:
             self.add_gate(qubit, gate, t0, dt, 'center')
-        # If t0 was used as time reference, we need to make sure that the sequence is still sorted correctly
-        # if t0 is not None:
-        #     self.sort_qubit_sequence(qubit)
 
     def add_gate(self, qubit, gate, t0=None, dt=None, align='center'):
         """
@@ -514,6 +511,11 @@ class Sequence(object):
         step.t_middle = step.t_start+max_duration/2
 
         self.sequences.append(step)
+
+        # If t0 was used as time reference,
+        # we need to make sure that the sequence is still sorted correctly
+        if t0 is not None:
+            self.sequences.sort(key=lambda x: x.t_end)
 
     def add_composite_gate(self, qubit, gate, t0=None, dt=None, align='center'):
         """
