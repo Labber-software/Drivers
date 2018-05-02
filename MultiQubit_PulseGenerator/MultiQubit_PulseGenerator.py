@@ -53,7 +53,8 @@ class Driver(LabberDriver):
                     mod = importlib.import_module(modName)
                     # the custom sequence class has to be named
                     # 'CustomSequence'
-                    self.sequence = mod.CustomSequence()
+                    if not isinstance(self.sequence, mod.CustomSequence):
+                        self.sequence = mod.CustomSequence()
                 else:
                     # standard built-in sequence
                     self.sequence = new_type()
@@ -67,7 +68,8 @@ class Driver(LabberDriver):
             sys.path.append(path)
             mod = importlib.import_module(modName)
             # the custom sequence class has to be named 'CustomSequence'
-            self.sequence = mod.CustomSequence()
+            if not isinstance(self.sequence, mod.CustomSequence):
+                self.sequence = mod.CustomSequence()
         return value
 
 
