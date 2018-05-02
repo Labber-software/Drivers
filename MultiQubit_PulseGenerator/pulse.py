@@ -248,8 +248,8 @@ class Pulse(object):
                 values = self.amplitude/2*(1-np.cos(2*np.pi*(t-t0+tau/2)/tau))
             else:
                 values = np.ones_like(t) * self.amplitude
-                values[t<t0-self.plateau/2] = self.amplitude/2*(1-np.cos(2*np.pi*(t[t<t0-self.plateau/2]-t0-self.plateau/2+tau/2)/tau))
-                values[t>t0+self.plateau/2] = self.amplitude/2*(1-np.cos(2*np.pi*(t[t>t0+self.plateau/2]-t0+self.plateau/2+tau/2)/tau))
+                values[t<t0-self.plateau/2] = self.amplitude/2*(1-np.cos(2*np.pi*(t[t<t0-self.plateau/2]-t0+self.plateau/2+tau/2)/tau))
+                values[t>t0+self.plateau/2] = self.amplitude/2*(1-np.cos(2*np.pi*(t[t>t0+self.plateau/2]-t0-self.plateau/2+tau/2)/tau))
 
         # Make sure the waveform is zero outside the pulse
         values[t<(t0-self.total_duration()/2)] = 0
