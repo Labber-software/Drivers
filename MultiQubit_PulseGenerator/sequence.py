@@ -196,6 +196,9 @@ class Sequence(object):
         end = self.sequences[-1].t_end + max_delay
         if self.trim_to_sequence:
             self.n_pts = int(np.ceil(end*self.sample_rate))+1
+            if self.n_pts % 2 == 1:
+                # Odd n_pts give spectral leakage in FFT
+                self.n_pts += 1
         for n in range(self.n_qubit):
             self.wave_xy[n] = np.zeros(self.n_pts, dtype=np.complex)
             self.wave_z[n] = np.zeros(self.n_pts, dtype=float)
