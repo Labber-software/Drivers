@@ -316,7 +316,7 @@ class Sequence(object):
                     continue
                 # Get the corresponding pulse
                 if isinstance(gate, IdentityGate):
-                    pulse = self.pulses_1qb_xy[qubit]
+                    pulse = copy(self.pulses_1qb_xy[qubit])
                     # No drag prevents a bug for short I gates
                     pulse.use_drag = False
                 elif isinstance(gate, SingleQubitRotation):
@@ -691,7 +691,7 @@ class Sequence(object):
                 gate = np.ones_like(wave)
                 # if creating readout trig, turn off gate during readout
                 if self.readout_trig_generate:
-                    gate[-int((self.readout_trig_duration - self.gate_overlap -
+                    gate[-int((config.get('Readout trig duration') - self.gate_overlap -
                                self.gate_delay) * self.sample_rate):] = 0.0
             else:
                 # non-uniform gate, find non-zero elements
