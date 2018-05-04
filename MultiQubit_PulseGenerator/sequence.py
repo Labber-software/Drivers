@@ -2,7 +2,7 @@
 import numpy as np
 from copy import copy
 from pulse import PulseShape, Pulse, PulseType
-from predistortion import Predistortion
+from predistortion import Predistortion, ExponentialPredistortion
 from crosstalk import Crosstalk
 from readout import Readout
 from gates import *
@@ -164,6 +164,7 @@ class Sequence(object):
         # predistortion objects
         self.perform_predistortion = False
         self.predistortions = [Predistortion(n) for n in range(MAX_QUBIT)]
+        self.predistortions_z = [ExponentialPredistortion(n) for n in range(MAX_QUBIT)]
 
         # gate switch waveform
         self.generate_gate_switch = False
@@ -641,12 +642,16 @@ class Sequence(object):
         """Pre-distort the waveforms.
 
         """
-        if not self.perform_predistortion:
-            return
-        # go through and predistort all waveforms
-        n_wave = self.n_qubit if self.local_xy else 1
-        for n in range(n_wave):
-            self.wave_xy[n] = self.predistortions[n].predistort(self.wave_xy[n])
+        if self.perform_predistortion:
+            # go through and predistort all waveforms
+            n_wave = self.n_qubit if self.local_xy else 1
+            for n in range(n_wave):
+                self.wave_xy[n] = self.predistortions[n].predistort(self.wave_xy[n])
+
+        if self.perform_predistortion_z:
+            # go through and predistort all waveforms
+            for n in range(self.n_qubit):
+                self.wave_z[n] = self.predistortions_z[n].predistort(self.wave_z[n])
 
     def perform_crosstalk_compensation(self):
         """Compensate for Z-control crosstalk
@@ -876,6 +881,11 @@ class Sequence(object):
         self.perform_predistortion = config.get('Predistort waveforms', False)
         # update all predistorting objects
         for p in self.predistortions:
+            p.set_parameters(config)
+
+        # Z predistortion
+        self.perform_predistortion_z = config.get('Predistort Z')
+        for p in self.predistortions_z:
             p.set_parameters(config)
 
         # crosstalk
