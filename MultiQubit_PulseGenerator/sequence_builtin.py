@@ -91,8 +91,11 @@ class PulseTrain(Sequence):
         n_pulse = int(config['# of pulses'])
         alternate = config['Alternate pulse direction']
 
+
         # create list with gates
         gates = []
+        if n_pulse == 0:
+            gates.append([Gate.I for q in range(self.n_qubit)])
         for n in range(n_pulse):
             # check if alternate pulses
             if alternate and (n % 2) == 1:
@@ -147,9 +150,9 @@ class VZ(Sequence):
 
         width = 0 if edge_to_edge else self.pulses_1qb[0].total_duration()
         vz = VirtualZGate(angle=z_angle)
-        self.add_gate_to_all(Gate.X2p)
+        # self.add_gate_to_all(Gate.X2p)
         self.add_gate_to_all(vz)
-        self.add_gate_to_all(Gate.X2p)
+        self.add_gate_to_all(Gate.Xp)
 
 
 class Timing(Sequence):
