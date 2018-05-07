@@ -91,8 +91,11 @@ class PulseTrain(Sequence):
         n_pulse = int(config['# of pulses'])
         alternate = config['Alternate pulse direction']
 
+
         # create list with gates
         gates = []
+        if n_pulse == 0:
+            gates.append([Gate.I for q in range(self.n_qubit)])
         for n in range(n_pulse):
             # check if alternate pulses
             if alternate and (n % 2) == 1:
@@ -128,15 +131,6 @@ class CZgates(Sequence):
         self.add_gates(gates)
 
 
-class CZecho(Sequence):
-    """Sequence for multi-qubit pulse trains, for pulse calibrations"""
-
-    def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms"""
-        # create list with gates
-
-        self.add_gate(qubit=[0, 1], gate=Gate.CZEcho)
-
 class VZ(Sequence):
     def generate_sequence(self, config):
         """Generate sequence by adding gates/pulses to waveforms"""
@@ -147,9 +141,9 @@ class VZ(Sequence):
 
         width = 0 if edge_to_edge else self.pulses_1qb[0].total_duration()
         vz = VirtualZGate(angle=z_angle)
-        self.add_gate_to_all(Gate.X2p)
+        # self.add_gate_to_all(Gate.X2p)
         self.add_gate_to_all(vz)
-        self.add_gate_to_all(Gate.X2p)
+        self.add_gate_to_all(Gate.Xp)
 
 
 class Timing(Sequence):
@@ -157,8 +151,11 @@ class Timing(Sequence):
         """Generate sequence by adding gates/pulses to waveforms"""
         # get parameters
         duration = config['Timing - Delay']
-        self.add_gate_to_all(Gate.Zp, t0=self.first_delay)
-        self.add_gate_to_all(Gate.Xp, t0=self.first_delay-duration)
+        max_width = np.max([[p.total_duration() for p in self.pulses_1qb_xy[:self.n_qubit]],
+                           [p.total_duration() for p in self.pulses_1qb_z[:self.n_qubit]]])
+        first_delay = self.first_delay+max_width/2
+        self.add_gate_to_all(Gate.Zp, t0=first_delay)
+        self.add_gate_to_all(Gate.Xp, t0=first_delay-duration)
 
 
 class Anharmonicity(Sequence):

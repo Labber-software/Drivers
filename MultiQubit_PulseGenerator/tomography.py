@@ -144,12 +144,11 @@ class Tomography(object):
 
         """
         # double-check that we actually want to do tomography:
-        if not config.get('Generate tomography pulse'):
+        if not config.get('Generate tomography postpulse'):
             return
 
         # Load tomo scheme into local variable:
         self.tomography_scheme = config.get('Tomography scheme')
-        
         # Prep dictionary to translate string 'one' into int(1) etc.:
         dnQubitsTranslate = {
             'One': int(1),
@@ -168,8 +167,6 @@ class Tomography(object):
             # Determine which qubit to route 1QB tomo signal to:
             self.singleQBtomoID = dnQubitsTranslate[config.get('Qubit for tomography')]
             self.tomography_index = config.get('Tomography pulse index 1-QB')
-            # log.log(20,'test')
-            # log.log(20,self.tomography_index)
 
         elif self.tomography_scheme in ['Two qubit (9 pulse set)',
                                         'Two qubit (30 pulse set)',
@@ -193,7 +190,6 @@ class Tomography(object):
         sequence : :obj: `Sequence`
             Sequence to which add tomography pulses
         """
-
         if self.tomography_scheme == 'Single qubit':
             qubitID = self.singleQBtomoID - 1
             gate = [None]
@@ -210,6 +206,7 @@ class Tomography(object):
             qubitID1 = self.twoQBtomoID1 - 1
             qubitID2 = self.twoQBtomoID2 - 1
             gate = [None, None]
+
 
             if self.tomography_index == 'XX: Y2m-Y2m':
                 gate = [Gate.Y2m, Gate.Y2m]
@@ -236,65 +233,65 @@ class Tomography(object):
             qubitID2 = self.twoQBtomoID2 - 1
             gate = [None, None]
 
-            if self.tomography_index == 'I-I': 
+            if self.tomography_index == 'I-I':
                 gate = [Gate.I,Gate.I]
-            elif self.tomography_index == 'Xp-I': 
+            elif self.tomography_index == 'Xp-I':
                 gate = [Gate.Xp,Gate.I]
-            elif self.tomography_index == 'I-Xp': 
+            elif self.tomography_index == 'I-Xp':
                 gate = [Gate.I,Gate.Xp]
-            elif self.tomography_index == 'X2p-I': 
+            elif self.tomography_index == 'X2p-I':
                 gate = [Gate.X2p,Gate.I]
-            elif self.tomography_index == 'X2p-X2p': 
+            elif self.tomography_index == 'X2p-X2p':
                 gate = [Gate.X2p,Gate.X2p]
-            elif self.tomography_index == 'X2p-Y2p': 
+            elif self.tomography_index == 'X2p-Y2p':
                 gate = [Gate.X2p,Gate.Y2p]
-            elif self.tomography_index == 'X2p-Xp': 
+            elif self.tomography_index == 'X2p-Xp':
                 gate = [Gate.X2p,Gate.Xp]
-            elif self.tomography_index == 'Y2p-I': 
+            elif self.tomography_index == 'Y2p-I':
                 gate = [Gate.Y2p,Gate.I]
-            elif self.tomography_index == 'Y2p-X2p': 
+            elif self.tomography_index == 'Y2p-X2p':
                 gate = [Gate.Y2p,Gate.X2p]
-            elif self.tomography_index == 'Y2p-Y2p': 
+            elif self.tomography_index == 'Y2p-Y2p':
                 gate = [Gate.Y2p,Gate.Y2p]
-            elif self.tomography_index == 'Y2p-Xp': 
+            elif self.tomography_index == 'Y2p-Xp':
                 gate = [Gate.Y2p,Gate.Xp]
-            elif self.tomography_index == 'I-X2p': 
+            elif self.tomography_index == 'I-X2p':
                 gate = [Gate.I,Gate.X2p]
-            elif self.tomography_index == 'Xp-X2p': 
+            elif self.tomography_index == 'Xp-X2p':
                 gate = [Gate.Xp,Gate.X2p]
-            elif self.tomography_index == 'I-Y2p': 
+            elif self.tomography_index == 'I-Y2p':
                 gate = [Gate.I,Gate.Y2p]
-            elif self.tomography_index == 'Xp-Y2p': 
+            elif self.tomography_index == 'Xp-Y2p':
                 gate = [Gate.Xp,Gate.Y2p]
-            elif self.tomography_index == 'I-I': 
+            elif self.tomography_index == 'I-I':
                 gate = [Gate.I,Gate.I]
-            elif self.tomography_index == 'Xm-I': 
+            elif self.tomography_index == 'Xm-I':
                 gate = [Gate.Xm,Gate.I]
-            elif self.tomography_index == 'I-Xm': 
+            elif self.tomography_index == 'I-Xm':
                 gate = [Gate.I,Gate.Xm]
-            elif self.tomography_index == 'X2m-I': 
+            elif self.tomography_index == 'X2m-I':
                 gate = [Gate.X2m,Gate.I]
-            elif self.tomography_index == 'X2m-X2m': 
+            elif self.tomography_index == 'X2m-X2m':
                 gate = [Gate.X2m,Gate.X2m]
-            elif self.tomography_index == 'X2m-Y2m': 
+            elif self.tomography_index == 'X2m-Y2m':
                 gate = [Gate.X2m,Gate.Y2m]
-            elif self.tomography_index == 'X2m-Xm': 
+            elif self.tomography_index == 'X2m-Xm':
                 gate = [Gate.X2m,Gate.Xm]
-            elif self.tomography_index == 'Y2m-I': 
+            elif self.tomography_index == 'Y2m-I':
                 gate = [Gate.Y2m,Gate.I]
-            elif self.tomography_index == 'Y2m-X2m': 
+            elif self.tomography_index == 'Y2m-X2m':
                 gate = [Gate.Y2m,Gate.X2m]
-            elif self.tomography_index == 'Y2m-Y2m': 
+            elif self.tomography_index == 'Y2m-Y2m':
                 gate = [Gate.Y2m,Gate.Y2m]
-            elif self.tomography_index == 'Y2m-Xm': 
+            elif self.tomography_index == 'Y2m-Xm':
                 gate = [Gate.Y2m,Gate.Xm]
-            elif self.tomography_index == 'I-X2m': 
+            elif self.tomography_index == 'I-X2m':
                 gate = [Gate.I,Gate.X2m]
-            elif self.tomography_index == 'Xm-X2m': 
+            elif self.tomography_index == 'Xm-X2m':
                 gate = [Gate.Xm,Gate.X2m]
-            elif self.tomography_index == 'I-Y2m': 
+            elif self.tomography_index == 'I-Y2m':
                 gate = [Gate.I,Gate.Y2m]
-            elif self.tomography_index == 'Xm-Y2m': 
+            elif self.tomography_index == 'Xm-Y2m':
                 gate = [Gate.Xm,Gate.Y2m]
             sequence.add_gate([qubitID1, qubitID2], gate)
 

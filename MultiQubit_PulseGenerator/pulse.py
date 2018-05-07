@@ -2,6 +2,7 @@
 import numpy as np
 from enum import Enum
 import logging
+from scipy.optimize import fmin
 log = logging.getLogger('LabberDriver')
 
 class PulseShape(Enum):
@@ -71,7 +72,9 @@ class Pulse(object):
                  use_drag=False, drag_coefficient=0.0, truncation_range=5.0,
                  pulse_type=PulseType.XY, start_at_zero=False, gated=False,
                  gate_delay=0, gate_amplitude=1, gate_duration=None,
-                 iq_ratio=1, iq_skew=0, i_offset=0, q_offset=0):
+                 iq_ratio=1, iq_skew=0, i_offset=0, q_offset=0,
+                 qubit_spectrum=None):
+
         # set variables
         self.amplitude = amplitude
         self.width = width
@@ -101,6 +104,7 @@ class Pulse(object):
         self.Lcoeff = Lcoeff
         self.dfdV = dfdV
         self.period_2qb = period_2qb
+        self.qubit_spectrum = qubit_spectrum
 
         # For IQ mixer corrections
         self.iq_ratio = iq_ratio
@@ -200,8 +204,10 @@ class Pulse(object):
 
         elif self.shape == PulseShape.CZ:
             # notation and calculations are based on the Paper "Fast adiabatic qubit gates using only sigma_z control" PRA 90, 022307 (2014)
-
+            # pulse.Offset = config.get('f11-f20 initial, 2QB' + s)
+            # pulse.amplitude = config.get('f11-f20 final, 2QB' + s)
             # Defining initial and final angles
+
             theta_i = np.arctan(self.Coupling/self.Offset) # Initial angle of on the |11>-|02> bloch sphere
             theta_f = np.arctan(self.Coupling/(self.amplitude)) # Final angle before moving back to initial angle
 
@@ -239,8 +245,12 @@ class Pulse(object):
                 elif 0<(t[i]-t0+self.width/2+self.plateau/2)<(self.width + self.plateau):
                     theta_t[i] = np.interp(t[i]-t0+self.width/2-self.plateau/2,t_tau,theta_tau)
 
-            # Going from frequency to voltage assuming a linear dependence. Should be improved in the future.
-            values = (self.Coupling/np.tan(theta_t))/self.dfdV - (self.Coupling/np.tan(theta_i))/self.dfdV
+            df = self.Coupling*(1/np.tan(theta_t) - 1/np.tan(theta_i))
+            if self.qubit_spectrum is None:
+                # Use linear dependence if no qubit spectrum was given
+                values = df/self.dfdV
+            else:
+                values = self.df_to_dV(df)
 
         elif self.shape == PulseShape.COSINE:
             tau = self.width
@@ -248,8 +258,8 @@ class Pulse(object):
                 values = self.amplitude/2*(1-np.cos(2*np.pi*(t-t0+tau/2)/tau))
             else:
                 values = np.ones_like(t) * self.amplitude
-                values[t<t0-self.plateau/2] = self.amplitude/2*(1-np.cos(2*np.pi*(t[t<t0-self.plateau/2]-t0-self.plateau/2+tau/2)/tau))
-                values[t>t0+self.plateau/2] = self.amplitude/2*(1-np.cos(2*np.pi*(t[t>t0+self.plateau/2]-t0+self.plateau/2+tau/2)/tau))
+                values[t<t0-self.plateau/2] = self.amplitude/2*(1-np.cos(2*np.pi*(t[t<t0-self.plateau/2]-t0+self.plateau/2+tau/2)/tau))
+                values[t>t0+self.plateau/2] = self.amplitude/2*(1-np.cos(2*np.pi*(t[t>t0+self.plateau/2]-t0-self.plateau/2+tau/2)/tau))
 
         # Make sure the waveform is zero outside the pulse
         values[t<(t0-self.total_duration()/2)] = 0
@@ -314,10 +324,80 @@ class Pulse(object):
         dt = t[1]-t[0]
         start = int(np.ceil((t0-self.total_duration()/2+self.gate_delay)/dt))
         stop = int(start + np.floor(self.gate_duration/dt))
-        log.log(20, 'Start index {}'.format(start))
-        log.log(20, 'Stop index {}'.format(stop))
         y[start:stop] = self.gate_amplitude
         return y
+
+
+    def qubit_frequency(self, V):
+        """
+            Qubit frequency as a function of voltage, including SQUID assymetry.
+        """
+        Vperiod = self.qubit_spectrum['Vperiod']
+        Voffset = self.qubit_spectrum['Voffset']
+        V0 = self.qubit_spectrum['V0']
+
+        Ec = self.qubit_spectrum['Ec']
+        f01_max = self.qubit_spectrum['f01_max']
+        f01_min = self.qubit_spectrum['f01_min']
+
+        EJ = (f01_max+Ec)**2/(8*Ec)
+        d = (f01_min+Ec)**2/(8*EJ*Ec)
+        F = np.pi*(V - Voffset)/Vperiod
+        f = np.sqrt(8*EJ*Ec*np.abs(np.cos(F))*np.sqrt(1+d**2*np.tan(F)**2))-Ec
+        return f
+
+
+    def f_to_V(self, f):
+        """
+            Finds the voltages corresponding to the frequencies f.
+        """
+        Vperiod = self.qubit_spectrum['Vperiod']
+        Voffset = self.qubit_spectrum['Voffset']
+        V0 = self.qubit_spectrum['V0']
+
+        if not isinstance(f, (list, np.ndarray)):
+            f = [f]
+
+        def g(V, f0):
+            """
+                Function to minimize.
+            """
+            return (f0-self.qubit_frequency(V))**2
+
+        # Make sure that starting guess is on a slope.
+        if V0 >= Voffset:
+            V_start = Vperiod/4+Voffset
+        else:
+            V_start = -Vperiod/4+Voffset
+
+        V = np.zeros_like(f)
+        for n, f0 in enumerate(f):
+            V[n] = fmin(g, V_start, args=(f0,))[0]
+
+        # Mirror points around Voffset, bounding the qubit to one side of the maxima
+        if V_start >= 0:
+            V[V<Voffset] = 2*Voffset - V[V<Voffset]
+        else:
+            V[V>Voffset] = 2*Voffset - V[V>Voffset]
+
+        # Mirror points beyond 1 period, bounding the qubit to one side of the minma
+        Vminp = Vperiod/2+Voffset
+        Vminn = -Vperiod/2+Voffset
+        V[V>Vminp] = 2*Vminp - V[V>Vminp]
+        V[V<Vminn] = 2*Vminn - V[V<Vminn]
+
+        return V
+
+    def df_to_dV(self, df):
+        V0 = self.qubit_spectrum['V0']
+        f0 = self.qubit_frequency(V0)
+        f01_max = self.qubit_spectrum['f01_max']
+        f01_min = self.qubit_spectrum['f01_min']
+        if np.any(f0+df > f01_max):
+            raise ValueError('Frequency requested is outside the qubit spectrum')
+        if np.any(f0+df < f01_min):
+            raise ValueError('Frequency requested is outside the qubit spectrum')
+        return self.f_to_V(df+f0)-V0
 
 
 if __name__ == '__main__':

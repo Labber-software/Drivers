@@ -2,6 +2,10 @@
 import numpy as np
 from pulse import PulseShape, Pulse
 
+# add logger, to allow logging to Labber's instrument log
+import logging
+log = logging.getLogger('LabberDriver')
+
 class Readout(object):
     """This class is used to generate and demodulate multi-tone qubit readout
 
@@ -24,6 +28,8 @@ class Readout(object):
         self.demod_length = 1.0E-6
         self.freq_offset = 0.0
         self.use_phase_ref = False
+
+        # self.n_records = 1
 
     def set_parameters(self, config={}):
         """Set base parameters using config from from Labber driver

@@ -2,7 +2,7 @@
 import numpy as np
 from copy import copy
 from pulse import PulseShape, Pulse, PulseType
-from predistortion import Predistortion
+from predistortion import Predistortion, ExponentialPredistortion
 from crosstalk import Crosstalk
 from readout import Readout
 from gates import *
@@ -164,6 +164,7 @@ class Sequence(object):
         # predistortion objects
         self.perform_predistortion = False
         self.predistortions = [Predistortion(n) for n in range(MAX_QUBIT)]
+        self.predistortions_z = [ExponentialPredistortion(n) for n in range(MAX_QUBIT)]
 
         # gate switch waveform
         self.generate_gate_switch = False
@@ -195,6 +196,9 @@ class Sequence(object):
         end = self.sequences[-1].t_end + max_delay
         if self.trim_to_sequence:
             self.n_pts = int(np.ceil(end*self.sample_rate))+1
+            if self.n_pts % 2 == 1:
+                # Odd n_pts give spectral leakage in FFT
+                self.n_pts += 1
         for n in range(self.n_qubit):
             self.wave_xy[n] = np.zeros(self.n_pts, dtype=np.complex)
             self.wave_z[n] = np.zeros(self.n_pts, dtype=float)
@@ -316,7 +320,9 @@ class Sequence(object):
                     continue
                 # Get the corresponding pulse
                 if isinstance(gate, IdentityGate):
-                    pulse = self.pulses_1qb_xy[qubit]
+                    pulse = copy(self.pulses_1qb_xy[qubit])
+                    # No drag prevents a bug for short I gates
+                    pulse.use_drag = False
                 elif isinstance(gate, SingleQubitRotation):
                     if gate.axis in ('X', 'Y'):
                         pulse = self.pulses_1qb_xy[qubit]
@@ -423,9 +429,6 @@ class Sequence(object):
             self.add_gate(qubit, gate, t0, dt, 'left')
         else:
             self.add_gate(qubit, gate, t0, dt, 'center')
-        # If t0 was used as time reference, we need to make sure that the sequence is still sorted correctly
-        # if t0 is not None:
-        #     self.sort_qubit_sequence(qubit)
 
     def add_gate(self, qubit, gate, t0=None, dt=None, align='center'):
         """
@@ -512,6 +515,11 @@ class Sequence(object):
         step.t_middle = step.t_start+max_duration/2
 
         self.sequences.append(step)
+
+        # If t0 was used as time reference,
+        # we need to make sure that the sequence is still sorted correctly
+        if t0 is not None:
+            self.sequences.sort(key=lambda x: x.t_end)
 
     def add_composite_gate(self, qubit, gate, t0=None, dt=None, align='center'):
         """
@@ -637,12 +645,16 @@ class Sequence(object):
         """Pre-distort the waveforms.
 
         """
-        if not self.perform_predistortion:
-            return
-        # go through and predistort all waveforms
-        n_wave = self.n_qubit if self.local_xy else 1
-        for n in range(n_wave):
-            self.wave_xy[n] = self.predistortions[n].predistort(self.wave_xy[n])
+        if self.perform_predistortion:
+            # go through and predistort all waveforms
+            n_wave = self.n_qubit if self.local_xy else 1
+            for n in range(n_wave):
+                self.wave_xy[n] = self.predistortions[n].predistort(self.wave_xy[n])
+
+        if self.perform_predistortion_z:
+            # go through and predistort all waveforms
+            for n in range(self.n_qubit):
+                self.wave_z[n] = self.predistortions_z[n].predistort(self.wave_z[n])
 
     def perform_crosstalk_compensation(self):
         """Compensate for Z-control crosstalk
@@ -687,7 +699,7 @@ class Sequence(object):
                 gate = np.ones_like(wave)
                 # if creating readout trig, turn off gate during readout
                 if self.readout_trig_generate:
-                    gate[-int((self.readout_trig_duration - self.gate_overlap -
+                    gate[-int((config.get('Readout trig duration') - self.gate_overlap -
                                self.gate_delay) * self.sample_rate):] = 0.0
             else:
                 # non-uniform gate, find non-zero elements
@@ -822,6 +834,7 @@ class Sequence(object):
             # global parameters
             pulse.shape = PulseShape(config.get('Pulse type, 2QB'))
             pulse.pulse_type = PulseType.Z
+
             if config.get('Pulse type, 2QB') == 'CZ':
                 pulse.F_Terms = d[config.get('Fourier terms, 2QB')]
                 if config.get('Uniform 2QB pulses'):
@@ -830,6 +843,20 @@ class Sequence(object):
                 else:
                     pulse.width = config.get('Width, 2QB' + s)
                     pulse.plateau = config.get('Plateau, 2QB')
+
+                # spectra
+                if config.get('Assume linear dependence' + s, True):
+                    pulse.qubit_spectrum = None
+                else:
+                    qubit_spectrum = {
+                        'Vperiod': config.get('Vperiod #{}'.format(1)),
+                        'Voffset': config.get('Voffset #{}'.format(1)),
+                        'Ec': config.get('Ec #{}'.format(1)),
+                        'f01_max': config.get('f01 max #{}'.format(1)),
+                        'f01_min': config.get('f01 min #{}'.format(1)),
+                        'V0': config.get('V0 #{}'.format(1)),
+                    }
+                    pulse.qubit_spectrum = qubit_spectrum
 
                 # Get Fourier values
                 if d[config.get('Fourier terms, 2QB')] == 4 :
@@ -865,13 +892,18 @@ class Sequence(object):
         self.processTomo.set_parameters(config)
 
         # tomography
-        self.perform_tomography = config.get('Generate tomography pulse', False)
+        self.perform_tomography = config.get('Generate tomography postpulse', False)
         self.tomography.set_parameters(config)
 
         # predistortion
         self.perform_predistortion = config.get('Predistort waveforms', False)
         # update all predistorting objects
         for p in self.predistortions:
+            p.set_parameters(config)
+
+        # Z predistortion
+        self.perform_predistortion_z = config.get('Predistort Z')
+        for p in self.predistortions_z:
             p.set_parameters(config)
 
         # crosstalk
@@ -904,7 +936,6 @@ class Sequence(object):
         self.readout_trig_generate = config.get('Generate readout trig')
         self.readout.set_parameters(config)
 
-        # TODO Check pulses readout
         # get readout pulse parameters
         phases = 2 * np.pi * np.array([0.8847060, 0.2043214, 0.9426104,
             0.6947334, 0.8752361, 0.2246747, 0.6503154, 0.7305004, 0.1309068])

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from BaseDriver import LabberDriver
-from sequence_builtin import Rabi, CPMG, PulseTrain, CZgates, CZecho, VZ, Timing, Anharmonicity
+from sequence_builtin import Rabi, CPMG, PulseTrain, CZgates, VZ, Timing, Anharmonicity
 from sequence_rb import SingleQubit_RB, TwoQubit_RB
 
 import importlib
@@ -13,7 +13,6 @@ SEQUENCES = {'Rabi': Rabi,
              'CP/CPMG': CPMG,
              'Pulse train': PulseTrain,
              'C-phase Pulses': CZgates,
-             'C-phase Echo': CZecho,
              '1-QB Randomized Benchmarking': SingleQubit_RB,
              '2-QB Randomized Benchmarking': TwoQubit_RB,
              'Virtual Z': VZ,
@@ -53,7 +52,8 @@ class Driver(LabberDriver):
                     mod = importlib.import_module(modName)
                     # the custom sequence class has to be named
                     # 'CustomSequence'
-                    self.sequence = mod.CustomSequence()
+                    if not isinstance(self.sequence, mod.CustomSequence):
+                        self.sequence = mod.CustomSequence()
                 else:
                     # standard built-in sequence
                     self.sequence = new_type()
@@ -67,7 +67,8 @@ class Driver(LabberDriver):
             sys.path.append(path)
             mod = importlib.import_module(modName)
             # the custom sequence class has to be named 'CustomSequence'
-            self.sequence = mod.CustomSequence()
+            if not isinstance(self.sequence, mod.CustomSequence):
+                self.sequence = mod.CustomSequence()
         return value
 
 
