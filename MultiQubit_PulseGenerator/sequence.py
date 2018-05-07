@@ -839,9 +839,9 @@ class Sequence(object):
             qubit_spectrum = {
                 'Vperiod': config.get('Vperiod'),
                 'Voffset': config.get('Voffset'),
-                'c': config.get('c'),
-                'A': config.get('A'),
-                'b': config.get('b'),
+                'Ec': config.get('Ec'),
+                'f01_max': config.get('f01 max'),
+                'f01_min': config.get('f01 min'),
                 'V0': config.get('V0'),
             }
             pulse.qubit_spectrum = qubit_spectrum

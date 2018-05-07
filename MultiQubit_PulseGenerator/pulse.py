@@ -334,14 +334,18 @@ class Pulse(object):
         """
         Vperiod = self.qubit_spectrum['Vperiod']
         Voffset = self.qubit_spectrum['Voffset']
-        c = self.qubit_spectrum['c']
-        A = self.qubit_spectrum['A']
-        b = self.qubit_spectrum['b']
         V0 = self.qubit_spectrum['V0']
 
+        Ec = self.qubit_spectrum['Ec']
+        f01_max = self.qubit_spectrum['f01_max']
+        f01_min = self.qubit_spectrum['f01_min']
+
+        EJ = (f01_max+Ec)**2/(8*Ec)
+        d = (f01_min+Ec)**2/(8*EJ*Ec)
         F = np.pi*(V - Voffset)/Vperiod
-        f = A*np.sqrt(np.abs(np.cos(F))*np.sqrt(1+b*np.tan(F)**2))+c
+        f = np.sqrt(8*EJ*Ec*np.abs(np.cos(F))*np.sqrt(1+d**2*np.tan(F)**2))-Ec
         return f
+
 
     def f_to_V(self, f):
         """
@@ -387,6 +391,12 @@ class Pulse(object):
     def df_to_dV(self, df):
         V0 = self.qubit_spectrum['V0']
         f0 = self.qubit_frequency(V0)
+        f01_max = self.qubit_spectrum['f01_max']
+        f01_min = self.qubit_spectrum['f01_min']
+        if np.any(f0+df > f01_max):
+            raise ValueError('Frequency requested is outside the qubit spectrum')
+        if np.any(f0+df < f01_min):
+            raise ValueError('Frequency requested is outside the qubit spectrum')
         return self.f_to_V(df+f0)-V0
 
 
