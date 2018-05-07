@@ -835,17 +835,6 @@ class Sequence(object):
             pulse.shape = PulseShape(config.get('Pulse type, 2QB'))
             pulse.pulse_type = PulseType.Z
 
-            # spectra
-            qubit_spectrum = {
-                'Vperiod': config.get('Vperiod'),
-                'Voffset': config.get('Voffset'),
-                'Ec': config.get('Ec'),
-                'f01_max': config.get('f01 max'),
-                'f01_min': config.get('f01 min'),
-                'V0': config.get('V0'),
-            }
-            pulse.qubit_spectrum = qubit_spectrum
-
             if config.get('Pulse type, 2QB') == 'CZ':
                 pulse.F_Terms = d[config.get('Fourier terms, 2QB')]
                 if config.get('Uniform 2QB pulses'):
@@ -854,6 +843,20 @@ class Sequence(object):
                 else:
                     pulse.width = config.get('Width, 2QB' + s)
                     pulse.plateau = config.get('Plateau, 2QB')
+
+                # spectra
+                if config.get('Assume linear dependence' + s, True):
+                    pulse.qubit_spectrum = None
+                else:
+                    qubit_spectrum = {
+                        'Vperiod': config.get('Vperiod #{}'.format(1)),
+                        'Voffset': config.get('Voffset #{}'.format(1)),
+                        'Ec': config.get('Ec #{}'.format(1)),
+                        'f01_max': config.get('f01 max #{}'.format(1)),
+                        'f01_min': config.get('f01 min #{}'.format(1)),
+                        'V0': config.get('V0 #{}'.format(1)),
+                    }
+                    pulse.qubit_spectrum = qubit_spectrum
 
                 # Get Fourier values
                 if d[config.get('Fourier terms, 2QB')] == 4 :
