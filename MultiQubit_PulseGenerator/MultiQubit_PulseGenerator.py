@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from BaseDriver import LabberDriver
-from sequence_builtin import Rabi, CPMG, PulseTrain, CZgates, CZecho, VZ, Timing, Anharmonicity
+from sequence_builtin import Rabi, CPMG, PulseTrain, CZgates, VZ, Timing, Anharmonicity
 from sequence_rb import SingleQubit_RB, TwoQubit_RB
 
 import importlib
@@ -13,7 +13,6 @@ SEQUENCES = {'Rabi': Rabi,
              'CP/CPMG': CPMG,
              'Pulse train': PulseTrain,
              'C-phase Pulses': CZgates,
-             'C-phase Echo': CZecho,
              '1-QB Randomized Benchmarking': SingleQubit_RB,
              '2-QB Randomized Benchmarking': TwoQubit_RB,
              'Virtual Z': VZ,

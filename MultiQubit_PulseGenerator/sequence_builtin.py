@@ -131,15 +131,6 @@ class CZgates(Sequence):
         self.add_gates(gates)
 
 
-class CZecho(Sequence):
-    """Sequence for multi-qubit pulse trains, for pulse calibrations"""
-
-    def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms"""
-        # create list with gates
-
-        self.add_gate(qubit=[0, 1], gate=Gate.CZEcho)
-
 class VZ(Sequence):
     def generate_sequence(self, config):
         """Generate sequence by adding gates/pulses to waveforms"""

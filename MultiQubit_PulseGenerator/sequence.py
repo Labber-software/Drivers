@@ -834,6 +834,18 @@ class Sequence(object):
             # global parameters
             pulse.shape = PulseShape(config.get('Pulse type, 2QB'))
             pulse.pulse_type = PulseType.Z
+
+            # spectra
+            qubit_spectrum = {
+                'Vperiod': config.get('Vperiod'),
+                'Voffset': config.get('Voffset'),
+                'c': config.get('c'),
+                'A': config.get('A'),
+                'b': config.get('b'),
+                'V0': config.get('V0'),
+            }
+            pulse.qubit_spectrum = qubit_spectrum
+
             if config.get('Pulse type, 2QB') == 'CZ':
                 pulse.F_Terms = d[config.get('Fourier terms, 2QB')]
                 if config.get('Uniform 2QB pulses'):
