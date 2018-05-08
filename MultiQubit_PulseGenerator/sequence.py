@@ -803,6 +803,7 @@ class Sequence(object):
             # pulse-specific parameters
             pulse.frequency = config.get('Frequency #%d' % m)
             pulse.drag_coefficient = config.get('DRAG scaling #%d' % m)
+            pulse.drag_detuning = config.get('DRAG frequency detuning #%d' % m)
             pulse.gated = False #config.get('Generate gate')
 
         # single-qubit pulses Z

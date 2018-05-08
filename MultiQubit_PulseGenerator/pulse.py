@@ -69,7 +69,8 @@ class Pulse(object):
                  Lcoeff = np.array([0.3]),dfdV=0.5E9,period_2qb=50E-9,
                  amplitude=0.5, width=10E-9, plateau=0.0,
                  frequency=0.0, phase=0.0, shape=PulseShape.GAUSSIAN,
-                 use_drag=False, drag_coefficient=0.0, truncation_range=5.0,
+                 use_drag=False, drag_coefficient=0.0, drag_detuning=0.0,
+                 truncation_range=5.0,
                  pulse_type=PulseType.XY, start_at_zero=False, gated=False,
                  gate_delay=0, gate_amplitude=1, gate_duration=None,
                  iq_ratio=1, iq_skew=0, i_offset=0, q_offset=0,
@@ -84,6 +85,7 @@ class Pulse(object):
         self.shape = shape
         self.use_drag = use_drag
         self.drag_coefficient = drag_coefficient
+        self.drag_detuning = drag_detuning
         self.truncation_range = truncation_range
         self.start_at_zero = start_at_zero
         self.pulse_type = pulse_type
@@ -287,6 +289,8 @@ class Pulse(object):
         if self.use_drag:
             beta = self.drag_coefficient/(t[1]-t[0])
             y = y + 1j*beta*np.gradient(y)
+            t_start = t-t0+self.total_duration()/2
+            y = y * np.exp(1j*2*np.pi*self.drag_detuning*(t-t0+self.total_duration()/2))
 
         if self.pulse_type in (PulseType.XY, PulseType.READOUT):
             # Apply phase and SSB
