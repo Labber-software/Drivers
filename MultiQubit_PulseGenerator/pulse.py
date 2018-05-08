@@ -344,47 +344,50 @@ class Pulse(object):
         f01_max = self.qubit_spectrum['f01_max']
         f01_min = self.qubit_spectrum['f01_min']
 
-        EJ = (f01_max+Ec)**2/(8*Ec)
+        EJS = (f01_max+Ec)**2/(8*Ec)
         d = (f01_min+Ec)**2/(8*EJ*Ec)
         F = np.pi*(V - Voffset)/Vperiod
-        f = np.sqrt(8*EJ*Ec*np.abs(np.cos(F))*np.sqrt(1+d**2*np.tan(F)**2))-Ec
+        f = np.sqrt(8*EJS*Ec*np.abs(np.cos(F))*np.sqrt(1+d**2*np.tan(F)**2))-Ec
         return f
 
 
     def f_to_V(self, f):
         """
-            Finds the voltages corresponding to the frequencies f.
+            Returns the voltages corresponding to the frequencies f.
         """
         Vperiod = self.qubit_spectrum['Vperiod']
         Voffset = self.qubit_spectrum['Voffset']
         V0 = self.qubit_spectrum['V0']
 
-        if not isinstance(f, (list, np.ndarray)):
-            f = [f]
+        Ec = self.qubit_spectrum['Ec']
+        f01_max = self.qubit_spectrum['f01_max']
+        f01_min = self.qubit_spectrum['f01_min']
 
-        def g(V, f0):
-            """
-                Function to minimize.
-            """
-            return (f0-self.qubit_frequency(V))**2
+        # Make sure frequencies are inside the possible frequency range
+        if np.any(f > f01_max):
+            raise ValueError('Frequency requested is outside the qubit spectrum')
+        if np.any(f < f01_min):
+            raise ValueError('Frequency requested is outside the qubit spectrum')
 
-        # Make sure that starting guess is on a slope.
-        if V0 >= Voffset:
-            V_start = Vperiod/4+Voffset
-        else:
-            V_start = -Vperiod/4+Voffset
+        # Calculate the JJ parameters
+        EJS = (f01_max+Ec)**2/(8*Ec)
+        d = (f01_min+Ec)**2/(8*EJS*Ec)
 
-        V = np.zeros_like(f)
-        for n, f0 in enumerate(f):
-            V[n] = fmin(g, V_start, args=(f0,))[0]
+        # Calculate the required EJ for the given frequencies
+        EJ = (f+Ec)**2/(8*Ec)
+
+        # Calculate the F=pi*(V-voffset)/vperiod corresponding to that EJ
+        F = np.arcsin(np.sqrt((EJ**2/EJS**2-1)/(d**2-1)))
+        # And finally the voltage
+        V = F*Vperiod/np.pi+Voffset
 
         # Mirror points around Voffset, bounding the qubit to one side of the maxima
-        if V_start >= 0:
+        if V0 >= Voffset:
             V[V<Voffset] = 2*Voffset - V[V<Voffset]
         else:
             V[V>Voffset] = 2*Voffset - V[V>Voffset]
 
-        # Mirror points beyond 1 period, bounding the qubit to one side of the minma
+        # Mirror points beyond 1 period, bounding the qubit to one side of the minima
         Vminp = Vperiod/2+Voffset
         Vminn = -Vperiod/2+Voffset
         V[V>Vminp] = 2*Vminp - V[V>Vminp]
@@ -393,14 +396,11 @@ class Pulse(object):
         return V
 
     def df_to_dV(self, df):
+        """
+        Returns the change in voltage corresponding to a change in frequency.
+        """
         V0 = self.qubit_spectrum['V0']
         f0 = self.qubit_frequency(V0)
-        f01_max = self.qubit_spectrum['f01_max']
-        f01_min = self.qubit_spectrum['f01_min']
-        if np.any(f0+df > f01_max):
-            raise ValueError('Frequency requested is outside the qubit spectrum')
-        if np.any(f0+df < f01_min):
-            raise ValueError('Frequency requested is outside the qubit spectrum')
         return self.f_to_V(df+f0)-V0
 
 
