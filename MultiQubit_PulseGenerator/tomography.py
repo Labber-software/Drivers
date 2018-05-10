@@ -311,7 +311,7 @@ class Tomography(object):
             elif self.tomography_index == 'Y2m-I':
                 gate = [Gate.Y2m,Gate.I]
             elif self.tomography_index == 'Id-Xp':
-                gate = [Gate.Id,Gate.Xp]
+                gate = [Gate.I,Gate.Xp]
             elif self.tomography_index == 'Xp-Xp':
                 gate = [Gate.Xp,Gate.Xp]
             elif self.tomography_index == 'X2p-Xp':

@@ -198,6 +198,13 @@ class MeasurementGate(CompositeGate):
         self.add_gate(ReadoutGate())
 
 
+class CZ(CompositeGate):
+    def __init__(self, phi1, phi2):
+        super().__init__(n_qubit=2)
+        self.add_gate([TwoQubitGate(), IdentityGate()])
+        self.add_gate([VirtualZGate(phi1), VirtualZGate(phi2)])
+
+
 class Gate(Enum):
     """Define possible qubit gates"""
     # single-qubit gates
@@ -227,17 +234,20 @@ class Gate(Enum):
     Mzm = MeasurementGate(axis='Z', sign='M')
 
     # Composite gates
-    ZZEcho = CompositeGate(n_qubit=2)
-    ZZEcho.add_gate([X2p, I])
-    ZZEcho.add_gate([CPh, I])
-    ZZEcho.add_gate([Xp, Xp])
-    ZZEcho.add_gate([CPh, I])
-    ZZEcho.add_gate([X2p, Xp])
+    CZEcho = CompositeGate(n_qubit=2)
+    CZEcho.add_gate([X2p, I])
+    CZEcho.add_gate([CPh, I])
+    CZEcho.add_gate([Xp, Xp])
+    CZEcho.add_gate([CPh, I])
+    CZEcho.add_gate([X2p, Xp])
 
     CNOT = CompositeGate(n_qubit=2)
     CNOT.add_gate([I, Y2m])
     CNOT.add_gate([CPh, I])
     CNOT.add_gate([I, Y2p])
+
+    CZ = CZ(0, 0)
+
 
 
 if __name__ == '__main__':
