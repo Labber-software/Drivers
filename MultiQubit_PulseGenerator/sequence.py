@@ -886,7 +886,8 @@ class Sequence(object):
                     pulse.plateau = config.get('Plateau, 2QB' + s)
                 # pulse-specific parameters
                 pulse.amplitude = config.get('Amplitude, 2QB' + s)
-
+        Gate.CZ.value.new_angles(config.get('QB1 Phi 2QB #12'),
+                                 config.get('QB2 Phi 2QB #12'))
         # process tomography prepulses
         self.perform_process_tomography = \
             config.get('Generate process tomography prepulse', False)

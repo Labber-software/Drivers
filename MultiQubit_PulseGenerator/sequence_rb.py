@@ -406,6 +406,7 @@ class TwoQubit_RB(Sequence):
             self.prev_randomize = randomize
             self.prev_N_cliffords = N_cliffords
             self.prev_interleave = interleave
+            self.prev_sequence = sequence
 
             multi_gate_seq = []
             # log.log(msg=str(qubits_to_benchmark), level =10)
@@ -449,10 +450,20 @@ class TwoQubit_RB(Sequence):
 
             multi_gate_seq = list(map(list, zip(*multi_gate_seq))) #transpose list of lists
             # log.log(msg=str(multi_gate_seq), level =10)
-            self.add_gates(multi_gate_seq)
+            # self.add_gates(multi_gate_seq)
+            for gates in multi_gate_seq:
+                log.log(20, gates)
+                if gates[0] == Gate.CZ:
+                    self.add_gate(qubit=[0, 1], gate=gates[0])
+                else:
+                    self.add_gate(qubit=[0, 1], gate=gates)
             self.prev_gate_seq = multi_gate_seq
         else:
-            self.add_gates(self.prev_gate_seq)
+            for gates in self.prev_gate_seq:
+                if gates[0] == Gate.CZ:
+                    self.add_gate(qubit=[0, 1], gate=gates[0])
+                else:
+                    self.add_gate(qubit=[0, 1], gate=gates)
 
 
 

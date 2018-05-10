@@ -203,6 +203,8 @@ class CZ(CompositeGate):
         super().__init__(n_qubit=2)
         self.add_gate([TwoQubitGate(), IdentityGate()])
         self.add_gate([VirtualZGate(phi1), VirtualZGate(phi2)])
+    def new_angles(self, phi1, phi2):
+        self.__init__(phi1, phi2)
 
 
 class Gate(Enum):
