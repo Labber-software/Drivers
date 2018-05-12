@@ -166,8 +166,8 @@ class Driver(LabberDriver):
 #        import time
 #        t0 = time.clock()
 #        lT = []
+
         # find out which traces to get
-        self.lTrace = [np.array([])] * self.nCh
         lCh = []
         iChMask = 0
         for n in range(self.nCh):
@@ -176,16 +176,22 @@ class Driver(LabberDriver):
                 iChMask += 2**n
         # get current settings
         nPts = int(self.getValue('Number of samples'))
-        # If in hardware loop mode, ignore records and use number of sequences
+        # in hardware loop mode, ignore records and use number of sequences
         if n_seq > 0:
             nSeg = n_seq
+            # set # of buffers equal to number of records
+            nCyclePerCall = n_seq
         else:
             nSeg = int(self.getValue('Number of records'))
+            nCyclePerCall = self.getValue('Records per Buffer')
+
         nAv = int(self.getValue('Number of averages'))
         # trigger delay is in 1/sample rate
         nTrigDelay = int(self.getValue('Trig Delay')/self.dt)
 
         if bArm:
+            # pre-allocate memory for output
+            self.lTrace = [np.zeros((nSeg * nPts))] * self.nCh
             # configure trigger for all active channels
             for nCh in lCh:
                 # channel number depens on hardware version
@@ -214,37 +220,38 @@ class Driver(LabberDriver):
         if not bMeasure:
             return
         # define number of cycles to read at a time
-        nCycleTotal = nSeg*nAv
-        # set cycles equal to number of records, else 100
-        nCyclePerCall = nSeg if nSeg>1 else 100
-        nCall = int(np.ceil(nCycleTotal/nCyclePerCall))
+        nCycleTotal = nSeg * nAv
+        nCall = int(np.ceil(nCycleTotal / nCyclePerCall))
         lScale = [(self.getRange(ch)/self.bitRange) for ch in range(self.nCh)]
+        count = 0
         for n in range(nCall):
             # number of cycles for this call, could be fewer for last call
-            nCycle = min(nCyclePerCall, nCycleTotal-(n*nCyclePerCall))
+            nCycle = min(nCyclePerCall, nCycleTotal - (n * nCyclePerCall))
 
-            self.reportStatus('Acquiring traces {}%'.format(int(100*n/nCall)))
+            # only report if more than 50 calls
+            if nCall > 50:
+                self.reportStatus(
+                    'Acquiring traces {}%'.format(int(100 * n / nCall)))
 
             # capture traces one by one
             for nCh in lCh:
                 # channel number depens on hardware version
                 ch = self.getHwCh(nCh)
-                data = self.DAQread(self.dig, ch, nPts*nCycle, int(1000+self.timeout_ms/nCall))
+                data = self.DAQread(self.dig, ch, nPts * nCycle,
+                                    int(1000 + self.timeout_ms / nCall))
                 # average, if wanted
-                scale = (self.getRange(nCh)/self.bitRange)
-                if nAv > 1 and data.size>0:
-                    nAvHere = nCycle/nSeg
-                    data = data.reshape((int(nAvHere), nPts*nSeg)).mean(0)
+                if nAv > 1 and data.size > 0:
+                    nAvHere = nCycle / nSeg
+                    data = data.reshape((int(nAvHere), nPts * nSeg)).mean(0)
                     # adjust scaling to account for summing averages
-                    scale = lScale[nCh]*(nAvHere/nAv)
+                    scale = lScale[nCh] * (nAvHere / nAv)
+                    # convert to voltage, add to total average
+                    self.lTrace[nCh] += data * scale
                 else:
-                    # use pre-calculated scaling
+                    # no average, store all data in one long vector
                     scale = lScale[nCh]
-                # convert to voltage, add to total average
-                if n==0:
-                    self.lTrace[nCh] = data*scale
-                else:
-                    self.lTrace[nCh] += data*scale
+                    self.lTrace[nCh][count:(count + data.size)] = data * scale
+                    count += data.size
 
             # break if stopped from outside
             if self.isStopped():
