@@ -122,11 +122,12 @@ class Driver(LabberDriver):
         """Perform the Set Value instrument operation. This function should
         return the actual value set by the instrument"""
         # check if channel-specific, if so get channel + name
-        if quant.name.startswith('Ch') and len(quant.name)>6:
+        if quant.name.startswith('Ch') and len(quant.name) > 6:
             ch = int(quant.name[2]) - 1
             name = quant.name[6:]
         else:
             ch, name = None, ''
+
         if name == 'Signal':
             if self.isHardwareLoop(options):
                 return self.getSignalHardwareLoop(ch, quant, options)
@@ -162,12 +163,12 @@ class Driver(LabberDriver):
 
     def getTraces(self, bArm=True, bMeasure=True, n_seq=0):
         """Get all active traces"""
-        # test timing
-#        import time
-#        t0 = time.clock()
-#        lT = []
+        # # test timing
+        # import time
+        # t0 = time.clock()
+        # lT = []
+
         # find out which traces to get
-        self.lTrace = [np.array([])] * self.nCh
         lCh = []
         iChMask = 0
         for n in range(self.nCh):
@@ -176,18 +177,25 @@ class Driver(LabberDriver):
                 iChMask += 2**n
         # get current settings
         nPts = int(self.getValue('Number of samples'))
-        # If in hardware loop mode, ignore records and use number of sequences
+        nCyclePerCall = int(self.getValue('Records per Buffer'))
+        # in hardware loop mode, ignore records and use number of sequences
         if n_seq > 0:
             nSeg = n_seq
         else:
             nSeg = int(self.getValue('Number of records'))
+
         nAv = int(self.getValue('Number of averages'))
         # trigger delay is in 1/sample rate
-        nTrigDelay = int(self.getValue('Trig Delay')/self.dt)
+        nTrigDelay = int(self.getValue('Trig Delay') / self.dt)
 
         if bArm:
+            # clear old data
+            self.dig.DAQflushMultiple(iChMask)
+            self.lTrace = [np.array([])] * self.nCh
             # configure trigger for all active channels
             for nCh in lCh:
+                # init data
+                self.lTrace[nCh] = np.zeros((nSeg * nPts))
                 # channel number depens on hardware version
                 ch = self.getHwCh(nCh)
                 # extra config for trig mode
@@ -208,51 +216,105 @@ class Driver(LabberDriver):
                 self.dig.DAQconfig(ch, nPts, nSeg*nAv, nTrigDelay, trigMode)
             # start acquiring data
             self.dig.DAQstartMultiple(iChMask)
-#        lT.append('Start %.1f ms' % (1000*(time.clock()-t0)))
+        # lT.append('Start %.1f ms' % (1000*(time.clock()-t0)))
         #
         # return if not measure
         if not bMeasure:
             return
         # define number of cycles to read at a time
-        nCycleTotal = nSeg*nAv
-        # set cycles equal to number of records, else 100
-        nCyclePerCall = nSeg if nSeg>1 else 100
-        nCall = int(np.ceil(nCycleTotal/nCyclePerCall))
-        lScale = [(self.getRange(ch)/self.bitRange) for ch in range(self.nCh)]
-        for n in range(nCall):
-            # number of cycles for this call, could be fewer for last call
-            nCycle = min(nCyclePerCall, nCycleTotal-(n*nCyclePerCall))
+        nCycleTotal = nSeg * nAv
+        nCall = int(np.ceil(nCycleTotal / nCyclePerCall))
+        lScale = [(self.getRange(ch) / self.bitRange) for ch in range(self.nCh)]
+        # keep track of progress in percent
+        old_percent = 0
 
-            self.reportStatus('Acquiring traces {}%'.format(int(100*n/nCall)))
+        # proceed depending on segment or not segment
+        if nSeg <= 1:
+            # non-segmented acquisiton
+            for n in range(nCall):
+                # number of cycles for this call, could be fewer for last call
+                nCycle = min(nCyclePerCall, nCycleTotal - (n * nCyclePerCall))
 
-            # capture traces one by one
-            for nCh in lCh:
-                # channel number depens on hardware version
-                ch = self.getHwCh(nCh)
-                data = self.DAQread(self.dig, ch, nPts*nCycle, int(1000+self.timeout_ms/nCall))
-                # average, if wanted
-                scale = (self.getRange(nCh)/self.bitRange)
-                if nAv > 1 and data.size>0:
-                    nAvHere = nCycle/nSeg
-                    data = data.reshape((int(nAvHere), nPts*nSeg)).mean(0)
+                # report progress, only report integer percent
+                if nCall > 100:
+                    new_percent = int(100 * n / nCall)
+                    if new_percent > old_percent:
+                        old_percent = new_percent
+                        self.reportStatus(
+                            'Acquiring traces ({}%)'.format(new_percent))
+
+                # capture traces one by one
+                for nCh in lCh:
+                    # channel number depens on hardware version
+                    ch = self.getHwCh(nCh)
+                    data = self.DAQread(self.dig, ch, nPts * nCycle,
+                                        int(1000 + self.timeout_ms / nCall))
+                    # stop if no data
+                    if data.size == 0:
+                        return
+
+                    # average
+                    data = data.reshape((nCycle, nPts)).mean(0)
                     # adjust scaling to account for summing averages
-                    scale = lScale[nCh]*(nAvHere/nAv)
-                else:
-                    # use pre-calculated scaling
-                    scale = lScale[nCh]
-                # convert to voltage, add to total average
-                if n==0:
-                    self.lTrace[nCh] = data*scale
-                else:
-                    self.lTrace[nCh] += data*scale
+                    scale = lScale[nCh] * (nCycle / nAv)
+                    # convert to voltage, add to total average
+                    self.lTrace[nCh] += data * scale
 
-            # break if stopped from outside
-            if self.isStopped():
-                break
+                # break if stopped from outside
+                if self.isStopped():
+                    break
+                # lT.append('N: %d, Tot %.1f ms' % (n, 1000 * (time.clock() - t0)))
 
-#                lT.append('N: %d, Tot %.1f ms' % (n, 1000*(time.clock()-t0)))
-#        # log timing info
-#        self.log(': '.join(lT))
+        else:
+            # segmented acquisition, get caLls per segment
+            (nCallSeg, extra_call) = divmod(nSeg, nCyclePerCall)
+            # pre-calculate list of cycles/call, last call may have more cycles
+            if nCallSeg == 0:
+                nCallSeg = 1
+                lCyclesSeg = [nSeg]
+            else:
+                lCyclesSeg = [nCyclePerCall] * nCallSeg
+                lCyclesSeg[-1] = nCyclePerCall + extra_call
+            # pre-calculate scale, should include scaling for averaging
+            lScale = np.array(lScale, dtype=float) / nAv
+
+
+            for n in range(nAv):
+                # report progress, only report integer percent
+                if nAv > 1:
+                    new_percent = int(100 * n / nAv)
+                    if new_percent > old_percent:
+                        old_percent = new_percent
+                        self.reportStatus(
+                            'Acquiring traces ({}%)'.format(new_percent))
+
+                count = 0
+                # loop over number of calls per segment
+                for m, nCycle in enumerate(lCyclesSeg):
+
+                    # capture traces one by one
+                    for nCh in lCh:
+                        # channel number depens on hardware version
+                        ch = self.getHwCh(nCh)
+                        data = self.DAQread(self.dig, ch, nPts * nCycle,
+                                            int(1000 + self.timeout_ms / nCall))
+                        # stop if no data
+                        if data.size == 0:
+                            return
+                        # store all data in one long vector
+                        self.lTrace[nCh][count:(count + data.size)] += \
+                            data * lScale[nCh]
+
+                    count += data.size
+
+                # break if stopped from outside
+                if self.isStopped():
+                    break
+
+                # lT.append('N: %d, Tot %.1f ms' % (n, 1000 * (time.clock() - t0)))
+
+        # # log timing info
+        # self.log(': '.join(lT))
 
 
     def getRange(self, ch):
