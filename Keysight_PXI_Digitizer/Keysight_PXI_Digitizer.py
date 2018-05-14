@@ -177,14 +177,12 @@ class Driver(LabberDriver):
                 iChMask += 2**n
         # get current settings
         nPts = int(self.getValue('Number of samples'))
+        nCyclePerCall = int(self.getValue('Records per Buffer'))
         # in hardware loop mode, ignore records and use number of sequences
         if n_seq > 0:
             nSeg = n_seq
-            # set # of buffers equal to number of records
-            nCyclePerCall = n_seq
         else:
             nSeg = int(self.getValue('Number of records'))
-            nCyclePerCall = int(self.getValue('Records per Buffer'))
 
         nAv = int(self.getValue('Number of averages'))
         # trigger delay is in 1/sample rate
