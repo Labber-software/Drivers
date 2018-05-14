@@ -127,8 +127,10 @@ class Predistortion(object):
 
 class ExponentialPredistortion:
     def __init__(self, waveform_number):
-        self.A = 0
-        self.tau = 0
+        self.A1 = 0
+        self.tau1 = 0
+        self.A2 = 0
+        self.tau2 = 0
         self.dt = 1
         self.n = int(waveform_number)
 
@@ -141,8 +143,10 @@ class ExponentialPredistortion:
             Configuration as defined by Labber driver configuration window
 
         """
-        self.A = config.get('Predistort Z{} - A'.format(self.n+1))
-        self.tau = config.get('Predistort Z{} - tau'.format(self.n+1))
+        self.A1 = config.get('Predistort Z{} - A1'.format(1))
+        self.tau1 = config.get('Predistort Z{} - tau1'.format(1))
+        self.A2 = config.get('Predistort Z{} - A2'.format(1))
+        self.tau2 = config.get('Predistort Z{} - tau2'.format(1))
         self.dt = 1/config.get('Sample rate')
 
     def predistort(self, waveform):
@@ -161,7 +165,7 @@ class ExponentialPredistortion:
         """
         Y = np.fft.rfft(waveform, norm='ortho')
         omega = 2*np.pi*np.fft.rfftfreq(len(waveform), self.dt)
-        H = 1 + (1j*self.A*omega*self.tau)/(1j*omega*self.tau+1)
+        H = 1 + (1j*self.A1*omega*self.tau1)/(1j*omega*self.tau1+1) + (1j*self.A2*omega*self.tau2)/(1j*omega*self.tau2+1)
         Yc = Y/H
         yc = np.fft.irfft(Yc, norm='ortho')
         return yc
