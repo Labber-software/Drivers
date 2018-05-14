@@ -114,6 +114,8 @@ class ProcessTomography(object):
                 gates.append(Gate.Y2p)
             elif index == 'Y':
                 gates.append(Gate.X2m)
+            else:
+                raise ValueError("Gate should be in ['0', '1', 'X', or 'Y']")
 
         return gates
 
