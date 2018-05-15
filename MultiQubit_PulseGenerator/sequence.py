@@ -112,6 +112,9 @@ class Sequence(object):
     readout_delay : float
         Readout trig delay.
 
+    simultaneous_pulses : bool
+        If True, pulses are applied in parallel on multiple qubits
+
     compensate_crosstalk : bool
         If True, Z-control waveforms will be compensated for cross-talk.
 
@@ -123,6 +126,7 @@ class Sequence(object):
         self.n_qubit = n_qubit
         self.dt = dt
         self.local_xy = local_xy
+        self.simultaneous_pulses = True
 
         # waveform parameter
         self.sample_rate = sample_rate
@@ -457,6 +461,19 @@ class Sequence(object):
                 self.add_multiple_composite_gates(qubit, gate, t0, dt, align)
                 return
 
+        if self.simultaneous_pulses:
+            self.add_step(qubit, gate, t0, dt, align)
+        else:
+            # Seperate pulses into multipe steps
+            for q, g in zip(qubit, gate):
+                self.add_step(q, g, t0, dt, align)
+
+        # If t0 was used as time reference,
+        # we need to make sure that the sequence is still sorted correctly
+        if t0 is not None:
+            self.sequences.sort(key=lambda x: x.t_end)
+
+    def add_step(self, qubit, gate, t0=None, dt=None, align='center'):
         step = Step(self.n_qubit, align=align)
         step.add_gate(qubit, gate)
 
@@ -515,11 +532,6 @@ class Sequence(object):
         step.t_middle = step.t_start+max_duration/2
 
         self.sequences.append(step)
-
-        # If t0 was used as time reference,
-        # we need to make sure that the sequence is still sorted correctly
-        if t0 is not None:
-            self.sequences.sort(key=lambda x: x.t_end)
 
     def add_composite_gate(self, qubit, gate, t0=None, dt=None, align='center'):
         """
@@ -767,6 +779,7 @@ class Sequence(object):
         self.n_qubit = d[config.get('Number of qubits')]
         self.dt = config.get('Pulse spacing')
         self.local_xy = config.get('Local XY control')
+        self.simultaneous_pulses = config.get('Simultaneous pulses')
 
         # waveform parameters
         self.sample_rate = config.get('Sample rate')
