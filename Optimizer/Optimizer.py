@@ -54,7 +54,6 @@ class Driver(InstrumentDriver.InstrumentWorker):
         Reference: https://en.wikipedia.org/wiki/Nelder%E2%80%93Mead_method
         '''
         self.i = int(self.getValue('Iteration'))
-        step = 0.1
         gamma = 2.
         rho = 0.5
         sigma = 0.5
@@ -63,10 +62,11 @@ class Driver(InstrumentDriver.InstrumentWorker):
             self.n_parameters = int(self.getValue('Number of parameters'))
             # init
             self.x_start = []
+            self.x_step = []
             for i in range(self.n_parameters):
                 self.x_start.append(self.getValue('Start value parameter #{}'.format(i+1)))
+                self.x_step.append(self.getValue('Step size parameter #{}'.format(i+1)))
             self.x_start = np.array(self.x_start)
-            self.log('xstart {}'.format(self.x_start))
             self.x = self.x_start
 
         elif self.i == 1:
@@ -75,7 +75,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
 
             x = copy.copy(self.x_start)
             self.k = 0
-            x[self.k] = x[self.k] + step
+            x[self.k] = x[self.k] + self.x_step[self.k]
+            self.log('start ', x)
             self.x = x
 
         elif self.i in (np.arange(self.n_parameters) + 1):
@@ -83,7 +84,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
             self.res.append([self.x, self.score])
             self.k += 1
             x = copy.copy(self.x_start)
-            x[self.k] = x[self.k] + step
+            x[self.k] = x[self.k] + self.x_step[self.k]
+            self.log('start ', x)
             self.x = x
 
         elif self.i == self.n_parameters + 1:
