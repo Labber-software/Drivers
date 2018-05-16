@@ -476,6 +476,11 @@ class Sequence(object):
             self.sequences.sort(key=lambda x: x.t_end)
 
     def add_step(self, qubit, gate, t0=None, dt=None, align='center'):
+        if not isinstance(qubit, list):
+            qubit = [qubit]
+        if not isinstance(gate, list):
+            gate = [gate]
+
         step = Step(self.n_qubit, align=align)
         step.add_gate(qubit, gate)
 
@@ -487,37 +492,39 @@ class Sequence(object):
 
         # Longest pulse in the step needed for correct timing
         max_duration = -np.inf
-        for qubit, gate in enumerate(step.gates):
+        for q, g in zip(qubit, gate):
+            if isinstance(g, Enum):
+                g = g.value
             # Virtual Z gate is special since it has no length
-            if isinstance(gate, VirtualZGate):
+            if isinstance(g, VirtualZGate):
                 duration = 0
                 pulse = None
             # Get the corresponding pulse
-            elif isinstance(gate, SingleQubitRotation):
-                if gate.axis in ('X', 'Y'):
-                    pulse = self.pulses_1qb_xy[qubit]
-                elif gate.axis == 'Z':
-                    pulse = self.pulses_1qb_z[qubit]
-            elif isinstance(gate, IdentityGate):
-                if gate.width is None:
-                    pulse = self.pulses_1qb_xy[qubit]
+            elif isinstance(g, SingleQubitRotation):
+                if g.axis in ('X', 'Y'):
+                    pulse = self.pulses_1qb_xy[q]
+                elif g.axis == 'Z':
+                    pulse = self.pulses_1qb_z[q]
+            elif isinstance(g, IdentityGate):
+                if g.width is None:
+                    pulse = self.pulses_1qb_xy[q]
                 else:
-                    duration = gate.width
+                    duration = g.width
                     pulse = None
-            elif isinstance(gate, TwoQubitGate):
-                pulse = self.pulses_2qb[qubit]
-            elif isinstance(gate, ReadoutGate):
-                pulse = self.pulses_readout[qubit]
-            elif isinstance(gate, CustomGate):
+            elif isinstance(g, TwoQubitGate):
+                pulse = self.pulses_2qb[q]
+            elif isinstance(g, ReadoutGate):
+                pulse = self.pulses_readout[q]
+            elif isinstance(g, CustomGate):
                 pulse = gate.pulse
             else:
-                raise ValueError('Please provide a pulse for this gate type.')
-
+                raise ValueError('Please provide a pulse for {}'.format(g))
             # calculate timings
             if pulse is not None:
                 duration = pulse.total_duration()
             if duration > max_duration:
                 max_duration = duration
+        log.log(20, 'max duration {}'.format(max_duration))
         if t0 is None:
             if dt is None:
                 if max_duration == 0:
@@ -567,17 +574,17 @@ class Sequence(object):
         sequence = []
         for i in range(gate_length):
             step = [Gate.I for n in range(self.n_qubit)]
-            for j, g in enumerate(gate):
+            for q, g in zip(qubit, gate):
                 if isinstance(g, Enum):
                     g = g.value
                 if isinstance(g, CompositeGate):
                     for k, G in enumerate(g.get_gate_at_index(i)):
-                        if isinstance(qubit[j], int):
-                            qubit[j] = [qubit[j]]
-                        step[qubit[j][k]] = G
+                        if isinstance(q, int):
+                            q = [q]
+                        step[q[k]] = G
                 else:
                     if j == 0:
-                        step[qubit[j]] = g
+                        step[q] = g
             sequence.append(step)
         self.add_gates(sequence)
 
