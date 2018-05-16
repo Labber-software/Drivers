@@ -24,7 +24,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         return the actual value set by the instrument"""
 
         if quant.name == 'Cost':
-            self.cost = value
+            self.cost += value
         return value
 
 
@@ -34,6 +34,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             n = int(quant.name.split('#')[1]) - 1
             if int(self.getValue('Iteration')) != self.i:
                 self.nelder_mead()
+                self.cost = 0
             value = self.x[n]
 
         else:
