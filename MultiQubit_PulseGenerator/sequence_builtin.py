@@ -143,6 +143,7 @@ class VZ(Sequence):
         vz = VirtualZGate(angle=z_angle)
         # self.add_gate_to_all(Gate.X2p)
         self.add_gate_to_all(vz)
+        self.add_gate_to_all(vz)
         self.add_gate_to_all(Gate.Xp)
 
 

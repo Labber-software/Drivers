@@ -329,15 +329,17 @@ class Sequence(object):
                     pulse.use_drag = False
                 elif isinstance(gate, SingleQubitRotation):
                     if gate.axis in ('X', 'Y'):
-                        pulse = self.pulses_1qb_xy[qubit]
+                        pulse = copy(self.pulses_1qb_xy[qubit])
+                        if gate.angle < 2 and gate.angle > -2:
+                            pulse.amplitude *= self.correction
                     elif gate.axis == 'Z':
                         pulse = self.pulses_1qb_z[qubit]
                 elif isinstance(gate, TwoQubitGate):
-                    pulse = self.pulses_2qb[qubit]
+                    pulse = copy(self.pulses_2qb[qubit])
                 elif isinstance(gate, ReadoutGate):
-                    pulse = self.pulses_readout[qubit]
+                    pulse = copy(self.pulses_readout[qubit])
                 elif isinstance(gate, CustomGate):
-                    pulse = gate.pulse
+                    pulse = copy(gate.pulse)
                 else:
                     raise ValueError('Please provide a pulse for this gate type.')
                 if pulse.pulse_type == PulseType.Z:
@@ -679,7 +681,6 @@ class Sequence(object):
     def perform_virtual_z(self):
         """Shifts the phase of pulses subsequent to virutal z gates
         """
-        # TODO Not for Readout
         for qubit in range(self.n_qubit):
             for m, step in enumerate(self.sequences):
                 gate = step.gates[qubit]
@@ -791,6 +792,7 @@ class Sequence(object):
         self.round_to_nearest = config.get('Round to nearest sample')
 
         # single-qubit pulses XY
+        self.correction = config.get('Correction #1')
         for n, pulse in enumerate(self.pulses_1qb_xy):
             # pulses are indexed from 1 in Labber
             m = n + 1
