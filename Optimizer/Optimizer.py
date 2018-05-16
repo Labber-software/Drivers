@@ -37,6 +37,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 self.cost = 0
             value = self.x[n]
 
+        elif quant.name == 'Cost':
+            value = self.cost
         else:
             # just return the quantity value
             value = quant.getValue()
