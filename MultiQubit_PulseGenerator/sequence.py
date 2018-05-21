@@ -689,12 +689,14 @@ class Sequence(object):
         """Shifts the phase of pulses subsequent to virutal z gates
         """
         for qubit in range(self.n_qubit):
+            phase = 0
             for m, step in enumerate(self.sequences):
                 gate = step.gates[qubit]
                 if isinstance(gate, VirtualZGate):
-                    for subsequent_step in self.sequences[m+1:len(self.sequences)]:
-                        if not isinstance(subsequent_step.gates[qubit], ReadoutGate):
-                            subsequent_step.gates[qubit] = subsequent_step.gates[qubit].add_phase(gate.angle)
+                    phase += gate.angle
+                    continue
+                if not isinstance(gate, ReadoutGate):
+                        step.gates[qubit] = gate.add_phase(phase)
 
     def add_readout(self):
         """Create read-out trig and waveform signals at the end of the sequence
