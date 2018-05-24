@@ -13,72 +13,72 @@ def add_singleQ_clifford(index, gate_seq):
     ### Paulis
     if index == 0:
         gate_seq.append(Gate.I)
-        gate_seq.append(Gate.I) # auxiliary
-        gate_seq.append(Gate.I) # auxiliary
+        #gate_seq.append(Gate.I) # auxiliary
+        #gate_seq.append(Gate.I) # auxiliary
     elif index == 1:
         gate_seq.append(Gate.Xp)
-        gate_seq.append(Gate.I) # auxiliary
-        gate_seq.append(Gate.I) # auxiliary
+        #gate_seq.append(Gate.I) # auxiliary
+        #gate_seq.append(Gate.I) # auxiliary
     elif index == 2:
         gate_seq.append(Gate.Yp)
-        gate_seq.append(Gate.I) # auxiliary
-        gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
     elif index == 3:
         gate_seq.append(Gate.Xp)
         gate_seq.append(Gate.Yp)
-        gate_seq.append(Gate.I) # auxiliary
+      #  gate_seq.append(Gate.I) # auxiliary
 
     ### 2pi/3 rotations
     elif index == 4:
         gate_seq.append(Gate.Y2p)
         gate_seq.append(Gate.X2p)
-        gate_seq.append(Gate.I) # auxiliary
+      #  gate_seq.append(Gate.I) # auxiliary
     elif index == 5:
         gate_seq.append(Gate.Y2m)
         gate_seq.append(Gate.X2p)
-        gate_seq.append(Gate.I) # auxiliary
+      #  gate_seq.append(Gate.I) # auxiliary
     elif index == 6:
         gate_seq.append(Gate.Y2p)
         gate_seq.append(Gate.X2m)
-        gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
     elif index == 7:
         gate_seq.append(Gate.Y2m)
         gate_seq.append(Gate.X2m)
-        gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
     elif index == 8:
         gate_seq.append(Gate.X2p)
         gate_seq.append(Gate.Y2p)
-        gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
     elif index == 9:
         gate_seq.append(Gate.X2m)
         gate_seq.append(Gate.Y2p)
-        gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
     elif index == 10:
         gate_seq.append(Gate.X2p)
         gate_seq.append(Gate.Y2m)
-        gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
     elif index == 11:
         gate_seq.append(Gate.X2m)
         gate_seq.append(Gate.Y2m)
-        gate_seq.append(Gate.I) # auxiliary
+        #gate_seq.append(Gate.I) # auxiliary
 
     ### pi/2 rotations
     elif index == 12:
         gate_seq.append(Gate.X2p)
-        gate_seq.append(Gate.I) # auxiliary
-        gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
     elif index == 13:
         gate_seq.append(Gate.X2m)
-        gate_seq.append(Gate.I) # auxiliary
-        gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
     elif index == 14:
         gate_seq.append(Gate.Y2p)
-        gate_seq.append(Gate.I) # auxiliary
-        gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
     elif index == 15:
         gate_seq.append(Gate.Y2m)
-        gate_seq.append(Gate.I) # auxiliary
-        gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
     elif index == 16:
         gate_seq.append(Gate.X2p)
         gate_seq.append(Gate.Y2p)
@@ -92,19 +92,19 @@ def add_singleQ_clifford(index, gate_seq):
     elif index == 18:
         gate_seq.append(Gate.Y2p)
         gate_seq.append(Gate.Xp)
-        gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
     elif index == 19:
         gate_seq.append(Gate.Y2m)
         gate_seq.append(Gate.Xp)
-        gate_seq.append(Gate.I) # auxiliary
+       # gate_seq.append(Gate.I) # auxiliary
     elif index == 20:
         gate_seq.append(Gate.X2p)
         gate_seq.append(Gate.Yp)
-        gate_seq.append(Gate.I) # auxiliary
+      #  gate_seq.append(Gate.I) # auxiliary
     elif index == 21:
         gate_seq.append(Gate.X2m)
         gate_seq.append(Gate.Yp)
-        gate_seq.append(Gate.I) # auxiliary
+      #  gate_seq.append(Gate.I) # auxiliary
     elif index == 22:
         gate_seq.append(Gate.X2p)
         gate_seq.append(Gate.Y2p)
@@ -308,6 +308,10 @@ class SingleQubit_RB(Sequence):
                             single_gate_seq.append(Gate.Y2m)
                         elif interleaved_gate == '1-QB Gate,I':
                             single_gate_seq.append(Gate.I)
+                        elif interleaved_gate == '1-QB Gate,Z':
+                            single_gate_seq.append(Gate.Zp)
+                        elif interleaved_gate == '1-QB Gate,VZ':
+                            single_gate_seq.append(Gate.VZp)
 
 
                 recovery_gate = self.get_recovery_gate(single_gate_seq)
@@ -352,6 +356,8 @@ class SingleQubit_RB(Sequence):
                 singleQ_gate = np.matmul(np.matrix([[0,-1],[1,0]]), singleQ_gate)
             elif (gate_seq[i] == Gate.Ym):
                 singleQ_gate = np.matmul(np.matrix([[0,1],[-1,0]]), singleQ_gate)
+            elif (gate_seq[i] in (Gate.Zp, Gate.VZp)):
+                singleQ_gate = np.matmul(np.matrix([[-1j,0],[0,1j]]), singleQ_gate)
         return singleQ_gate
 
     def get_recovery_gate(self,gate_seq):

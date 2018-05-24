@@ -91,7 +91,9 @@ class ProcessTomography(object):
             whichGate = self.prepulse_index[:2]
             gate = self.gate_from_index(whichGate)
 
-            sequence.add_gate([qubitID1, qubitID2], gate)
+            # sequence.add_gate([qubitID1, qubitID2], gate)
+            sequence.add_gate([qubitID1], gate[0])
+            sequence.add_gate([qubitID2], gate[1])
 
     def gate_from_index(self, whichGate):
         """Helper function to translate prepulse index into gate
@@ -195,11 +197,11 @@ class Tomography(object):
             gate = [None]
 
             if self.tomography_index == 'Z: I':
-                gate = Gate.Mzp # measure Z polarization, using the 'measurement gate' operation
+                gate = Gate.I # measure Z polarization
             elif self.tomography_index == 'Y: X2p':
-                gate = Gate.Myp # measure Y polarization, using the 'measurement gate' operation
+                gate = Gate.X2p # measure Y polarization
             elif self.tomography_index == 'X: Y2m':
-                gate = Gate.Mxp # measure X polarization, using the 'measurement gate' operation
+                gate = Gate.Y2m # measure X polarization
             sequence.add_gate(qubitID, gate)
 
         elif self.tomography_scheme == 'Two qubit (9 pulse set)':
@@ -226,7 +228,9 @@ class Tomography(object):
                 gate = [Gate.X2p, Gate.I]
             elif self.tomography_index == 'ZZ: I-I':
                 gate = [Gate.I, Gate.I]
-            sequence.add_gate([qubitID1, qubitID2], gate)
+            #sequence.add_gate([qubitID1, qubitID2], gate)
+            sequence.add_gate([qubitID1], gate[0])
+            sequence.add_gate([qubitID2], gate[1])
 
         elif self.tomography_scheme == 'Two qubit (30 pulse set)':
             qubitID1 = self.twoQBtomoID1 - 1
@@ -293,7 +297,9 @@ class Tomography(object):
                 gate = [Gate.I,Gate.Y2m]
             elif self.tomography_index == 'Xm-Y2m':
                 gate = [Gate.Xm,Gate.Y2m]
-            sequence.add_gate([qubitID1, qubitID2], gate)
+            #sequence.add_gate([qubitID1, qubitID2], gate)
+            sequence.add_gate([qubitID1], gate[0])
+            sequence.add_gate([qubitID2], gate[1])
 
         elif self.tomography_scheme == 'Two qubit (36 pulse set)':
             qubitID1 = self.twoQBtomoID1 - 1
@@ -372,7 +378,8 @@ class Tomography(object):
                 gate = [Gate.Y2p,Gate.Y2m]
             elif self.tomography_index == 'Y2m-Y2m':
                 gate = [Gate.Y2m,Gate.Y2m]
-            sequence.add_gate([qubitID1, qubitID2], gate)
-
+            #sequence.add_gate([qubitID1, qubitID2], gate)
+            sequence.add_gate([qubitID1], gate[0])
+            sequence.add_gate([qubitID2], gate[1])
 if __name__ == '__main__':
     pass

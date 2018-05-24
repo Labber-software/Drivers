@@ -209,20 +209,32 @@ class CZ(CompositeGate):
 
 class Gate(Enum):
     """Define possible qubit gates"""
-    # single-qubit gates
+    # Single-qubit gates
     I = IdentityGate()
+
+    # X gates
     Xp = SingleQubitRotation(axis='X', angle=np.pi)
     Xm = SingleQubitRotation(axis='X', angle=-np.pi)
     X2p = SingleQubitRotation(axis='X', angle=np.pi/2)
     X2m = SingleQubitRotation(axis='X', angle=-np.pi/2)
+
+    # Y gates
     Yp = SingleQubitRotation(axis='Y', angle=np.pi)
     Ym = SingleQubitRotation(axis='Y', angle=-np.pi)
     Y2m = SingleQubitRotation(axis='Y', angle=-np.pi/2)
     Y2p = SingleQubitRotation(axis='Y', angle=np.pi/2)
+
+    # Z gates
     Zp = SingleQubitRotation(axis='Z', angle=np.pi)
     Z2p = SingleQubitRotation(axis='Z', angle=np.pi/2)
     Zm = SingleQubitRotation(axis='Z', angle=-np.pi)
     Z2m = SingleQubitRotation(axis='Z', angle=-np.pi/2)
+
+    # Virtual Z gates
+    VZp = VirtualZGate(angle=np.pi)
+    VZ2p = VirtualZGate(angle=np.pi/2)
+    VZm = VirtualZGate(angle=-np.pi)
+    VZ2m = VirtualZGate(angle=np.pi/2)
 
     # two-qubit gates
     CPh = TwoQubitGate()
