@@ -1,8 +1,10 @@
 #!/usr/bin/env python
-from BaseDriver import Error, IdError
+from BaseDriver import Error
 from VISA_Driver import VISA_Driver
+from pyvisa.constants import (
+    VI_ATTR_WR_BUF_OPER_MODE, VI_ATTR_RD_BUF_OPER_MODE, VI_FLUSH_ON_ACCESS,
+    VI_READ_BUF, VI_WRITE_BUF)
 import numpy as np
-import os
 
 from pyte16 import download_binary_data
 
@@ -13,6 +15,24 @@ class Driver(VISA_Driver):
         """Perform the operation of opening the instrument connection"""
         # open visa communication
         VISA_Driver.performOpen(self, options)
+
+        # set additional flags
+        self.com.set_visa_attribute(
+            VI_ATTR_WR_BUF_OPER_MODE, VI_FLUSH_ON_ACCESS)
+        self.com.set_visa_attribute(
+            VI_ATTR_RD_BUF_OPER_MODE, VI_FLUSH_ON_ACCESS)
+
+        read_buff_size_bytes = 4096
+        write_buff_size_bytes = 4096
+
+        self.com.visalib.set_buffer(
+            self.com.session, VI_READ_BUF, read_buff_size_bytes)
+        self.com.__dict__['read_buff_size'] = read_buff_size_bytes
+        self.com.visalib.set_buffer(
+            self.com.session, VI_WRITE_BUF, write_buff_size_bytes)
+        self.com.__dict__['write_buff_size'] = write_buff_size_bytes
+
+
         # timeout
         self.timeout_ms = int(1000 * self.dComCfg['Timeout'])
         self.nCh = 2
@@ -125,8 +145,8 @@ class Driver(VISA_Driver):
                 sOutput += (':INST %d;:OUTP 1;' % (n + 1))
         if sOutput != '':
             self.writeAndLog(sOutput)
-        # wait some time to allow output to turn on
-        self.wait(0.02)
+        # check for operation complete before returning
+        self.askAndLog('*OPC?')
 
 
     def scaleWaveformToU16(self, vData, dVpp, ch):
@@ -186,7 +206,8 @@ class Driver(VISA_Driver):
 
         self.writeAndLog(':TRAC:DEF 1, %d' % len(vU16))
         self.writeAndLog(':TRAC:SEL 1')
-        download_binary_data(self.com, 'TRAC:DATA', vU16, len(vU16) * 2)
+        download_binary_data(self.com, 'TRAC:DATA', vU16, len(vU16) * 2,
+                             paranoia_level=0)
         return True
 
 
