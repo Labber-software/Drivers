@@ -336,15 +336,6 @@ class Sequence:
 
         self.generate_waveforms()
 
-        # if self.align_to_end:
-        #     for n in range(self.n_qubit):
-        #         self.wave_xy[n] = self.align_waveform_to_end(self.wave_xy[n])
-        #         self.wave_z[n] = self.align_waveform_to_end(self.wave_z[n])
-        #         self.wave_gate[n] = self.align_waveform_to_end(
-        #             self.wave_gate[n])
-        #     self.readout_trig = self.align_waveform_to_end(self.readout_trig)
-        #     self.readout_iq = self.align_waveform_to_end(self.readout_iq)
-
         # collapse all xy pulses to one waveform if no local XY control
         if not self.local_xy:
             # sum all waveforms to first one
@@ -354,7 +345,7 @@ class Sequence:
                 self.wave_xy[n][:] = 0.0
 
         if self.readout_trig_generate:
-            self.add_reaout_trig(config)
+            self.add_readout_trig(config)
 
         self.perform_crosstalk_compensation()
 
@@ -440,9 +431,6 @@ class Sequence:
                     t0 = middle + (max_duration - pulse.total_duration()) / 2
                 # calculate the pulse waveform for the selected indices
                 waveform[indices] += gate.get_waveform(pulse, t0, t)
-
-                # if pulse.gated:
-                #     gate_waveform += pulse.calculate_gate(t0, self.t)
 
     def add_single_pulse(self, qubit, pulse, t0=None, dt=None,
                          align_left=False):
@@ -835,50 +823,18 @@ class Sequence:
             # store results
             self.wave_gate[n] = gate
 
-    def add_reaout_trig(self, config):
+    def add_readout_trig(self, config):
         """Create waveform for readout trigger."""
-        wave = self.readout_iq
-        # go through all waveforms
-        # non-uniform gate, find non-zero elements
-        gate = np.array(np.abs(wave) > 0.0, dtype=float)
-        # fix gate overlap
-        n_overlap = 0
-        diff_gate = np.diff(gate)
-        indx_up = np.nonzero(diff_gate > 0.0)[0]
-        indx_down = np.nonzero(diff_gate < 0.0)[0]
-        # add extra elements to left and right for overlap
-        for indx in indx_up:
-            gate[max(0, indx - n_overlap):(indx + 1)] = 1.0
-        for indx in indx_down:
-            gate[indx:(indx + n_overlap + 1)] = 1.0
+        trig = np.zeros_like(self.readout_iq)
+        start = (np.abs(self.readout_iq) > 0.0).nonzero()[0][0]
+        end = int(np.min((start+self.readout_trig_duration*self.sample_rate,
+                          self.n_pts)))
+        trig[start:end] = self.readout_trig_amplitude
 
-        # fix gaps in gate shorter than min (look for 1>0)
-        diff_gate = np.diff(gate)
-        indx_up = np.nonzero(diff_gate > 0.0)[0]
-        indx_down = np.nonzero(diff_gate < 0.0)[0]
-        # ignore first transition if starting in zero
-        if gate[0] == 0:
-            indx_up = indx_up[1:]
-        n_down_up = min(len(indx_down), len(indx_up))
-        len_down = indx_up[:n_down_up] - indx_down[:n_down_up]
-        # find short gaps
-        short_gaps = np.nonzero(len_down < (self.minimal_gate_time *
-                                            self.sample_rate))[0]
-        for indx in short_gaps:
-            gate[indx_down[indx]:(1 + indx_up[indx])] = 1.0
-
-        # shift gate in time
-        n_shift = 0
-        if n_shift < 0:
-            n_shift = abs(n_shift)
-            gate = np.r_[gate[n_shift:], np.zeros((n_shift,))]
-        elif n_shift > 0:
-            gate = np.r_[np.zeros((n_shift,)), gate[:(-n_shift)]]
-        # make sure gate starts/ends in 0
-        gate[0] = 0.0
-        gate[-1] = 0.0
-        # store results
-        self.readout_trig = gate
+        # make sure trig starts/ends in 0
+        trig[0] = 0.0
+        trig[-1] = 0.0
+        self.readout_trig = trig
 
     def align_waveform_to_end(self, waveform):
         """Align the given waveform to the end of the waveform."""
@@ -940,7 +896,6 @@ class Sequence:
             pulse.frequency = config.get('Frequency #%d' % m)
             pulse.drag_coefficient = config.get('DRAG scaling #%d' % m)
             pulse.drag_detuning = config.get('DRAG frequency detuning #%d' % m)
-            pulse.gated = False  # config.get('Generate gate')
 
         # single-qubit pulses Z
         for n, pulse in enumerate(self.pulses_1qb_z):
@@ -1065,21 +1020,13 @@ class Sequence:
         # readout
         self.readout_match_main_size = config.get(
             'Match main sequence waveform size')
-
-        # predistortion
-        self.predistort = config.get('Predistort readout waveform')
-        if self.predistort:
-            for n in range(self.max_qubit):
-                # pre-distortion settings are currently same for all qubits
-                linewidth = config.get('Resonator linewidth')
-                self.measured_rise[n] = 1.0 / (2 * np.pi * linewidth)
-                self.target_rise[n] = config.get('Target rise time')
-
-        # readout settings
         self.readout_delay = config.get('Readout delay')
         self.readout_i_offset = config.get('Readout offset - I')
         self.readout_q_offset = config.get('Readout offset - Q')
         self.readout_trig_generate = config.get('Generate readout trig')
+        self.readout_trig_amplitude = config.get('Readout trig amplitude')
+        self.readout_trig_duration = config.get('Readout trig duration')
+        self.readout_predistort = config.get('Predistort readout waveform')
         self.readout.set_parameters(config)
 
         # get readout pulse parameters
@@ -1113,11 +1060,6 @@ class Sequence:
                 pulse.amplitude = config.get('Readout amplitude #%d' % (n + 1))
 
             pulse.frequency = config.get('Readout frequency #%d' % m)
-
-            # Readout trig parameters
-            pulse.gated = self.readout_trig_generate
-            pulse.gate_amplitude = config.get('Readout trig amplitude')
-            pulse.gate_duration = config.get('Readout trig duration')
 
         # Delays
         self.wave_xy_delays = np.zeros(self.n_qubit)

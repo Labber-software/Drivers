@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-import numpy as np
-from enum import Enum
 import logging
+from enum import Enum
+
+import numpy as np
+
 log = logging.getLogger('LabberDriver')
 
 
@@ -55,9 +57,6 @@ class Pulse(object):
         Description of attribute `truncation_range`.
     start_at_zero : type
         Description of attribute `start_at_zero`.
-    def __init__(self, shape : type
-        Description of attribute `def __init__(self, shape`.
-    shape        pulse_type
 
     """
 
@@ -77,13 +76,6 @@ class Pulse(object):
         self.start_at_zero = False
         self.pulse_type = pulse_type
 
-        # For gating of the pulse
-        self.gated = False
-        self.gate_delay = 0.0
-        self.gate_amplitude = 1.0
-
-        self.gate_duration = self.total_duration()
-
         # For CZ pulses
         self.F_Terms = 1
         self.Coupling = 20E6
@@ -95,8 +87,6 @@ class Pulse(object):
         # For IQ mixer corrections
         self.iq_ratio = 1.0
         self.iq_skew = 0.0
-        self.i_offset = 0.0
-        self.q_offset = 0.0
 
     def total_duration(self):
         """Short summary.
@@ -315,33 +305,6 @@ class Pulse(object):
                       -y.imag * np.sin(omega * t - phase + self.iq_skew +
                                        np.pi / 2))
             y = data_i + 1j * data_q
-        return y
-
-    def calculate_gate(self, t0, t):
-        """Calculate pulse gate.
-
-        Parameters
-        ----------
-        t0 : float
-            Pulse position, referenced to center of pulse.
-
-        t : numpy array
-            Array with time values for which to calculate the pulse gate.
-
-        Returns
-        -------
-        waveform : numpy array
-            Array containing pulse gate.
-
-        """
-        if not self.gated:
-            raise ValueError('Waveform is not defined as gated.')
-        y = np.zeros_like(t)
-        dt = t[1] - t[0]
-        start = int(
-            np.ceil((t0 - self.total_duration() / 2 + self.gate_delay) / dt))
-        stop = int(start + np.floor(self.gate_duration / dt))
-        y[start:stop] = self.gate_amplitude
         return y
 
     def qubit_frequency(self, V):
