@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-import numpy as np
-from copy import copy
-from pulse import PulseShape, Pulse, PulseType
-from predistortion import Predistortion, ExponentialPredistortion
-from crosstalk import Crosstalk
-from readout import Readout
-from gates import *
-from tomography import ProcessTomography, Tomography
-from enum import Enum
 import logging
+from copy import copy
+from enum import Enum
+
+import numpy as np
+
+from crosstalk import Crosstalk
+from gates import *
+from predistortion import ExponentialPredistortion, Predistortion
+from pulse import Pulse, PulseShape, PulseType
+from readout import Readout
+from tomography import ProcessTomography, Tomography
 
 # Allow logging to Labber's instrument log
 log = logging.getLogger('LabberDriver')
@@ -77,6 +79,11 @@ class Step:
                 self.gates[qubit[i]] = gate[i].value
             else:
                 self.gates[qubit[i]] = gate[i]
+
+    def time_shift(self, shift):
+        self.t_start += shift
+        self.t_middle += shift
+        self.t_end += shift
 
 
 class Sequence:
@@ -320,16 +327,23 @@ class Sequence:
         self.perform_virtual_z()
 
         self.init_waveforms()
-        self.generate_waveforms()
 
         if self.align_to_end:
-            for n in range(self.n_qubit):
-                self.wave_xy[n] = self.align_waveform_to_end(self.wave_xy[n])
-                self.wave_z[n] = self.align_waveform_to_end(self.wave_z[n])
-                self.wave_gate[n] = self.align_waveform_to_end(
-                    self.wave_gate[n])
-            self.readout_trig = self.align_waveform_to_end(self.readout_trig)
-            self.readout_iq = self.align_waveform_to_end(self.readout_iq)
+            shift = self.round((self.n_pts - 2) / self.sample_rate -
+                               self.sequences[-1].t_end)
+            for step in self.sequences:
+                step.time_shift(shift)
+
+        self.generate_waveforms()
+
+        # if self.align_to_end:
+        #     for n in range(self.n_qubit):
+        #         self.wave_xy[n] = self.align_waveform_to_end(self.wave_xy[n])
+        #         self.wave_z[n] = self.align_waveform_to_end(self.wave_z[n])
+        #         self.wave_gate[n] = self.align_waveform_to_end(
+        #             self.wave_gate[n])
+        #     self.readout_trig = self.align_waveform_to_end(self.readout_trig)
+        #     self.readout_iq = self.align_waveform_to_end(self.readout_iq)
 
         # collapse all xy pulses to one waveform if no local XY control
         if not self.local_xy:
@@ -338,6 +352,9 @@ class Sequence:
             # clear other waveforms
             for n in range(1, self.n_qubit):
                 self.wave_xy[n][:] = 0.0
+
+        if self.readout_trig_generate:
+            self.add_reaout_trig(config)
 
         self.perform_crosstalk_compensation()
 
@@ -400,9 +417,9 @@ class Sequence:
                     delay = 0
 
                 # get the range of indices in use
-                start = self.round_to_nearest_sample(step.t_start + delay)
-                middle = self.round_to_nearest_sample(step.t_middle + delay)
-                end = self.round_to_nearest_sample(step.t_end + delay)
+                start = self.round(step.t_start + delay)
+                middle = self.round(step.t_middle + delay)
+                end = self.round(step.t_end + delay)
                 indices = np.arange(
                     max(np.floor(start * self.sample_rate), 0),
                     min(np.ceil(end * self.sample_rate), self.n_pts),
@@ -424,8 +441,8 @@ class Sequence:
                 # calculate the pulse waveform for the selected indices
                 waveform[indices] += gate.get_waveform(pulse, t0, t)
 
-                if pulse.gated:
-                    gate_waveform += pulse.calculate_gate(t0, self.t)
+                # if pulse.gated:
+                #     gate_waveform += pulse.calculate_gate(t0, self.t)
 
     def add_single_pulse(self, qubit, pulse, t0=None, dt=None,
                          align_left=False):
@@ -603,8 +620,8 @@ class Sequence:
                 step.t_start = t_end + dt
         else:
             step.t_start = t0 - max_duration / 2
-        step.t_start = self.round_to_nearest_sample(step.t_start)
-        step.t_end = self.round_to_nearest_sample(step.t_start + max_duration)
+        step.t_start = self.round(step.t_start)
+        step.t_end = self.round(step.t_start + max_duration)
         step.t_middle = step.t_start + max_duration / 2
 
         self.sequences.append(step)
@@ -658,12 +675,8 @@ class Sequence:
             sequence.append(step)
         self.add_gates(sequence)
 
-    def round_to_nearest_sample(self, t):
-        """Round the given time t to the nearest sample point."""
-        if self.round_to_nearest is True:
-            return round(t * self.sample_rate) / self.sample_rate
-        else:
-            return t
+    def round(self, t, acc=1E-12):
+        return int(np.round(t / acc)) * acc
 
     def add_gate_to_all(self, gate, t0=None, dt=None, align='center'):
         """Add a single gate to all qubits.
@@ -821,6 +834,51 @@ class Sequence:
             gate[-1] = 0.0
             # store results
             self.wave_gate[n] = gate
+
+    def add_reaout_trig(self, config):
+        """Create waveform for readout trigger."""
+        wave = self.readout_iq
+        # go through all waveforms
+        # non-uniform gate, find non-zero elements
+        gate = np.array(np.abs(wave) > 0.0, dtype=float)
+        # fix gate overlap
+        n_overlap = 0
+        diff_gate = np.diff(gate)
+        indx_up = np.nonzero(diff_gate > 0.0)[0]
+        indx_down = np.nonzero(diff_gate < 0.0)[0]
+        # add extra elements to left and right for overlap
+        for indx in indx_up:
+            gate[max(0, indx - n_overlap):(indx + 1)] = 1.0
+        for indx in indx_down:
+            gate[indx:(indx + n_overlap + 1)] = 1.0
+
+        # fix gaps in gate shorter than min (look for 1>0)
+        diff_gate = np.diff(gate)
+        indx_up = np.nonzero(diff_gate > 0.0)[0]
+        indx_down = np.nonzero(diff_gate < 0.0)[0]
+        # ignore first transition if starting in zero
+        if gate[0] == 0:
+            indx_up = indx_up[1:]
+        n_down_up = min(len(indx_down), len(indx_up))
+        len_down = indx_up[:n_down_up] - indx_down[:n_down_up]
+        # find short gaps
+        short_gaps = np.nonzero(len_down < (self.minimal_gate_time *
+                                            self.sample_rate))[0]
+        for indx in short_gaps:
+            gate[indx_down[indx]:(1 + indx_up[indx])] = 1.0
+
+        # shift gate in time
+        n_shift = 0
+        if n_shift < 0:
+            n_shift = abs(n_shift)
+            gate = np.r_[gate[n_shift:], np.zeros((n_shift,))]
+        elif n_shift > 0:
+            gate = np.r_[np.zeros((n_shift,)), gate[:(-n_shift)]]
+        # make sure gate starts/ends in 0
+        gate[0] = 0.0
+        gate[-1] = 0.0
+        # store results
+        self.readout_trig = gate
 
     def align_waveform_to_end(self, waveform):
         """Align the given waveform to the end of the waveform."""
