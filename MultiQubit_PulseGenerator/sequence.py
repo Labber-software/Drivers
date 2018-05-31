@@ -588,7 +588,7 @@ class Sequence:
             elif isinstance(g, ReadoutGate):
                 pulse = self.pulses_readout[q]
             elif isinstance(g, CustomGate):
-                pulse = gate.pulse
+                pulse = g.pulse
             else:
                 raise ValueError('Please provide a pulse for {}'.format(g))
             # calculate timings
