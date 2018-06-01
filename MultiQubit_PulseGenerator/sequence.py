@@ -110,7 +110,7 @@ class Sequence:
 
     Attributes
     ----------
-    dt : type
+    dt : float
         Pulse spacing in seconds.
     local_xy : bool
         If False, all waveforms are combined into one.

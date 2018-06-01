@@ -9,12 +9,13 @@ log = logging.getLogger('LabberDriver')
 
 
 class BaseGate:
-    """Short summary.
+    """Base class for a qubit gate.
 
     Attributes
     ----------
     phase_shift : float
-        Description of attribute `phase_shift`.
+        The phase shift applied when compiling into pulsesself.
+        For example used for virutal Z gates.
 
     """
 
@@ -62,25 +63,16 @@ class BaseGate:
         pulse.phase += self.phase_shift
         return pulse.calculate_waveform(t0, t)
 
-    def get_matrix(self):
-        """Return the matrix representation of the gate."""
-        # TODO Implement this for each type of gate
-        pass
-
 
 class SingleQubitRotation(BaseGate):
-    """Short summary.
+    """Single qubit rotations.
 
     Parameters
     ----------
-    axis : type
-        Description of parameter `axis`.
-    angle : type
-        Description of parameter `angle`.
-
-    Attributes
-    ----------
-    axis        angle
+    axis : str {'X', 'Y', 'Z'}
+        Rotation axis.
+    angle : float
+        Roation angle.
 
     """
 
@@ -89,24 +81,7 @@ class SingleQubitRotation(BaseGate):
         self.axis = axis
         self.angle = angle
 
-    def get_waveform(self, pulse, t0, t):
-        """Short summary.
-
-        Parameters
-        ----------
-        pulse : type
-            Description of parameter `pulse`.
-        t0 : type
-            Description of parameter `t0`.
-        t : type
-            Description of parameter `t`.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
+    def get_waveform(self, pulse, t0, t):  # noqa D102
         pulse = copy(pulse)
         if self.axis == 'X':
             pulse.phase += 0
@@ -117,7 +92,7 @@ class SingleQubitRotation(BaseGate):
             pass
         else:
             raise ValueError('Axis must be X, Y, or Z.')
-        # pi pulse should correspond to the full amplitude
+        # pi pulse correspond to the full amplitude
         pulse.amplitude *= self.angle / np.pi
         return super().get_waveform(pulse, t0, t)
 
@@ -131,8 +106,9 @@ class IdentityGate(BaseGate):
 
     Parameters
     ----------
-    width : type
-        Description of parameter `width` (the default is None).
+    width : float
+        Width of the I gate in seconds,
+        None uses the XY width (the default is None).
 
     """
 
@@ -176,12 +152,12 @@ class ReadoutGate(BaseGate):
 
 
 class CustomGate(BaseGate):
-    """Short summary.
+    """A gate using a given :obj:`Pulse`.
 
     Parameters
     ----------
-    pulse : type
-        Description of parameter `pulse`.
+    pulse : :obj:`Pulse`
+        The corresponding pulse.
 
     """
 
@@ -194,20 +170,17 @@ class CustomGate(BaseGate):
 
 
 class CompositeGate:
-    """Short summary.
+    """Multiple gates in one object.
 
     Parameters
     ----------
-    n_qubit : type
-        Description of parameter `n_qubit` (the default is 1).
+    n_qubit : int
+        Number of qubits involved in the composite gate (the default is 1).
 
     Attributes
     ----------
-    sequence : type
-        Description of attribute `sequence`.
-    def __init__(self, n_qubit : type
-        Description of attribute `def __init__(self, n_qubit`.
-    n_qubit
+    sequence : list of :obj:`BaseGate`
+        Holds the gates involved.
 
     """
 
@@ -216,23 +189,22 @@ class CompositeGate:
         self.sequence = []
 
     def add_gate(self, gate, t0=None, dt=None, align='center'):
-        """Short summary.
+        """Add one or multiple gates to the composite gate.
 
         Parameters
         ----------
-        gate : type
-            Description of parameter `gate`.
-        t0 : type
-            Description of parameter `t0` (the default is None).
-        dt : type
-            Description of parameter `dt` (the default is None).
-        align : type
-            Description of parameter `align` (the default is 'center').
-
-        Returns
-        -------
-        type
-            Description of returned object.
+        gate : :obj:`BaseGate` or list of :obj:`BaseGate`
+            The gates to be added. The length of `gate` must equal `n_qubit`.
+        t0 : float, optional
+            Absolute gate position (the default is None).
+        dt : float, optional
+            Gate spacing, referenced to the previous pulse
+            (the default is None).
+        align : str, optional
+            If two or more qubits have differnt pulse lengths, `align`
+            specifies how those pulses should be aligned. 'Left' aligns the
+            start, 'center' aligns the centers, and 'right' aligns the end,
+            (the default is 'center').
 
         """
         if not isinstance(gate, list):
@@ -243,17 +215,17 @@ class CompositeGate:
         self.sequence.append(gate)
 
     def get_gate_at_index(self, i):
-        """Short summary.
+        """Get the gates at a certain step in the composite gate.
 
         Parameters
         ----------
-        i : type
-            Description of parameter `i`.
+        i : int
+            The step position.
 
         Returns
         -------
-        type
-            Description of returned object.
+        list of :obj:`BaseGate`
+            The gates at the `i`:th position.
 
         """
         return self.sequence[i]
@@ -291,21 +263,14 @@ class MeasurementGate(CompositeGate):
 
 
 class CZ(CompositeGate):
-    """Short summary.
+    """CPHASE gate followed by single qubit Z rotations.
 
     Parameters
     ----------
-    phi1 : type
-        Description of parameter `phi1`.
-    phi2 : type
-        Description of parameter `phi2`.
-
-    Attributes
-    ----------
-    add_gate : type
-        Description of attribute `add_gate`.
-    add_gate : type
-        Description of attribute `add_gate`.
+    phi1 : float
+        Z rotation angle for qubit 1.
+    phi2 : float
+        Z rotation angle for qubit 2.
 
     """
 
@@ -315,19 +280,14 @@ class CZ(CompositeGate):
         self.add_gate([VirtualZGate(phi1), VirtualZGate(phi2)])
 
     def new_angles(self, phi1, phi2):
-        """Short summary.
+        """Update the angles of the single qubit rotations.
 
         Parameters
         ----------
-        phi1 : type
-            Description of parameter `phi1`.
-        phi2 : type
-            Description of parameter `phi2`.
-
-        Returns
-        -------
-        type
-            Description of returned object.
+        phi1 : float
+            Z rotation angle for qubit 1.
+        phi2 : float
+            Z rotation angle for qubit 2.
 
         """
         self.__init__(phi1, phi2)
@@ -386,7 +346,7 @@ class Gate(Enum):
     CNOT.add_gate([CPh, I])
     CNOT.add_gate([I, Y2p])
 
-    CZ = CZ(0, 0)
+    CZ = CZ(0, 0)  # Start with 0, 0 as the single qubit phase shifts.
 
 
 if __name__ == '__main__':

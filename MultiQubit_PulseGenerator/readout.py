@@ -14,14 +14,8 @@ class Readout(object):
 
     Parameters
     ----------
-    max_qubit : type
-        Description of parameter `max_qubit` (the default is 9).
-
-    Attributes
-    ----------
-    def __init__(self, max_qubit : type
-        Description of attribute `def __init__(self, max_qubit`.
-    max_qubit
+    max_qubit : int
+        The maximum number of qubits (the default is 9).
 
     """
 

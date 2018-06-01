@@ -131,6 +131,31 @@ class Predistortion(object):
 
 
 class ExponentialPredistortion:
+    """Implement a three-pole predistortion on the Z waveforms.
+
+    Parameters
+    ----------
+    waveform_number : int
+        The waveform number to predistort.
+
+    Attributes
+    ----------
+    A1 : float
+        Amplitude for the first pole.
+    tau1 : float
+        Time constant for the first pole.
+    A2 : float
+        Amplitude for the second pole.
+    tau2 : float
+        Time constant for the second pole.
+    A3 : float
+        Amplitude for the third pole.
+    tau3 : float
+        Time constant for the third pole.
+    dt : float
+        Sample spacing for the waveform.
+
+    """
     def __init__(self, waveform_number):
         self.A1 = 0
         self.tau1 = 0
@@ -175,9 +200,15 @@ class ExponentialPredistortion:
         """
         Y = np.fft.rfft(waveform, norm='ortho')
 
-        omega = 2*np.pi*np.fft.rfftfreq(len(waveform), self.dt)
-        H = 1 + (1j*self.A1*omega*self.tau1)/(1j*omega*self.tau1+1) + (1j*self.A2*omega*self.tau2)/(1j*omega*self.tau2+1) + (1j*self.A3*omega*self.tau3)/(1j*omega*self.tau3+1)
-        Yc = Y/H
+        omega = 2 * np.pi * np.fft.rfftfreq(len(waveform), self.dt)
+        H = (1 +
+             (1j * self.A1 * omega * self.tau1) /
+             (1j * omega * self.tau1 + 1) +
+             (1j * self.A2 * omega * self.tau2) /
+             (1j * omega * self.tau2 + 1) +
+             (1j * self.A3 * omega * self.tau3) /
+             (1j * omega * self.tau3 + 1))
+        Yc = Y / H
 
         yc = np.fft.irfft(Yc, norm='ortho')
         return yc

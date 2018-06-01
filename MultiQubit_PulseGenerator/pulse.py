@@ -30,33 +30,34 @@ class Pulse(object):
 
     Parameters
     ----------
-    shape : type
-        Description of parameter `shape` (the default is PulseShape.GAUSSIAN).
-    pulse_type : type
-        Description of parameter `pulse_type` (the default is PulseType.XY).
+    shape : :obj:`PulseShape`
+        Pulse shape (the default is PulseShape.GAUSSIAN).
+    pulse_type : :obj:`PulseType`
+        Pulse type (the default is PulseType.XY).
 
     Attributes
     ----------
-    amplitude : type
-        Description of attribute `amplitude`.
-    width : type
-        Description of attribute `width`.
-    plateau : type
-        Description of attribute `plateau`.
-    frequency : type
-        Description of attribute `frequency`.
-    phase : type
-        Description of attribute `phase`.
-    use_drag : type
-        Description of attribute `use_drag`.
-    drag_coefficient : type
-        Description of attribute `drag_coefficient`.
-    drag_detuning : type
-        Description of attribute `drag_detuning`.
-    truncation_range : type
-        Description of attribute `truncation_range`.
-    start_at_zero : type
-        Description of attribute `start_at_zero`.
+    amplitude : float
+        Pulse amplitude.
+    width : float
+        Pulse width.
+    plateau : float
+        Pulse plateau.
+    frequency : float
+        SSB frequency.
+    phase : float
+        Pulse phase.
+    use_drag : bool
+        If True, applies DRAG correction.
+    drag_coefficient : float
+        Drag coefficient.
+    drag_detuning : float
+        Applies a frequnecy detuning for DRAG pulses.
+    truncation_range : float
+        The truncation range of Gaussian pulses,
+        in units of standard deviations.
+    start_at_zero : bool
+        If True, forces the pulse to start in 0.
 
     """
 
@@ -89,12 +90,12 @@ class Pulse(object):
         self.iq_skew = 0.0
 
     def total_duration(self):
-        """Short summary.
+        """Get the total duration for the pulse.
 
         Returns
         -------
-        type
-            Description of returned object.
+        float
+            Total duration in seconds.
 
         """
         # calculate total length of pulse
