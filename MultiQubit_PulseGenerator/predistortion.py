@@ -131,6 +131,8 @@ class ExponentialPredistortion:
         self.tau1 = 0
         self.A2 = 0
         self.tau2 = 0
+        self.A3 = 0
+        self.tau3 = 0
         self.dt = 1
         self.n = int(waveform_number)
 
@@ -147,6 +149,8 @@ class ExponentialPredistortion:
         self.tau1 = config.get('Predistort Z{} - tau1'.format(1))
         self.A2 = config.get('Predistort Z{} - A2'.format(1))
         self.tau2 = config.get('Predistort Z{} - tau2'.format(1))
+        self.A3 = config.get('Predistort Z{} - A3'.format(1))
+        self.tau3 = config.get('Predistort Z{} - tau3'.format(1))
         self.dt = 1/config.get('Sample rate')
 
     def predistort(self, waveform):
@@ -165,7 +169,7 @@ class ExponentialPredistortion:
         """
         Y = np.fft.rfft(waveform, norm='ortho')
         omega = 2*np.pi*np.fft.rfftfreq(len(waveform), self.dt)
-        H = 1 + (1j*self.A1*omega*self.tau1)/(1j*omega*self.tau1+1) + (1j*self.A2*omega*self.tau2)/(1j*omega*self.tau2+1)
+        H = 1 + (1j*self.A1*omega*self.tau1)/(1j*omega*self.tau1+1) + (1j*self.A2*omega*self.tau2)/(1j*omega*self.tau2+1) + (1j*self.A3*omega*self.tau3)/(1j*omega*self.tau3+1)
         Yc = Y/H
         yc = np.fft.irfft(Yc, norm='ortho')
         return yc
