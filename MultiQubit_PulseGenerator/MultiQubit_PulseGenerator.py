@@ -6,19 +6,15 @@ import sys
 import numpy as np
 
 from BaseDriver import LabberDriver
-from sequence_builtin import (CPMG, Anharmonicity, CZgates, PulseTrain, Rabi,
-                              Timing)
+from sequence_builtin import CPMG, PulseTrain, Rabi
 from sequence_rb import SingleQubit_RB, TwoQubit_RB
 
 # dictionary with built-in sequences
 SEQUENCES = {'Rabi': Rabi,
              'CP/CPMG': CPMG,
              'Pulse train': PulseTrain,
-             'C-phase Pulses': CZgates,
              '1-QB Randomized Benchmarking': SingleQubit_RB,
              '2-QB Randomized Benchmarking': TwoQubit_RB,
-             'Anharmonicity': Anharmonicity,
-             'Timing': Timing,
              'Custom': type(None)}
 
 

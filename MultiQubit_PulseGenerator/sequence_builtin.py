@@ -95,31 +95,20 @@ class PulseTrain(Sequence):
         # get parameters
         n_pulse = int(config['# of pulses'])
         alternate = config['Alternate pulse direction']
-        pi2pulses = config.get('Pi/2 pulses')
 
         # create list with gates
         gates = []
         if n_pulse == 0:
             gates.append([Gate.I for q in range(self.n_qubit)])
         for n in range(n_pulse):
+            pulse_type = config['Pulse']
             # check if alternate pulses
             if alternate and (n % 2) == 1:
-                if pi2pulses:
-                    gate = Gate.X2m
-                else:
-                    gate = Gate.Xm
+                pulse_type = pulse_type.replace('p', 'm')
+                gate = Gate.__getattr__(pulse_type)
             else:
-                if pi2pulses:
-                    gate = Gate.X2p
-                else:
-                    gate = Gate.Xp
-            # create list with same gate for all active qubits
-            gate_qubits = [gate for q in range(self.n_qubit)]
-            # append to list of gates
-            gates.append(gate_qubits)
-
-        # add list of gates to sequence
-        self.add_gates(gates)
+                gate = Gate.__getattr__(pulse_type)
+            self.add_gate_to_all(gate)
 
 
 class CZgates(Sequence):

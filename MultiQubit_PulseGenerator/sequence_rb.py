@@ -10,77 +10,55 @@ from sequence import Sequence
 log = logging.getLogger('LabberDriver')
 
 
-def add_singleQ_clifford(index, gate_seq):
+def add_singleQ_clifford(index, gate_seq, pad_with_I=True):
     """Add single qubit clifford (24)."""
+    length_before = len(gate_seq)
     # Paulis
     if index == 0:
         gate_seq.append(Gate.I)
-        # gate_seq.append(Gate.I) # auxiliary
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 1:
         gate_seq.append(Gate.Xp)
-        # gate_seq.append(Gate.I) # auxiliary
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 2:
         gate_seq.append(Gate.Yp)
-        # gate_seq.append(Gate.I) # auxiliary
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 3:
         gate_seq.append(Gate.Xp)
         gate_seq.append(Gate.Yp)
-        # gate_seq.append(Gate.I) # auxiliary
 
     # 2pi/3 rotations
     elif index == 4:
         gate_seq.append(Gate.Y2p)
         gate_seq.append(Gate.X2p)
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 5:
         gate_seq.append(Gate.Y2m)
         gate_seq.append(Gate.X2p)
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 6:
         gate_seq.append(Gate.Y2p)
         gate_seq.append(Gate.X2m)
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 7:
         gate_seq.append(Gate.Y2m)
         gate_seq.append(Gate.X2m)
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 8:
         gate_seq.append(Gate.X2p)
         gate_seq.append(Gate.Y2p)
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 9:
         gate_seq.append(Gate.X2m)
         gate_seq.append(Gate.Y2p)
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 10:
         gate_seq.append(Gate.X2p)
         gate_seq.append(Gate.Y2m)
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 11:
         gate_seq.append(Gate.X2m)
         gate_seq.append(Gate.Y2m)
-        # gate_seq.append(Gate.I) # auxiliary
 
     # pi/2 rotations
     elif index == 12:
         gate_seq.append(Gate.X2p)
-        # gate_seq.append(Gate.I) # auxiliary
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 13:
         gate_seq.append(Gate.X2m)
-        # gate_seq.append(Gate.I) # auxiliary
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 14:
         gate_seq.append(Gate.Y2p)
-        # gate_seq.append(Gate.I) # auxiliary
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 15:
         gate_seq.append(Gate.Y2m)
-        # gate_seq.append(Gate.I) # auxiliary
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 16:
         gate_seq.append(Gate.X2p)
         gate_seq.append(Gate.Y2p)
@@ -94,19 +72,15 @@ def add_singleQ_clifford(index, gate_seq):
     elif index == 18:
         gate_seq.append(Gate.Y2p)
         gate_seq.append(Gate.Xp)
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 19:
         gate_seq.append(Gate.Y2m)
         gate_seq.append(Gate.Xp)
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 20:
         gate_seq.append(Gate.X2p)
         gate_seq.append(Gate.Yp)
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 21:
         gate_seq.append(Gate.X2m)
         gate_seq.append(Gate.Yp)
-        # gate_seq.append(Gate.I) # auxiliary
     elif index == 22:
         gate_seq.append(Gate.X2p)
         gate_seq.append(Gate.Y2p)
@@ -119,6 +93,11 @@ def add_singleQ_clifford(index, gate_seq):
         raise ValueError(
             'index is out of range. it should be smaller than 24 and greater'
             ' or equal to 0: ', str(index))
+
+    length_after = len(gate_seq)
+    if pad_with_I:
+        for i in range(3-(length_after-length_before)):
+            gate_seq.append(Gate.I)
 
 
 def add_twoQ_clifford(index, gate_seq_1, gate_seq_2):
@@ -338,33 +317,13 @@ class SingleQubit_RB(Sequence):
                 single_gate_seq = []
                 for i in range(N_cliffords):
                     rndnum = rnd.randint(0, 23)
-                    add_singleQ_clifford(rndnum, single_gate_seq)
+                    add_singleQ_clifford(rndnum, single_gate_seq,
+                                         pad_with_I=False)
                     # If interleave gate,
                     if interleave is True:
                         self.prev_interleaved_gate = interleaved_gate
-
-                        if interleaved_gate == '1-QB Gate,X,+Pi':
-                            single_gate_seq.append(Gate.Xp)
-                        elif interleaved_gate == '1-QB Gate,X,-Pi':
-                            single_gate_seq.append(Gate.Xm)
-                        elif interleaved_gate == '1-QB Gate,X,+Pi_over2':
-                            single_gate_seq.append(Gate.X2p)
-                        elif interleaved_gate == '1-QB Gate,X,-Pi_over2':
-                            single_gate_seq.append(Gate.X2m)
-                        elif interleaved_gate == '1-QB Gate,Y,+Pi':
-                            single_gate_seq.append(Gate.Yp)
-                        elif interleaved_gate == '1-QB Gate,Y,-Pi':
-                            single_gate_seq.append(Gate.Ym)
-                        elif interleaved_gate == '1-QB Gate,Y,+Pi_over2':
-                            single_gate_seq.append(Gate.Y2p)
-                        elif interleaved_gate == '1-QB Gate,Y,-Pi_over2':
-                            single_gate_seq.append(Gate.Y2m)
-                        elif interleaved_gate == '1-QB Gate,I':
-                            single_gate_seq.append(Gate.I)
-                        elif interleaved_gate == '1-QB Gate,Z':
-                            single_gate_seq.append(Gate.Zp)
-                        elif interleaved_gate == '1-QB Gate,VZ':
-                            single_gate_seq.append(Gate.VZp)
+                        single_gate_seq.append(
+                            Gate.__getattr__(interleaved_gate))
 
                 recovery_gate = self.get_recovery_gate(single_gate_seq)
                 single_gate_seq.append(recovery_gate)
@@ -504,10 +463,10 @@ class TwoQubit_RB(Sequence):
                 # If interleave gate,
                 if interleave is True:
                     self.prev_interleaved_gate = interleaved_gate
-                    if interleaved_gate == '2-QB Gate,CZ':
+                    if interleaved_gate == 'CZ':
                         gate_seq_1.append(Gate.I)
                         gate_seq_2.append(Gate.CZ)
-                    elif interleaved_gate == '2-QB Gate,CZEcho':
+                    elif interleaved_gate == 'CZEcho':
                         # CZEcho is a composite gate, so get each gate
                         gate = Gate.CZEcho.value
                         for g in gate.sequence:
