@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-from enum import Enum
-import numpy as np
-from copy import copy
-
-# add logger, to allow logging to Labber's instrument log
 import logging
+from copy import copy
+from enum import Enum
+
+import numpy as np
+
 log = logging.getLogger('LabberDriver')
 
 
@@ -134,10 +134,6 @@ class IdentityGate(BaseGate):
     width : type
         Description of parameter `width` (the default is None).
 
-    Attributes
-    ----------
-    width
-
     """
 
     def __init__(self, width=None):
@@ -189,10 +185,6 @@ class CustomGate(BaseGate):
     ----------
     pulse : type
         Description of parameter `pulse`.
-
-    Attributes
-    ----------
-    pulse
 
     """
 

@@ -1,13 +1,14 @@
 #!/usr/bin/env python
-from BaseDriver import LabberDriver
-from sequence_builtin import Rabi, CPMG, PulseTrain, CZgates, Timing, \
-    Anharmonicity
-from sequence_rb import SingleQubit_RB, TwoQubit_RB
-
 import importlib
-import numpy as np
 import os
 import sys
+
+import numpy as np
+
+from BaseDriver import LabberDriver
+from sequence_builtin import (CPMG, Anharmonicity, CZgates, PulseTrain, Rabi,
+                              Timing)
+from sequence_rb import SingleQubit_RB, TwoQubit_RB
 
 # dictionary with built-in sequences
 SEQUENCES = {'Rabi': Rabi,

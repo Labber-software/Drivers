@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-import numpy as np
-from pulse import PulseShape, Pulse
-
 # add logger, to allow logging to Labber's instrument log
 import logging
+
+import numpy as np
+
+from pulse import Pulse, PulseShape
+
 log = logging.getLogger('LabberDriver')
 
 

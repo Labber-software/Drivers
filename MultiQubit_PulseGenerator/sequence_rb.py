@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-from sequence import Sequence
-from gates import *
-import random as rnd
-import numpy as np
-# add logger, to allow logging to Labber's instrument log
 import logging
+import random as rnd
+
+import numpy as np
+
+from gates import *
+from sequence import Sequence
+
 log = logging.getLogger('LabberDriver')
 
 

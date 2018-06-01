@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-import numpy as np
-from copy import copy
-from sequence import Sequence
-from gates import Gate, VirtualZGate, CompositeGate, IdentityGate, CustomGate
-from pulse import PulseShape, Pulse
-
 # add logger, to allow logging to Labber's instrument log
 import logging
+from copy import copy
+
+import numpy as np
+
+from gates import CompositeGate, CustomGate, Gate, IdentityGate, VirtualZGate
+from pulse import Pulse, PulseShape
+from sequence import Sequence
+
 log = logging.getLogger('LabberDriver')
 
 

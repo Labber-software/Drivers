@@ -11,7 +11,7 @@
 # transfer functions to a common file in a convenient way.
 
 import numpy as np
-from numpy.fft import ifft, fft, fftshift, ifftshift, fftfreq
+from numpy.fft import fft, fftfreq, fftshift, ifft, ifftshift
 from scipy.interpolate import interp1d
 
 

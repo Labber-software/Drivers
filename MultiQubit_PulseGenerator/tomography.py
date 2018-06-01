@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-from gates import Gate
-from copy import copy
-# add logger, to allow logging to Labber's instrument log
 import logging
+from copy import copy
+
+from gates import Gate
+
 log = logging.getLogger('LabberDriver')
 
 
