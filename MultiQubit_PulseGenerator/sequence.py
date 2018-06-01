@@ -126,14 +126,6 @@ class Sequence:
         If True, the number of points are adjusted to length of the seqeunce.
     align_to_end : bool
         If True, the waveforms are aligned to the end.
-    sequences : list of :obj:`Step`
-        Holds all the steps in the sequence.
-    wave_xy : list of :obj:`ndarrays`
-        XY waveforms
-    wave_z : list of :obj:`ndarrays`
-        Z waveforms
-    wave_gate : list of :obj:`ndarrays`
-        Gate waveforms
     wave_xy_delays : :obj:`ndarray`
         Delays for XY waveforms in seconds.
     wave_z_delays : :obj:`ndarray`
@@ -148,22 +140,12 @@ class Sequence:
         Readout pulses for each qubit.
     perform_process_tomography : bool
         If True, adds prepulses.
-    process_tomography : :obj:`ProcessTomography`
-        ProcessTomography instance.
     perform_state_tomography : bool
         If True, add post pulses for state tomography.
-    state_tomography : :obj:`StateTomograhy`
-        StateTomography instance.
     compensate_crosstalk : bool
         If True, compensate for Z crosstalk.
-    crosstalk : :obj:`Crosstalk`
-        Crosstalk instance.
     perform_predistortion : bool
         If True, perform predistorion.
-    predistortions : list of :obj:`Predistortion`
-        Instances of :obj:`Predistortions` for each qubit.
-    predistortions_z : list of :obj:`ExponentialPredistortion`
-        Instances of :obj:`ExponentialPredistortion` for each qubit.
     generate_gate_switch : bool
         If True, generate gates for XY.
     uniform_gate : bool
@@ -178,8 +160,6 @@ class Sequence:
         If True, generate readout trigs.
     readout_delay : float
         Delay from last pulse until start of readout in seconds.
-    readout : list of :obj:`Readout`
-        Readout instances for each qubit.
     readout_trig : list of :obj:`ndarray`
         Readout trigs.
     readout_iq : list of :obj:`ndarray`
@@ -204,11 +184,12 @@ class Sequence:
         self.qubits = [Qubit() for n in range(MAX_QUBIT)]
 
         # waveforms
-        self.wave_xy = [np.zeros(0, dtype=np.complex)
+        self._wave_xy = [np.zeros(0, dtype=np.complex)
                         for n in range(MAX_QUBIT)]
-        self.wave_z = [np.zeros(0) for n in range(MAX_QUBIT)]
-        self.wave_gate = [np.zeros(0) for n in range(MAX_QUBIT)]
+        self._wave_z = [np.zeros(0) for n in range(MAX_QUBIT)]
+        self._wave_gate = [np.zeros(0) for n in range(MAX_QUBIT)]
 
+        # waveform delays
         self.wave_xy_delays = np.zeros(MAX_QUBIT)
         self.wave_z_delays = np.zeros(MAX_QUBIT)
 
@@ -221,20 +202,20 @@ class Sequence:
 
         # process tomography
         self.perform_process_tomography = False
-        self.process_tomography = ProcessTomography()
+        self._process_tomography = ProcessTomography()
 
         # tomography
         self.perform_state_tomography = False
-        self.state_tomography = StateTomography()
+        self._state_tomography = StateTomography()
 
-        # cross-talk object
+        # cross-talk
         self.compensate_crosstalk = False
-        self.crosstalk = Crosstalk()
+        self._crosstalk = Crosstalk()
 
-        # predistortion objects
+        # predistortion
         self.perform_predistortion = False
-        self.predistortions = [Predistortion(n) for n in range(MAX_QUBIT)]
-        self.predistortions_z = [
+        self._predistortions = [Predistortion(n) for n in range(MAX_QUBIT)]
+        self._predistortions_z = [
             ExponentialPredistortion(n) for n in range(MAX_QUBIT)]
 
         # gate switch waveform
@@ -325,10 +306,10 @@ class Sequence:
         # collapse all xy pulses to one waveform if no local XY control
         if not self.local_xy:
             # sum all waveforms to first one
-            self.wave_xy[0] = np.sum(self.wave_xy[:self.n_qubit], 0)
+            self._wave_xy[0] = np.sum(self._wave_xy[:self.n_qubit], 0)
             # clear other waveforms
             for n in range(1, self.n_qubit):
-                self.wave_xy[n][:] = 0.0
+                self._wave_xy[n][:] = 0.0
 
         if self.readout_trig_generate:
             self._add_readout_trig(config)
@@ -346,9 +327,9 @@ class Sequence:
 
         # create and return dictionary with waveforms
         data = dict()
-        data['wave_xy'] = self.wave_xy
-        data['wave_z'] = self.wave_z
-        data['wave_gate'] = self.wave_gate
+        data['wave_xy'] = self._wave_xy
+        data['wave_z'] = self._wave_z
+        data['wave_gate'] = self._wave_gate
         data['readout_trig'] = self.readout_trig
         data['readout_iq'] = self.readout_iq
         return data
@@ -419,7 +400,8 @@ class Sequence:
         else:
             self.add_gate(qubit, gate, t0, dt, 'center')
 
-    def add_gate(self, qubit, gate, t0=None, dt=None, align='center'):
+    def add_gate(self, qubit, gate, t0=None, dt=None, align='center',
+                 simultaneous=None):
         """Add a set of gates to the given qubit sequences.
 
         For the qubits with no specificied gate, an IdentityGate will be given.
@@ -463,9 +445,15 @@ class Sequence:
                 self._add_multiple_composite_gates(qubit, gate, t0, dt, align)
                 return
 
-        if self.simultaneous_pulses:
+        if simultaneous is None and self.simultaneous_pulses is True:
             self._add_step(qubit, gate, t0, dt, align)
-        else:
+        elif simultaneous is None and self.simultaneous_pulses is False:
+            # Seperate pulses into multipe steps
+            for q, g in zip(qubit, gate):
+                self._add_step(q, g, t0, dt, align)
+        elif simultaneous is True:
+            self._add_step(qubit, gate, t0, dt, align)
+        elif simultaneous is False:
             # Seperate pulses into multipe steps
             for q, g in zip(qubit, gate):
                 self._add_step(q, g, t0, dt, align)
@@ -475,7 +463,8 @@ class Sequence:
             # might not be chronological.
             self.sequences.sort(key=lambda x: x.t_end)
 
-    def add_gate_to_all(self, gate, t0=None, dt=None, align='center'):
+    def add_gate_to_all(self, gate, t0=None, dt=None, align='center',
+                        simultaneous=None):
         """Add a single gate to all qubits.
 
         Pulses are added at the end
@@ -483,7 +472,7 @@ class Sequence:
         """
         self.add_gate([n for n in range(self.n_qubit)],
                       [gate for n in range(self.n_qubit)], t0=t0, dt=dt,
-                      align=align)
+                      align=align, simultaneous=simultaneous)
 
     def add_gates(self, gates):
         """Add multiple gates to the qubit waveform.
@@ -674,9 +663,9 @@ class Sequence:
                 # Odd n_pts give spectral leakage in FFT
                 self.n_pts += 1
         for n in range(self.n_qubit):
-            self.wave_xy[n] = np.zeros(self.n_pts, dtype=np.complex)
-            self.wave_z[n] = np.zeros(self.n_pts, dtype=float)
-            self.wave_gate[n] = np.zeros(self.n_pts, dtype=float)
+            self._wave_xy[n] = np.zeros(self.n_pts, dtype=np.complex)
+            self._wave_z[n] = np.zeros(self.n_pts, dtype=float)
+            self._wave_gate[n] = np.zeros(self.n_pts, dtype=float)
 
         # Waveform time vector
         self.t = np.arange(self.n_pts) / self.sample_rate
@@ -714,11 +703,11 @@ class Sequence:
                     raise ValueError(
                         'Please provide a pulse for this gate type.')
                 if pulse.pulse_type == PulseType.Z:
-                    waveform = self.wave_z[qubit]
+                    waveform = self._wave_z[qubit]
                     delay = self.wave_z_delays[qubit]
                 elif pulse.pulse_type == PulseType.XY:
-                    waveform = self.wave_xy[qubit]
-                    gate_waveform = self.wave_gate
+                    waveform = self._wave_xy[qubit]
+                    gate_waveform = self._wave_gate
                     delay = self.wave_xy_delays[qubit]
                 elif pulse.pulse_type == PulseType.READOUT:
                     waveform = self.readout_iq
@@ -755,7 +744,7 @@ class Sequence:
         if not self.perform_process_tomography:
             return
 
-        self.process_tomography.add_pulses(self)
+        self._process_tomography.add_pulses(self)
 
     # TODO rename state tomography
     def _add_state_tomography(self):
@@ -763,7 +752,7 @@ class Sequence:
         if not self.perform_state_tomography:
             return
         # Add pulses
-        self.state_tomography.add_pulses(self)
+        self._state_tomography.add_pulses(self)
 
     def _predistort_waveforms(self):
         """Pre-distort the waveforms."""
@@ -771,20 +760,20 @@ class Sequence:
             # go through and predistort all waveforms
             n_wave = self.n_qubit if self.local_xy else 1
             for n in range(n_wave):
-                self.wave_xy[n] = self.predistortions[n].predistort(
-                    self.wave_xy[n])
+                self._wave_xy[n] = self._predistortions[n].predistort(
+                    self._wave_xy[n])
 
         if self.perform_predistortion_z:
             # go through and predistort all waveforms
             for n in range(self.n_qubit):
-                self.wave_z[n] = self.predistortions_z[n].predistort(
-                    self.wave_z[n])
+                self._wave_z[n] = self._predistortions_z[n].predistort(
+                    self._wave_z[n])
 
     def _perform_crosstalk_compensation(self):
         """Compensate for Z-control crosstalk."""
         if not self.compensate_crosstalk:
             return
-        self.wave_z = self.crosstalk.compensate(self.wave_z)
+        self._wave_z = self._crosstalk.compensate(self._wave_z)
 
     def _perform_virtual_z(self):
         """Shifts the phase of pulses subsequent to virutal z gates."""
@@ -802,8 +791,9 @@ class Sequence:
         """Create read-out waveform at the end of the sequence."""
         if self.readout_delay > 0:
             delay = IdentityGate(width=self.readout_delay)
-            self.add_gate_to_all(delay, dt=0)
-        self.add_gate_to_all(ReadoutGate(), dt=0, align='left')
+            self.add_gate_to_all(delay, dt=0, simultaneous=True)
+        self.add_gate_to_all(ReadoutGate(), dt=0, align='left',
+                             simultaneous=True)
 
     def _add_microwave_gate(self, config):
         """Create waveform for gating microwave switch."""
@@ -811,7 +801,7 @@ class Sequence:
             return
         n_wave = self.n_qubit if self.local_xy else 1
         # go through all waveforms
-        for n, wave in enumerate(self.wave_xy[:n_wave]):
+        for n, wave in enumerate(self._wave_xy[:n_wave]):
             if self.uniform_gate:
                 # the uniform gate is all ones
                 gate = np.ones_like(wave)
@@ -860,7 +850,7 @@ class Sequence:
             gate[0] = 0.0
             gate[-1] = 0.0
             # store results
-            self.wave_gate[n] = gate
+            self._wave_gate[n] = gate
 
     def _round(self, t, acc=1E-12):
         """Round the time `t` with a certain accuarcy `acc`.
@@ -1041,27 +1031,27 @@ class Sequence:
         # process tomography prepulses
         self.perform_process_tomography = \
             config.get('Generate process tomography prepulse', False)
-        self.process_tomography.set_parameters(config)
+        self._process_tomography.set_parameters(config)
 
         # tomography
         self.perform_state_tomography = config.get(
             'Generate tomography postpulse', False)
-        self.state_tomography.set_parameters(config)
+        self._state_tomography.set_parameters(config)
 
         # predistortion
         self.perform_predistortion = config.get('Predistort waveforms', False)
         # update all predistorting objects
-        for p in self.predistortions:
+        for p in self._predistortions:
             p.set_parameters(config)
 
         # Z predistortion
         self.perform_predistortion_z = config.get('Predistort Z')
-        for p in self.predistortions_z:
+        for p in self._predistortions_z:
             p.set_parameters(config)
 
         # crosstalk
         self.compensate_crosstalk = config.get('Compensate cross-talk', False)
-        self.crosstalk.set_parameters(config)
+        self._crosstalk.set_parameters(config)
 
         # gate switch waveform
         self.generate_gate_switch = config.get('Generate gate')
