@@ -9,21 +9,21 @@ from pulse import PulseShape, Pulse
 import logging
 log = logging.getLogger('LabberDriver')
 
+
 class Rabi(Sequence):
-    """Sequence for driving Rabi oscillations in multiple qubits"""
+    """Sequence for driving Rabi oscillations in multiple qubits."""
 
     def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms"""
+        """Generate sequence by adding gates/pulses to waveforms."""
         # just add pi-pulses for the number of available qubits
         self.add_gate_to_all(Gate.Xp, align='right')
 
 
-
 class CPMG(Sequence):
-    """Sequence for multi-qubit Ramsey/Echo/CMPG experiments"""
+    """Sequence for multi-qubit Ramsey/Echo/CMPG experiments."""
 
     def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms"""
+        """Generate sequence by adding gates/pulses to waveforms."""
         # get parameters
         n_pulse = int(config['# of pi pulses'])
         pi_to_q = config['Add pi pulses to Q']
@@ -35,19 +35,22 @@ class CPMG(Sequence):
         else:
             truncation = 0.0
 
-        max_width = np.max([p.total_duration() for p in self.pulses_1qb_xy[:self.n_qubit]])
+        max_width = np.max([p.total_duration()
+                            for p in self.pulses_1qb_xy[:self.n_qubit]])
         # select type of refocusing pi pulse
         gate_pi = Gate.Yp if pi_to_q else Gate.Xp
 
         # add pulses for all active qubits
         for n, pulse in enumerate(self.pulses_1qb_xy[:self.n_qubit]):
             # get effective pulse durations, for timing purposes
-            width = self.pulses_1qb_xy[n].total_duration() if edge_to_edge else 0.0
+            width = self.pulses_1qb_xy[n].total_duration(
+            ) if edge_to_edge else 0.0
             pulse_total = width * (n_pulse + 1)
-            # center pulses in add_gates mode; ensure sufficient pulse spacing in CPMG mode
-            t0 = self.first_delay + self.pulses_1qb_xy[n].total_duration()/2
-            # Align everything to the end of the last pulse of the one with the longest pulse width
-            t0 += (max_width - self.pulses_1qb_xy[n].total_duration()) * (n_pulse + 1) if edge_to_edge else 0.0
+            # Ensure sufficient pulse spacing in CPMG mode
+            t0 = self.first_delay + self.pulses_1qb_xy[n].total_duration() / 2
+            # Align to the end of the one with the longest pulse width
+            t0 += (max_width - self.pulses_1qb_xy[n].total_duration()) * (
+                n_pulse + 1) if edge_to_edge else 0.0
             t0 += (max_width - self.pulses_1qb_xy[n].total_duration())
             # special case for -1 pulses => T1 experiment
             if n_pulse < 0:
@@ -83,10 +86,10 @@ class CPMG(Sequence):
 
 
 class PulseTrain(Sequence):
-    """Sequence for multi-qubit pulse trains, for pulse calibrations"""
+    """Sequence for multi-qubit pulse trains, for pulse calibrations."""
 
     def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms"""
+        """Generate sequence by adding gates/pulses to waveforms."""
         # get parameters
         n_pulse = int(config['# of pulses'])
         alternate = config['Alternate pulse direction']
@@ -116,11 +119,12 @@ class PulseTrain(Sequence):
         # add list of gates to sequence
         self.add_gates(gates)
 
+
 class CZgates(Sequence):
-    """Sequence for multi-qubit pulse trains, for pulse calibrations"""
+    """Sequence for multi-qubit pulse trains, for pulse calibrations."""
 
     def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms"""
+        """Generate sequence by adding gates/pulses to waveforms."""
         # get parameters
         n_pulse = int(config['# of pulses, CZgates'])
 
@@ -137,37 +141,27 @@ class CZgates(Sequence):
         self.add_gates(gates)
 
 
-class VZ(Sequence):
-    def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms"""
-        # get parameters
-        duration = config['Sequence duration']
-        z_angle = config['Z Phase']*np.pi/180
-        edge_to_edge = config['Edge-to-edge pulses']
-
-        width = 0 if edge_to_edge else self.pulses_1qb[0].total_duration()
-        vz = VirtualZGate(angle=z_angle)
-        # self.add_gate_to_all(Gate.X2p)
-        self.add_gate_to_all(vz)
-        self.add_gate_to_all(vz)
-        self.add_gate_to_all(Gate.Xp)
-
-
 class Timing(Sequence):
+    """Sequence for timing calibration."""
+
     def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms"""
+        """Generate sequence by adding gates/pulses to waveforms."""
         # get parameters
         duration = config['Timing - Delay']
-        max_width = np.max([[p.total_duration() for p in self.pulses_1qb_xy[:self.n_qubit]],
-                           [p.total_duration() for p in self.pulses_1qb_z[:self.n_qubit]]])
-        first_delay = self.first_delay+max_width/2
+        max_width = np.max([[p.total_duration() for p in
+                             self.pulses_1qb_xy[:self.n_qubit]],
+                            [p.total_duration() for p in
+                             self.pulses_1qb_z[:self.n_qubit]]])
+        first_delay = self.first_delay + max_width / 2
         self.add_gate_to_all(Gate.Zp, t0=first_delay)
-        self.add_gate_to_all(Gate.Xp, t0=first_delay-duration)
+        self.add_gate_to_all(Gate.Xp, t0=first_delay - duration)
 
 
 class Anharmonicity(Sequence):
+    """Sequence for anharmonicity calibration."""
+
     def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms"""
+        """Generate sequence by adding gates/pulses to waveforms."""
         self.add_gate_to_all(Gate.Xp)
         pulse12 = copy(self.pulses_1qb_xy[0])
         pulse12.shape = PulseShape(config.get('Anharmonicity - Pulse type'))
@@ -175,13 +169,11 @@ class Anharmonicity(Sequence):
         pulse12.width = config.get('Anharmonicity - Width')
         pulse12.plateau = config.get('Anharmonicity - Plateau')
         pulse12.frequency = config.get('Anharmonicity - Frequency')
-        pulse12.truncation_range = config.get('Anharmonicity - Truncation range')
+        pulse12.truncation_range = config.get(
+            'Anharmonicity - Truncation range')
         gate = CustomGate(pulse12)
         self.add_gate_to_all(gate)
         self.add_gate_to_all(Gate.Xp)
-
-
-
 
 
 if __name__ == '__main__':

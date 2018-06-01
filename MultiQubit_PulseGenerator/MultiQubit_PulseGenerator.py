@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from BaseDriver import LabberDriver
-from sequence_builtin import Rabi, CPMG, PulseTrain, CZgates, VZ, Timing, Anharmonicity
+from sequence_builtin import Rabi, CPMG, PulseTrain, CZgates, Timing, \
+    Anharmonicity
 from sequence_rb import SingleQubit_RB, TwoQubit_RB
 
 import importlib
@@ -15,7 +16,6 @@ SEQUENCES = {'Rabi': Rabi,
              'C-phase Pulses': CZgates,
              '1-QB Randomized Benchmarking': SingleQubit_RB,
              '2-QB Randomized Benchmarking': TwoQubit_RB,
-             'Virtual Z': VZ,
              'Anharmonicity': Anharmonicity,
              'Timing': Timing,
              'Custom': type(None)}
@@ -32,7 +32,6 @@ class Driver(LabberDriver):
         # always create a sequence at startup
         name = self.getValue('Sequence')
         self.sendValueToOther('Sequence', name)
-
 
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
         """Perform the Set Value instrument operation."""
@@ -71,18 +70,15 @@ class Driver(LabberDriver):
                 self.sequence = mod.CustomSequence()
         return value
 
-
     def performGetValue(self, quant, options={}):
-        """Perform the Get Value instrument operation
-
-        """
+        """Perform the Get Value instrument operation."""
         # ignore if no sequence
         if self.sequence is None:
             return quant.getValue()
 
         # check type of quantity
         if (quant.name.startswith('Voltage, QB') or
-            quant.name.startswith('Single-shot, QB')):
+                quant.name.startswith('Single-shot, QB')):
             # perform demodulation, check if config is updated
             if self.isConfigUpdated():
                 # update sequence object with current driver configuation
@@ -99,7 +95,8 @@ class Driver(LabberDriver):
             ref = self.getValue('Demodulation - Reference')
             # perform demodulation
             if demod_iq:
-                value = self.sequence.readout.demodulate_iq(n, signal_i, signal_q, ref)
+                value = self.sequence.readout.demodulate_iq(
+                    n, signal_i, signal_q, ref)
             else:
                 value = self.sequence.readout.demodulate(n, signal, ref)
             # average values if not single-shot
@@ -121,9 +118,8 @@ class Driver(LabberDriver):
             value = quant.getValue()
         return value
 
-
     def getWaveformFromMemory(self, quant):
-        """Return data from already calculated waveforms"""
+        """Return data from already calculated waveforms."""
         # check which data to return
         if quant.name[-1] in ('1', '2', '3', '4', '5', '6', '7', '8', '9'):
             # get name and number of qubit waveform asked for
@@ -156,9 +152,6 @@ class Driver(LabberDriver):
         dt = 1 / self.sequence.sample_rate
         value = quant.getTraceDict(value, dt=dt)
         return value
-
-
-
 
 
 if __name__ == '__main__':

@@ -6,8 +6,20 @@ from pulse import PulseShape, Pulse
 import logging
 log = logging.getLogger('LabberDriver')
 
+
 class Readout(object):
-    """This class is used to generate and demodulate multi-tone qubit readout
+    """Demodulate multi-tone qubit readout.
+
+    Parameters
+    ----------
+    max_qubit : type
+        Description of parameter `max_qubit` (the default is 9).
+
+    Attributes
+    ----------
+    def __init__(self, max_qubit : type
+        Description of attribute `def __init__(self, max_qubit`.
+    max_qubit
 
     """
 
@@ -17,11 +29,6 @@ class Readout(object):
         self.n_readout = max_qubit
         self.sample_rate = 1E9
         self.frequencies = np.zeros(self.max_qubit)
-        # TODO this needs to move
-        # predistortion
-        self.predistort = False
-        self.measured_rise = np.zeros(self.max_qubit)
-        self.target_rise = np.zeros(self.max_qubit)
 
         # demodulation
         self.demod_skip = 0.0
@@ -32,7 +39,7 @@ class Readout(object):
         # self.n_records = 1
 
     def set_parameters(self, config={}):
-        """Set base parameters using config from from Labber driver
+        """Set base parameters using config from from Labber driver.
 
         Parameters
         ----------
@@ -40,25 +47,14 @@ class Readout(object):
             Configuration as defined by Labber driver configuration window
 
         """
-
         # get other parameters
         d = dict(Zero=0, One=1, Two=2, Three=3, Four=4, Five=5, Six=6, Seven=7,
                  Eight=8, Nine=9)
         self.n_readout = d[config.get('Number of qubits')]
-        self.match_main_size = config.get('Match main sequence waveform size')
-        self.distribute_phases = config.get('Distribute readout phases')
 
-        # predistortion
-        self.predistort = config.get('Predistort readout waveform')
-        if self.predistort:
-            for n in range(self.max_qubit):
-                # pre-distortion settings are currently same for all qubits
-                linewidth = config.get('Resonator linewidth')
-                self.measured_rise[n] = 1.0 / (2 * np.pi * linewidth)
-                self.target_rise[n] = config.get('Target rise time')
         # demodulation
         for n in range(self.max_qubit):
-            self.frequencies[n] = config.get('Readout frequency #%d' % (n+1))
+            self.frequencies[n] = config.get('Readout frequency #%d' % (n + 1))
         self.demod_skip = config.get('Demodulation - Skip')
         self.demod_length = config.get('Demodulation - Length')
         self.freq_offset = config.get('Demodulation - Frequency offset')
@@ -69,7 +65,7 @@ class Readout(object):
         self.n_records = config.get('Demodulation - Number of records', 1)
 
     def demodulate(self, n, signal, ref=None):
-        """Calculate complex signal from data and reference
+        """Calculate complex signal from data and reference.
 
         Parameters
         ----------
@@ -137,7 +133,7 @@ class Readout(object):
         return values
 
     def demodulate_iq(self, n, signal_i, signal_q, ref=None):
-        """Calculate complex signal from complex data and reference
+        """Calculate complex signal from complex data and reference.
 
         Parameters
         ----------
@@ -187,14 +183,15 @@ class Readout(object):
             return np.zeros(n_segment, dtype=complex)
 
         # define data to use, put in 2d array of segments
-        vData = np.reshape(vI+1j*vQ, (n_segment, int(n_total / n_segment)))
+        vData = np.reshape(vI + 1j * vQ, (n_segment, int(n_total / n_segment)))
         # calculate cos/sin vectors, allow segmenting
         vTime = dt * (n0 + np.arange(length, dtype=float))
         vS = np.exp(-2j * np.pi * vTime * frequency)
 
         # calc I/Q
-        dI = np.trapz((vS*vData[:, n0:n0+length]).real)/float(length-1)
-        dQ = -np.trapz((vS*vData[:, n0:n0+length]).imag)/float(length-1)
+        dI = np.trapz((vS * vData[:, n0:n0 + length]).real) / float(length - 1)
+        dQ = -np.trapz((vS * vData[:, n0:n0 + length]
+                        ).imag) / float(length - 1)
         values = dI + 1j * dQ
         if self.use_phase_ref and ref is not None:
             # skip reference if trace length doesn't match
