@@ -171,9 +171,6 @@ class TwoQubitGate(BaseGate):
 class ReadoutGate(BaseGate):
     """Readouts the qubit state."""
 
-    def __init__(self):
-        super().__init__()
-
     def get_waveform(self, pulse, t0, t):  # noqa: D102
         return super().get_waveform(pulse, t0, t)
 

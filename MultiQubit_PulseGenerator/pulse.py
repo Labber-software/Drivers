@@ -82,7 +82,7 @@ class Pulse(object):
         self.Offset = 300E6
         self.Lcoeff = np.array([0.3])
         self.dfdV = 500E6
-        self.qubit_spectrum = None
+        self.qubit = None
 
         # For IQ mixer corrections
         self.iq_ratio = 1.0
@@ -241,11 +241,11 @@ class Pulse(object):
                         t_tau, theta_tau)
 
             df = self.Coupling * (1 / np.tan(theta_t) - 1 / np.tan(theta_i))
-            if self.qubit_spectrum is None:
-                # Use linear dependence if no qubit spectrum was given
+            if self.qubit is None:
+                # Use linear dependence if no qubit was given
                 values = df / self.dfdV
             else:
-                values = self.df_to_dV(df)
+                values = self.qubit.df_to_dV(df)
 
         elif self.shape == PulseShape.COSINE:
             tau = self.width
@@ -306,109 +306,6 @@ class Pulse(object):
                                        np.pi / 2))
             y = data_i + 1j * data_q
         return y
-
-    def qubit_frequency(self, V):
-        """Short summary.
-
-        Parameters
-        ----------
-        V : type
-            Description of parameter `V`.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        Vperiod = self.qubit_spectrum['Vperiod']
-        Voffset = self.qubit_spectrum['Voffset']
-        V0 = self.qubit_spectrum['V0']
-
-        Ec = self.qubit_spectrum['Ec']
-        f01_max = self.qubit_spectrum['f01_max']
-        f01_min = self.qubit_spectrum['f01_min']
-
-        EJS = (f01_max + Ec)**2 / (8 * Ec)
-        d = (f01_min + Ec)**2 / (8 * EJ * Ec)
-        F = np.pi * (V - Voffset) / Vperiod
-        f = np.sqrt(8 * EJS * Ec * np.abs(np.cos(F)) *
-                    np.sqrt(1 + d**2 * np.tan(F)**2)) - Ec
-        return f
-
-    def f_to_V(self, f):
-        """Short summary.
-
-        Parameters
-        ----------
-        f : type
-            Description of parameter `f`.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        Vperiod = self.qubit_spectrum['Vperiod']
-        Voffset = self.qubit_spectrum['Voffset']
-        V0 = self.qubit_spectrum['V0']
-
-        Ec = self.qubit_spectrum['Ec']
-        f01_max = self.qubit_spectrum['f01_max']
-        f01_min = self.qubit_spectrum['f01_min']
-
-        # Make sure frequencies are inside the possible frequency range
-        if np.any(f > f01_max):
-            raise ValueError(
-                'Frequency requested is outside the qubit spectrum')
-        if np.any(f < f01_min):
-            raise ValueError(
-                'Frequency requested is outside the qubit spectrum')
-
-        # Calculate the JJ parameters
-        EJS = (f01_max + Ec)**2 / (8 * Ec)
-        d = (f01_min + Ec)**2 / (8 * EJS * Ec)
-
-        # Calculate the required EJ for the given frequencies
-        EJ = (f + Ec)**2 / (8 * Ec)
-
-        # Calculate the F=pi*(V-voffset)/vperiod corresponding to that EJ
-        F = np.arcsin(np.sqrt((EJ**2 / EJS**2 - 1) / (d**2 - 1)))
-        # And finally the voltage
-        V = F * Vperiod / np.pi + Voffset
-
-        # Mirror around Voffset, bounding the qubit to one side of the maxima
-        if V0 >= Voffset:
-            V[V < Voffset] = 2 * Voffset - V[V < Voffset]
-        else:
-            V[V > Voffset] = 2 * Voffset - V[V > Voffset]
-
-        # Mirror beyond 1 period, bounding the qubit to one side of the minima
-        Vminp = Vperiod / 2 + Voffset
-        Vminn = -Vperiod / 2 + Voffset
-        V[V > Vminp] = 2 * Vminp - V[V > Vminp]
-        V[V < Vminn] = 2 * Vminn - V[V < Vminn]
-
-        return V
-
-    def df_to_dV(self, df):
-        """Short summary.
-
-        Parameters
-        ----------
-        df : type
-            Description of parameter `df`.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        V0 = self.qubit_spectrum['V0']
-        f0 = self.qubit_frequency(V0)
-        return self.f_to_V(df + f0) - V0
 
 
 if __name__ == '__main__':

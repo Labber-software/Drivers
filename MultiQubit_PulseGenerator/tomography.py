@@ -121,8 +121,8 @@ class ProcessTomography(object):
         return gates
 
 
-class Tomography(object):
-    """This class handles qubit control pulses for tomography."""
+class StateTomography(object):
+    """This class handles qubit control pulses for state tomography."""
 
     def __init__(self, tomography_index=0, singleQBtomoID=0,
                  twoQBtomoID1=0, twoQBtomoID2=1,
