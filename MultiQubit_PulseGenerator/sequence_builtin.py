@@ -5,8 +5,7 @@ from copy import copy
 
 import numpy as np
 
-from gates import CompositeGate, CustomGate, Gate, IdentityGate, VirtualZGate
-from pulse import Pulse, PulseShape
+from gates import Gate
 from sequence import Sequence
 
 log = logging.getLogger('LabberDriver')
@@ -31,11 +30,6 @@ class CPMG(Sequence):
         pi_to_q = config['Add pi pulses to Q']
         duration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
-        if self.pulses_1qb_xy[0].shape == PulseShape.GAUSSIAN:
-            # Only gaussian pulses has a truncation range
-            truncation = config['Truncation range']
-        else:
-            truncation = 0.0
 
         max_width = np.max([p.total_duration()
                             for p in self.pulses_1qb_xy[:self.n_qubit]])
@@ -96,10 +90,8 @@ class PulseTrain(Sequence):
         n_pulse = int(config['# of pulses'])
         alternate = config['Alternate pulse direction']
 
-        # create list with gates
-        gates = []
         if n_pulse == 0:
-            gates.append([Gate.I for q in range(self.n_qubit)])
+            self.add_gate_to_all(Gate.I)
         for n in range(n_pulse):
             pulse_type = config['Pulse']
             # check if alternate pulses
@@ -109,62 +101,6 @@ class PulseTrain(Sequence):
             else:
                 gate = Gate.__getattr__(pulse_type)
             self.add_gate_to_all(gate)
-
-
-class CZgates(Sequence):
-    """Sequence for multi-qubit pulse trains, for pulse calibrations."""
-
-    def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms."""
-        # get parameters
-        n_pulse = int(config['# of pulses, CZgates'])
-
-        # create list with gates
-        gates = []
-        for n in range(n_pulse):
-            gate = Gate.CPh
-            # create list with same gate for all active qubits
-            gate_qubits = [gate for q in range(self.n_qubit)]
-            # append to list of gates
-            gates.append(gate_qubits)
-
-        # add list of gates to sequence
-        self.add_gates(gates)
-
-
-class Timing(Sequence):
-    """Sequence for timing calibration."""
-
-    def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms."""
-        # get parameters
-        duration = config['Timing - Delay']
-        max_width = np.max([[p.total_duration() for p in
-                             self.pulses_1qb_xy[:self.n_qubit]],
-                            [p.total_duration() for p in
-                             self.pulses_1qb_z[:self.n_qubit]]])
-        first_delay = self.first_delay + max_width / 2
-        self.add_gate_to_all(Gate.Zp, t0=first_delay)
-        self.add_gate_to_all(Gate.Xp, t0=first_delay - duration)
-
-
-class Anharmonicity(Sequence):
-    """Sequence for anharmonicity calibration."""
-
-    def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms."""
-        self.add_gate_to_all(Gate.Xp)
-        pulse12 = copy(self.pulses_1qb_xy[0])
-        pulse12.shape = PulseShape(config.get('Anharmonicity - Pulse type'))
-        pulse12.amplitude = config.get('Anharmonicity - Amplitude')
-        pulse12.width = config.get('Anharmonicity - Width')
-        pulse12.plateau = config.get('Anharmonicity - Plateau')
-        pulse12.frequency = config.get('Anharmonicity - Frequency')
-        pulse12.truncation_range = config.get(
-            'Anharmonicity - Truncation range')
-        gate = CustomGate(pulse12)
-        self.add_gate_to_all(gate)
-        self.add_gate_to_all(Gate.Xp)
 
 
 if __name__ == '__main__':

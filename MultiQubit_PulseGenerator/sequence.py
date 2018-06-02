@@ -6,12 +6,13 @@ from enum import Enum
 import numpy as np
 
 from crosstalk import Crosstalk
-from gates import *
+from gates import (CompositeGate, CustomGate, Gate, IdentityGate, ReadoutGate,
+                   SingleQubitRotation, TwoQubitGate, VirtualZGate)
 from predistortion import ExponentialPredistortion, Predistortion
 from pulse import Pulse, PulseShape, PulseType
+from qubits import Qubit, Transmon
 from readout import Readout
 from tomography import ProcessTomography, StateTomography
-from qubits import Qubit, Transmon
 
 # Allow logging to Labber's instrument log
 log = logging.getLogger('LabberDriver')
@@ -185,7 +186,7 @@ class Sequence:
 
         # waveforms
         self._wave_xy = [np.zeros(0, dtype=np.complex)
-                        for n in range(MAX_QUBIT)]
+                         for n in range(MAX_QUBIT)]
         self._wave_z = [np.zeros(0) for n in range(MAX_QUBIT)]
         self._wave_gate = [np.zeros(0) for n in range(MAX_QUBIT)]
 
@@ -641,8 +642,7 @@ class Sequence:
                             q = [q]
                         step[q[k]] = G
                 else:
-                    if j == 0:
-                        step[q] = g
+                    step[q] = g
             sequence.append(step)
         self.add_gates(sequence)
 
@@ -689,8 +689,6 @@ class Sequence:
                 elif isinstance(gate, SingleQubitRotation):
                     if gate.axis in ('X', 'Y'):
                         pulse = copy(self.pulses_1qb_xy[qubit])
-                        if gate.angle < 2 and gate.angle > -2:
-                            pulse.amplitude *= self.correction
                     elif gate.axis == 'Z':
                         pulse = self.pulses_1qb_z[qubit]
                 elif isinstance(gate, TwoQubitGate):
@@ -707,11 +705,9 @@ class Sequence:
                     delay = self.wave_z_delays[qubit]
                 elif pulse.pulse_type == PulseType.XY:
                     waveform = self._wave_xy[qubit]
-                    gate_waveform = self._wave_gate
                     delay = self.wave_xy_delays[qubit]
                 elif pulse.pulse_type == PulseType.READOUT:
                     waveform = self.readout_iq
-                    gate_waveform = self.readout_trig
                     delay = 0
 
                 # get the range of indices in use
@@ -921,7 +917,6 @@ class Sequence:
             self.qubits[n] = qubit
 
         # single-qubit pulses XY
-        self.correction = config.get('Correction #1')
         for n, pulse in enumerate(self.pulses_1qb_xy):
             m = n + 1  # pulses are indexed from 1 in Labber
             # global parameters

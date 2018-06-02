@@ -5,9 +5,7 @@ from scipy.linalg import inv
 
 
 class Crosstalk(object):
-    """This class is used to compensate crosstalk qubit Z control
-
-    """
+    """This class is used to compensate crosstalk qubit Z control."""
 
     def __init__(self):
         # define variables

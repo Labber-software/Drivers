@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import logging
-from copy import copy
 
 from gates import Gate
 

@@ -156,6 +156,7 @@ class ExponentialPredistortion:
         Sample spacing for the waveform.
 
     """
+
     def __init__(self, waveform_number):
         self.A1 = 0
         self.tau1 = 0
@@ -175,13 +176,14 @@ class ExponentialPredistortion:
             Configuration as defined by Labber driver configuration window
 
         """
-        self.A1 = config.get('Predistort Z{} - A1'.format(1))
-        self.tau1 = config.get('Predistort Z{} - tau1'.format(1))
-        self.A2 = config.get('Predistort Z{} - A2'.format(1))
-        self.tau2 = config.get('Predistort Z{} - tau2'.format(1))
+        m = self.n + 1
+        self.A1 = config.get('Predistort Z{} - A1'.format(m))
+        self.tau1 = config.get('Predistort Z{} - tau1'.format(m))
+        self.A2 = config.get('Predistort Z{} - A2'.format(m))
+        self.tau2 = config.get('Predistort Z{} - tau2'.format(m))
 
-        self.A3 = config.get('Predistort Z{} - A3'.format(1))
-        self.tau3 = config.get('Predistort Z{} - tau3'.format(1))
+        self.A3 = config.get('Predistort Z{} - A3'.format(m))
+        self.tau3 = config.get('Predistort Z{} - tau3'.format(m))
         self.dt = 1 / config.get('Sample rate')
 
     def predistort(self, waveform):

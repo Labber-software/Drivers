@@ -4,8 +4,6 @@ import logging
 
 import numpy as np
 
-from pulse import Pulse, PulseShape
-
 log = logging.getLogger('LabberDriver')
 
 

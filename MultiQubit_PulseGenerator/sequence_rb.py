@@ -4,7 +4,7 @@ import random as rnd
 
 import numpy as np
 
-from gates import *
+from gates import Gate
 from sequence import Sequence
 
 log = logging.getLogger('LabberDriver')
@@ -96,6 +96,7 @@ def add_singleQ_clifford(index, gate_seq, pad_with_I=True):
 
     length_after = len(gate_seq)
     if pad_with_I:
+        # Force the clifford to have a length of 3 gates
         for i in range(3-(length_after-length_before)):
             gate_seq.append(Gate.I)
 
@@ -311,7 +312,6 @@ class SingleQubit_RB(Sequence):
             self.prev_sequence = sequence
 
             multi_gate_seq = []
-            max_n_gates = 0
             for n in range(self.n_qubit):
                 # Generate 1QB RB sequence
                 single_gate_seq = []
@@ -327,15 +327,7 @@ class SingleQubit_RB(Sequence):
 
                 recovery_gate = self.get_recovery_gate(single_gate_seq)
                 single_gate_seq.append(recovery_gate)
-                if len(single_gate_seq) > max_n_gates:
-                    max_n_gates = len(single_gate_seq)
                 multi_gate_seq.append(single_gate_seq)
-
-            # Sequences with different lengths causes a bug. Pad with I gates.
-            for seq in multi_gate_seq:
-                if len(seq) < max_n_gates:
-                    for n in range(max_n_gates - len(seq)):
-                        seq.insert(0, Gate.I)
 
             # transpose list of lists
             multi_gate_seq = list(map(list, zip(*multi_gate_seq)))
@@ -344,9 +336,9 @@ class SingleQubit_RB(Sequence):
         else:
             self.add_gates(self.prev_gate_seq)
 
-    def evalulate_seq(self, gate_seq):
-        """Evaulate Single Qubit Gate Sequence."""
-        # Reference: http://www.vcpc.univie.ac.at/~ian/hotlist/qc/talks/bloch-sphere-rotations.pdf
+    def evaluate_sequence(self, gate_seq):
+        """Evaluate Single Qubit Gate Sequence."""
+# http://www.vcpc.univie.ac.at/~ian/hotlist/qc/talks/bloch-sphere-rotations.pdf
         singleQ_gate = np.matrix([[1, 0], [0, 1]])
         for i in range(len(gate_seq)):
             if (gate_seq[i] == Gate.I):
@@ -384,7 +376,7 @@ class SingleQubit_RB(Sequence):
         """Get recovery gate."""
         qubit_state = np.matrix('1; 0')
         # initial state: ground state, following the QC community's convention
-        qubit_state = np.matmul(self.evalulate_seq(gate_seq), qubit_state)
+        qubit_state = np.matmul(self.evaluate_sequence(gate_seq), qubit_state)
         # find recovery gate which makes qubit_state return to initial state
         if (np.abs(np.linalg.norm(qubit_state.item((0, 0))) - 1) < 0.1):
             # ground state -> I
@@ -509,7 +501,7 @@ class TwoQubit_RB(Sequence):
                 else:
                     self.add_gate(qubit=[0, 1], gate=gates)
 
-    def evalulate_seq(self, gate_seq_1, gate_seq_2):
+    def evaluate_sequence(self, gate_seq_1, gate_seq_2):
         """Evaulate Two Qubit Gate Sequence."""
         twoQ_gate = np.matrix(
             [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
@@ -577,7 +569,7 @@ class TwoQubit_RB(Sequence):
         qubit_state = np.matrix(
             '1; 0; 0; 0')  # initial state: ground state |00>
         # initial state: ground state |00>
-        qubit_state = np.matmul(self.evalulate_seq(
+        qubit_state = np.matmul(self.evaluate_sequence(
             gate_seq_1, gate_seq_2), qubit_state)
 
         # find recovery gate which makes qubit_state return to initial state
@@ -587,7 +579,7 @@ class TwoQubit_RB(Sequence):
         # Search recovery gate in two Qubit clifford group
         for i in range(total_num_cliffords):
             add_twoQ_clifford(i, recovery_seq_1, recovery_seq_2)
-            qubit_final_state = np.matmul(self.evalulate_seq(
+            qubit_final_state = np.matmul(self.evaluate_sequence(
                 recovery_seq_1, recovery_seq_2), qubit_state)
             # numerical error threshold: 1e-4
             if np.abs(np.abs(qubit_final_state[0]) - 1) < 1e-6:
