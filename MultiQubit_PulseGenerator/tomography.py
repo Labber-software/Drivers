@@ -27,9 +27,6 @@ class ProcessTomography(object):
             Configuration as defined by Labber driver configuration window
 
         """
-        # Double-check that we want to do process tomography
-        if not config.get('Generate process tomography prepulse'):
-            return
 
         # determine which tomography scheme is in use
         self.tomography_scheme = config.get('Tomography scheme')
@@ -142,9 +139,6 @@ class StateTomography(object):
             Configuration as defined by Labber driver configuration window
 
         """
-        # double-check that we actually want to do tomography:
-        if not config.get('Generate tomography postpulse'):
-            return
 
         # Load tomo scheme into local variable:
         self.tomography_scheme = config.get('Tomography scheme')

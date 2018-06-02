@@ -119,6 +119,7 @@ class IdentityGate(BaseGate):
     def get_waveform(self, pulse, t0, t):  # noqa: D102
         pulse = copy(pulse)
         pulse.amplitude = 0
+        pulse.use_drag = False
         if self.width is not None:
             pulse.width = self.width
             pulse.plateau = 0

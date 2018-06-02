@@ -28,10 +28,10 @@ class Step:
     ----------
     n_qubit : int
         Number of qubits in the sequece (the default is MAX_QUBIT).
-    t_start : float
-        Start of the sequence in seconds (the default is 0).
-    t_end : float
-        End of the sequence in seconds (the default is 0).
+    t0 : float
+        Start of the sequence in seconds (the default is None).
+    dt : float
+        End of the sequence in seconds (the default is None).
     align : str {'left', 'center', 'right'}
         The alignment of pulses if they have different lengths,
         (the default is 'center').
@@ -45,13 +45,15 @@ class Step:
 
     """
 
-    def __init__(self, n_qubit=MAX_QUBIT, t_start=0, t_end=0, align='center'):
+    def __init__(self, n_qubit=MAX_QUBIT, t0=None, dt=None, align='center'):
         self.n_qubit = n_qubit
-        self.gates = [Gate.I.value for n in range(self.n_qubit)]
+        self.gates = [None for n in range(self.n_qubit)]
         self.align = align
-        self.t_start = t_start
-        self.t_end = t_end
-        self.t_middle = t_end - (t_end - t_start) / 2
+        self.t0 = t0
+        self.dt = dt
+        self.t_start = None
+        self.t_end = None
+        self.t_middle = None
 
     def add_gate(self, qubit, gate):
         """Add the given gate(s) to the specified qubit(s).
@@ -73,9 +75,6 @@ class Step:
         if not isinstance(gate, list):
             gate = [gate]
         for i in range(len(gate)):
-            if gate[i] is None:
-                # Replace Nones with Identity gate
-                gate[i] = Gate.I
             if isinstance(gate[i], Enum):
                 # We need the gate object, not the enum
                 self.gates[qubit[i]] = gate[i].value
@@ -97,146 +96,23 @@ class Step:
 
 
 class Sequence:
-    """Represent an multi qubit sequence that can contain many gates.
-
-    The user creates a subclass of `Sequence` and overloads the
-    `generate_sequence` method. Gates and pulses are added via one of the
-    add_... methods. When the sequence is done, `calculate_waveforms` converts
-    the sequence into qubit pulses using the given pulse parameters.
-
-    Parameters
-    ----------
-    n_qubit : int
-        Number of qubits (the default is 5).
-
-    Attributes
-    ----------
-    dt : float
-        Pulse spacing in seconds.
-    local_xy : bool
-        If False, all waveforms are combined into one.
-    simultaneous_pulses : bool
-        If False, all pulses are seperated in time.
-    sample_rate : float
-        Sample rate of the AWG.
-    n_pts : int
-        Number of points in each waveform.
-    first_delay : float
-        Delay until first pulse in seconds.
-    trim_to_sequence : bool
-        If True, the number of points are adjusted to length of the seqeunce.
-    align_to_end : bool
-        If True, the waveforms are aligned to the end.
-    wave_xy_delays : :obj:`ndarray`
-        Delays for XY waveforms in seconds.
-    wave_z_delays : :obj:`ndarray`
-        Delays for Z waveforms in seconds.
-    pulses_1qb_xy : list of :obj:`Pulse`
-        XY Pulses for each qubit.
-    pulses_1qb_z : list of :obj:`Pulse`
-        Z Pulses for each qubit.
-    pulses_2qb : list of :obj:`Pulse`
-        2 qubit Pulses for each qubit.
-    pulses_readout : list of :obj:`Pulse`
-        Readout pulses for each qubit.
-    perform_process_tomography : bool
-        If True, adds prepulses.
-    perform_state_tomography : bool
-        If True, add post pulses for state tomography.
-    compensate_crosstalk : bool
-        If True, compensate for Z crosstalk.
-    perform_predistortion : bool
-        If True, perform predistorion.
-    generate_gate_switch : bool
-        If True, generate gates for XY.
-    uniform_gate : bool
-        If True, generate a uniform gate for XY.
-    gate_delay : float
-        Gate delay in seconds.
-    gate_overlap : float
-        Gate overlap in seconds.
-    minimal_gate_time : float
-        Minimum gate time in seconds.
-    readout_trig_generate : bool
-        If True, generate readout trigs.
-    readout_delay : float
-        Delay from last pulse until start of readout in seconds.
-    readout_trig : list of :obj:`ndarray`
-        Readout trigs.
-    readout_iq : list of :obj:`ndarray`
-        Readout waveforms.
-
-    """
-
     def __init__(self, n_qubit=5):
         self.n_qubit = n_qubit
-        self.dt = 10E-9
-        self.local_xy = True
-        self.simultaneous_pulses = True
-
-        # waveform parameter
-        self.sample_rate = 1.2E9
-        self.n_pts = 240E3
-        self.first_delay = 100E-9
-        self.trim_to_sequence = True
-        self.align_to_end = False
 
         self.sequences = []
-        self.qubits = [Qubit() for n in range(MAX_QUBIT)]
-
-        # waveforms
-        self._wave_xy = [np.zeros(0, dtype=np.complex)
-                         for n in range(MAX_QUBIT)]
-        self._wave_z = [np.zeros(0) for n in range(MAX_QUBIT)]
-        self._wave_gate = [np.zeros(0) for n in range(MAX_QUBIT)]
-
-        # waveform delays
-        self.wave_xy_delays = np.zeros(MAX_QUBIT)
-        self.wave_z_delays = np.zeros(MAX_QUBIT)
-
-        # define pulses
-        self.pulses_1qb_xy = [Pulse() for n in range(MAX_QUBIT)]
-        self.pulses_1qb_z = [Pulse() for n in range(MAX_QUBIT)]
-        self.pulses_2qb = [Pulse() for n in range(MAX_QUBIT - 1)]
-        self.pulses_readout = [Pulse(pulse_type=PulseType.READOUT)
-                               for n in range(MAX_QUBIT)]
 
         # process tomography
         self.perform_process_tomography = False
         self._process_tomography = ProcessTomography()
 
-        # tomography
+        # state tomography
         self.perform_state_tomography = False
         self._state_tomography = StateTomography()
 
-        # cross-talk
-        self.compensate_crosstalk = False
-        self._crosstalk = Crosstalk()
-
-        # predistortion
-        self.perform_predistortion = False
-        self._predistortions = [Predistortion(n) for n in range(MAX_QUBIT)]
-        self._predistortions_z = [
-            ExponentialPredistortion(n) for n in range(MAX_QUBIT)]
-
-        # gate switch waveform
-        self.generate_gate_switch = False
-        self.uniform_gate = False
-        self.gate_delay = 0.0
-        self.gate_overlap = 20E-9
-        self.minimal_gate_time = 20E-9
-
-        # readout trig settings
-        self.readout_trig_generate = False
-
-        # readout wave object and settings
+        # readout
         self.readout_delay = 0.0
-        self.readout = Readout(max_qubit=MAX_QUBIT)
-        self.readout_trig = np.array([], dtype=float)
-        self.readout_iq = np.array([], dtype=np.complex)
 
     # Public methods
-
     def generate_sequence(self, config):
         """Generate sequence by adding gates/pulses to waveforms.
 
@@ -249,91 +125,24 @@ class Sequence:
         # this function should be overloaded by specific sequence
         pass
 
-    def calculate_waveforms(self, config):
-        """Calculate waveforms for all qubits.
-
-        The function will initialize the waveforms, generate the qubit pulse
-        sequence, create gates and readout pulses, perform pre-distortion,
-        and finally return the qubit control waveforms.
-
-        Parameters
-        ----------
-        config : dict
-            Configuration as defined by Labber driver configuration window
-
-        Returns
-        -------
-        waveforms : dict with ndarrays
-            Dictionary with qubit waveforms. Depending on the sequence
-            configuration, the dictionary will have the following keys:
-            wave_xy : list of complex ndarrays
-            Waveforms for qubit XY control.
-            wave_z : list of ndarrays
-            Waveforms for qubit Z control.
-            wave_gate : list of ndarrays
-            Waveforms for gating qubit XY pulses.
-            readout_trig : ndarray
-            Waveform for triggering/gating qubit readout
-            readout_iq : complex ndarray
-            Waveform for readout IQ control
-
-        """
+    def get_sequence(self, config):
         self.sequences = []
-        self._add_process_tomography()
+
+        if self.perform_process_tomography:
+            self._process_tomography.add_pulses(self)
+
         self.generate_sequence(config)
-        self._add_state_tomography()
-        # If there is no readout present in the sequence, add it.
-        add_readout = True
-        for g in self.sequences[-1].gates:
-            if isinstance(g, ReadoutGate):
-                add_readout = False
-        if add_readout:
-            self._add_readout()
-        # Make sure readout starts at the same time for each qubit
-        self.sequences[-1].align = 'left'
 
-        self._perform_virtual_z()
+        if self.perform_state_tomography:
+            self._state_tomography.add_pulses(self)
 
-        self._init_waveforms()
+        if self.readout_delay > 0:
+            delay = IdentityGate(width=self.readout_delay)
+            self.add_gate_to_all(delay, dt=0, simultaneous=True)
+        self.add_gate_to_all(ReadoutGate(), dt=0, align='left',
+                             simultaneous=True)
 
-        if self.align_to_end:
-            shift = self._round((self.n_pts - 2) / self.sample_rate -
-                                self.sequences[-1].t_end)
-            for step in self.sequences:
-                step.time_shift(shift)
-
-        self._generate_waveforms()
-
-        # collapse all xy pulses to one waveform if no local XY control
-        if not self.local_xy:
-            # sum all waveforms to first one
-            self._wave_xy[0] = np.sum(self._wave_xy[:self.n_qubit], 0)
-            # clear other waveforms
-            for n in range(1, self.n_qubit):
-                self._wave_xy[n][:] = 0.0
-
-        if self.readout_trig_generate:
-            self._add_readout_trig(config)
-
-        self._perform_crosstalk_compensation()
-
-        # microwave gate switch waveform
-        self._add_microwave_gate(config)
-
-        # I/Q waveform predistortion
-        self._predistort_waveforms()
-
-        # Apply offsets
-        self.readout_iq += self.readout_i_offset + 1j * self.readout_q_offset
-
-        # create and return dictionary with waveforms
-        data = dict()
-        data['wave_xy'] = self._wave_xy
-        data['wave_z'] = self._wave_z
-        data['wave_gate'] = self._wave_gate
-        data['readout_trig'] = self.readout_trig
-        data['readout_iq'] = self.readout_iq
-        return data
+        return self.sequences
 
     # Public methods for adding pulses and gates to the sequence.
     def add_single_pulse(self, qubit, pulse, t0=None, dt=None,
@@ -446,23 +255,7 @@ class Sequence:
                 self._add_multiple_composite_gates(qubit, gate, t0, dt, align)
                 return
 
-        if simultaneous is None and self.simultaneous_pulses is True:
-            self._add_step(qubit, gate, t0, dt, align)
-        elif simultaneous is None and self.simultaneous_pulses is False:
-            # Seperate pulses into multipe steps
-            for q, g in zip(qubit, gate):
-                self._add_step(q, g, t0, dt, align)
-        elif simultaneous is True:
-            self._add_step(qubit, gate, t0, dt, align)
-        elif simultaneous is False:
-            # Seperate pulses into multipe steps
-            for q, g in zip(qubit, gate):
-                self._add_step(q, g, t0, dt, align)
-
-        if t0 is not None:
-            # When t0 is used for time reference, the order of the added pulses
-            # might not be chronological.
-            self.sequences.sort(key=lambda x: x.t_end)
+        self._add_step(qubit, gate, t0, dt, align)
 
     def add_gate_to_all(self, gate, t0=None, dt=None, align='center',
                         simultaneous=None):
@@ -537,64 +330,8 @@ class Sequence:
         if not isinstance(gate, list):
             gate = [gate]
 
-        step = Step(self.n_qubit, align=align)
+        step = Step(self.n_qubit, t0=t0, dt=dt, align=align)
         step.add_gate(qubit, gate)
-
-        if len(self.sequences) == 0:
-            t_start = self.first_delay - self.dt
-        else:
-            t_start = self.sequences[-1].t_end
-        t_end = t_start
-
-        # Longest pulse in the step needed for correct timing
-        max_duration = -np.inf
-        for q, g in zip(qubit, gate):
-            if isinstance(g, Enum):
-                g = g.value
-            # Virtual Z gate is special since it has no length
-            if isinstance(g, VirtualZGate):
-                duration = 0
-                pulse = None
-            # Get the corresponding pulse
-            elif isinstance(g, SingleQubitRotation):
-                if g.axis in ('X', 'Y'):
-                    pulse = self.pulses_1qb_xy[q]
-                elif g.axis == 'Z':
-                    pulse = self.pulses_1qb_z[q]
-            elif isinstance(g, IdentityGate):
-                if g.width is None:
-                    pulse = self.pulses_1qb_xy[q]
-                else:
-                    duration = g.width
-                    pulse = None
-            elif isinstance(g, TwoQubitGate):
-                pulse = self.pulses_2qb[q]
-            elif isinstance(g, ReadoutGate):
-                pulse = self.pulses_readout[q]
-            elif isinstance(g, CustomGate):
-                pulse = g.pulse
-            else:
-                raise ValueError('Please provide a pulse for {}'.format(g))
-            # calculate timings
-            if pulse is not None:
-                duration = pulse.total_duration()
-            if duration > max_duration:
-                max_duration = duration
-
-        if t0 is None:
-            if dt is None:
-                if max_duration == 0:
-                    # gates with zero time shouldn't introduce 2*dt spacing
-                    step.t_start = t_end
-                else:
-                    step.t_start = t_end + self.dt
-            else:
-                step.t_start = t_end + dt
-        else:
-            step.t_start = t0 - max_duration / 2
-        step.t_start = self._round(step.t_start)
-        step.t_end = self._round(step.t_start + max_duration)
-        step.t_middle = step.t_start + max_duration / 2
 
         self.sequences.append(step)
 
@@ -646,109 +383,206 @@ class Sequence:
             sequence.append(step)
         self.add_gates(sequence)
 
-    def _init_waveforms(self):
-        """Initialize waveforms according to sequence settings."""
-        # To keep the first pulse delay, use the smallest delay as reference.
-        min_delay = np.min([self.wave_xy_delays[:self.n_qubit],
-                            self.wave_z_delays[:self.n_qubit]])
-        self.wave_xy_delays -= min_delay
-        self.wave_z_delays -= min_delay
-        max_delay = np.max([self.wave_xy_delays[:self.n_qubit],
-                            self.wave_z_delays[:self.n_qubit]])
-        # create empty waveforms of the correct size
-        end = self.sequences[-1].t_end + max_delay
-        if self.trim_to_sequence:
-            self.n_pts = int(np.ceil(end * self.sample_rate)) + 1
-            if self.n_pts % 2 == 1:
-                # Odd n_pts give spectral leakage in FFT
-                self.n_pts += 1
-        for n in range(self.n_qubit):
-            self._wave_xy[n] = np.zeros(self.n_pts, dtype=np.complex)
-            self._wave_z[n] = np.zeros(self.n_pts, dtype=float)
-            self._wave_gate[n] = np.zeros(self.n_pts, dtype=float)
+    def set_parameters(self, config={}):
+        """Set base parameters using config from from Labber driver.
 
-        # Waveform time vector
-        self.t = np.arange(self.n_pts) / self.sample_rate
-        # readout trig
-        self.readout_trig = np.zeros(self.n_pts, dtype=float)
-        # readout i/q waveform
-        self.readout_iq = np.zeros(self.n_pts, dtype=np.complex)
+        Parameters
+        ----------
+        config : dict
+            Configuration as defined by Labber driver configuration window
 
-    def _generate_waveforms(self):
-        """Generate the waveforms corresponding to the sequence."""
+        """
+        # sequence parameters
+        d = dict(Zero=0, One=1, Two=2, Three=3, Four=4, Five=5, Six=6, Seven=7,
+                 Eight=8, Nine=9)
+        self.n_qubit = d[config.get('Number of qubits')]
+
+        # Readout
+        self.readout_delay = config.get('Readout delay')
+
+        # process tomography prepulses
+        self.perform_process_tomography = \
+            config.get('Generate process tomography prepulse', False)
+        self._process_tomography.set_parameters(config)
+
+        # state tomography
+        self.perform_state_tomography = config.get(
+            'Generate state tomography postpulse', False)
+        self._state_tomography.set_parameters(config)
+
+
+class SequenceToWaveforms:
+    def __init__(self, n_qubit=5):
+        self.n_qubit = n_qubit
+        self.dt = 10E-9
+        self.local_xy = True
+        self.simultaneous_pulses = True
+
+        # waveform parameter
+        self.sample_rate = 1.2E9
+        self.n_pts = 240E3
+        self.first_delay = 100E-9
+        self.trim_to_sequence = True
+        self.align_to_end = False
+
+        self.sequences = []
+        self.qubits = [Qubit() for n in range(MAX_QUBIT)]
+
+        # waveforms
+        self._wave_xy = [np.zeros(0, dtype=np.complex)
+                         for n in range(MAX_QUBIT)]
+        self._wave_z = [np.zeros(0) for n in range(MAX_QUBIT)]
+        self._wave_gate = [np.zeros(0) for n in range(MAX_QUBIT)]
+
+        # waveform delays
+        self.wave_xy_delays = np.zeros(MAX_QUBIT)
+        self.wave_z_delays = np.zeros(MAX_QUBIT)
+
+        # define pulses
+        self.pulses_1qb_xy = [Pulse() for n in range(MAX_QUBIT)]
+        self.pulses_1qb_z = [Pulse() for n in range(MAX_QUBIT)]
+        self.pulses_2qb = [Pulse() for n in range(MAX_QUBIT - 1)]
+        self.pulses_readout = [Pulse(pulse_type=PulseType.READOUT)
+                               for n in range(MAX_QUBIT)]
+
+        # cross-talk
+        self.compensate_crosstalk = False
+        self._crosstalk = Crosstalk()
+
+        # predistortion
+        self.perform_predistortion = False
+        self._predistortions = [Predistortion(n) for n in range(MAX_QUBIT)]
+        self._predistortions_z = [
+            ExponentialPredistortion(n) for n in range(MAX_QUBIT)]
+
+        # gate switch waveform
+        self.generate_gate_switch = False
+        self.uniform_gate = False
+        self.gate_delay = 0.0
+        self.gate_overlap = 20E-9
+        self.minimal_gate_time = 20E-9
+
+        # readout trig settings
+        self.readout_trig_generate = False
+
+        # readout wave object and settings
+        self.readout = Readout(max_qubit=MAX_QUBIT)
+        self.readout_trig = np.array([], dtype=float)
+        self.readout_iq = np.array([], dtype=np.complex)
+
+    def get_waveforms(self, sequences, config):
+        self.sequences = sequences
+        self._seperate_gates()
+
+        self._add_timings()
+        self._init_waveforms()
+
+        if self.align_to_end:
+            shift = self._round((self.n_pts - 2) / self.sample_rate -
+                                self.sequences[-1].t_end)
+            for step in self.sequences:
+                step.time_shift(shift)
+
+        self._perform_virtual_z()
+        self._generate_waveforms()
+        # collapse all xy pulses to one waveform if no local XY control
+        if not self.local_xy:
+            # sum all waveforms to first one
+            self._wave_xy[0] = np.sum(self._wave_xy[:self.n_qubit], 0)
+            # clear other waveforms
+            for n in range(1, self.n_qubit):
+                self._wave_xy[n][:] = 0.0
+
+        self._perform_crosstalk_compensation()
+        self._predistort_waveforms()
+        self._add_readout_trig(config)
+        self._add_microwave_gate(config)
+
+        # Apply offsets
+        self.readout_iq += self.readout_i_offset + 1j * self.readout_q_offset
+
+        # create and return dictionary with waveforms
+        waveforms = dict()
+        waveforms['xy'] = self._wave_xy
+        waveforms['z'] = self._wave_z
+        waveforms['gate'] = self._wave_gate
+        waveforms['readout_trig'] = self.readout_trig
+        waveforms['readout_iq'] = self.readout_iq
+        return waveforms
+
+    def _seperate_gates(self):
+        if not self.simultaneous_pulses:
+            new_sequences = []
+            for step in self.sequences:
+                for i, gate in enumerate(step.gates):
+                    if gate is not None:
+                        new_step = Step(n_qubit=step.n_qubit, t0=step.t0,
+                                        dt=step.dt, align=step.align)
+                        new_step.add_gate(i, gate)
+                        new_sequences.append(new_step)
+            self.sequences = new_sequences
+
+        # Replace any missing gates with I
         for step in self.sequences:
-            for qubit, gate in enumerate(step.gates):
-                # Virtual Z gate is special since it has no waveform
-                if isinstance(gate, VirtualZGate):
-                    continue
-                # Get the corresponding pulse
-                if isinstance(gate, IdentityGate):
-                    pulse = copy(self.pulses_1qb_xy[qubit])
-                    # Force no drag prevents a bug for short I gates
-                    pulse.use_drag = False
-                elif isinstance(gate, SingleQubitRotation):
-                    if gate.axis in ('X', 'Y'):
-                        pulse = copy(self.pulses_1qb_xy[qubit])
-                    elif gate.axis == 'Z':
-                        pulse = self.pulses_1qb_z[qubit]
-                elif isinstance(gate, TwoQubitGate):
-                    pulse = copy(self.pulses_2qb[qubit])
-                elif isinstance(gate, ReadoutGate):
-                    pulse = copy(self.pulses_readout[qubit])
-                elif isinstance(gate, CustomGate):
-                    pulse = copy(gate.pulse)
-                else:
-                    raise ValueError(
-                        'Please provide a pulse for this gate type.')
-                if pulse.pulse_type == PulseType.Z:
-                    waveform = self._wave_z[qubit]
-                    delay = self.wave_z_delays[qubit]
-                elif pulse.pulse_type == PulseType.XY:
-                    waveform = self._wave_xy[qubit]
-                    delay = self.wave_xy_delays[qubit]
-                elif pulse.pulse_type == PulseType.READOUT:
-                    waveform = self.readout_iq
-                    delay = 0
+            for i, gate in enumerate(step.gates):
+                if gate is None:
+                    step.gates[i] = Gate.I.value
 
-                # get the range of indices in use
-                start = self._round(step.t_start + delay)
-                middle = self._round(step.t_middle + delay)
-                end = self._round(step.t_end + delay)
-                indices = np.arange(
-                    max(np.floor(start * self.sample_rate), 0),
-                    min(np.ceil(end * self.sample_rate), self.n_pts),
-                    dtype=int
-                )
-                # return directly if no indices
-                if len(indices) == 0:
-                    continue
+    def _add_timings(self):
+        for step in self.sequences:
+            if step.dt is None and step.t0 is None:
+                # Use global pulse spacing
+                step.dt = self.dt
 
-                # calculate time values for the pulse indices
-                t = indices / self.sample_rate
-                max_duration = end - start
-                if step.align == 'center':
-                    t0 = middle
-                elif step.align == 'left':
-                    t0 = middle - (max_duration - pulse.total_duration()) / 2
-                elif step.align == 'right':
-                    t0 = middle + (max_duration - pulse.total_duration()) / 2
-                # calculate the pulse waveform for the selected indices
-                waveform[indices] += gate.get_waveform(pulse, t0, t)
+        t_start = self.first_delay - self.sequences[0].dt
 
-    def _add_process_tomography(self):
-        """Add process tomography gates to the beginning of the waveforms."""
-        if not self.perform_process_tomography:
-            return
+        # Longest pulse in the step needed for correct timing
+        for step in self.sequences:
+            max_duration = -np.inf
+            for q, g in enumerate(step.gates):
+                pulse = self._get_pulse_for_gate(q, g)
+                if pulse is not None:
+                    duration = pulse.total_duration()
+                if duration > max_duration:
+                    max_duration = duration
+            if step.t0 is None:
+                step.t_start = t_start + step.dt
+            else:
+                step.t_start = step.t0 - max_duration / 2
+            step.t_start = self._round(step.t_start)
+            step.t_end = self._round(step.t_start + max_duration)
+            step.t_middle = step.t_start + max_duration / 2
+            t_start = step.t_end
 
-        self._process_tomography.add_pulses(self)
+        # Make sure that the sequence is sorted chronologically.
+        self.sequences.sort(key=lambda x: x.t_end)
 
-    # TODO rename state tomography
-    def _add_state_tomography(self):
-        """Add tomography pulses at the end of the qubit xy waveforms."""
-        if not self.perform_state_tomography:
-            return
-        # Add pulses
-        self._state_tomography.add_pulses(self)
+    def _get_pulse_for_gate(self, qubit, gate):
+        # Virtual Z is special since it has no length
+        if isinstance(gate, VirtualZGate):
+            pulse = None
+        # Get the corresponding pulse for other gates
+        elif isinstance(gate, SingleQubitRotation):
+            if gate.axis in ('X', 'Y'):
+                pulse = self.pulses_1qb_xy[qubit]
+            elif gate.axis == 'Z':
+                pulse = self.pulses_1qb_z[qubit]
+        elif isinstance(gate, IdentityGate):
+            if gate.width is None:
+                pulse = copy(self.pulses_1qb_xy[qubit])
+            else:
+                pulse = copy(self.pulses_1qb_xy[qubit])
+                pulse.width = gate.width
+        elif isinstance(gate, TwoQubitGate):
+            pulse = self.pulses_2qb[qubit]
+        elif isinstance(gate, ReadoutGate):
+            pulse = self.pulses_readout[qubit]
+        elif isinstance(gate, CustomGate):
+            pulse = gate.pulse
+        else:
+            raise ValueError('Please provide a pulse for {}'.format(gate))
+
+        return pulse
 
     def _predistort_waveforms(self):
         """Pre-distort the waveforms."""
@@ -782,14 +616,6 @@ class Sequence:
                     continue
                 if not isinstance(gate, ReadoutGate):
                     step.gates[qubit] = gate.add_phase(phase)
-
-    def _add_readout(self):
-        """Create read-out waveform at the end of the sequence."""
-        if self.readout_delay > 0:
-            delay = IdentityGate(width=self.readout_delay)
-            self.add_gate_to_all(delay, dt=0, simultaneous=True)
-        self.add_gate_to_all(ReadoutGate(), dt=0, align='left',
-                             simultaneous=True)
 
     def _add_microwave_gate(self, config):
         """Create waveform for gating microwave switch."""
@@ -868,6 +694,8 @@ class Sequence:
 
     def _add_readout_trig(self, config):
         """Create waveform for readout trigger."""
+        if not self.readout_trig_generate:
+            return
         trig = np.zeros_like(self.readout_iq)
         start = (np.abs(self.readout_iq) > 0.0).nonzero()[0][0]
         end = int(np.min((start +
@@ -879,6 +707,77 @@ class Sequence:
         trig[0] = 0.0
         trig[-1] = 0.0
         self.readout_trig = trig
+
+    def _init_waveforms(self):
+        """Initialize waveforms according to sequence settings."""
+        # To keep the first pulse delay, use the smallest delay as reference.
+        min_delay = np.min([self.wave_xy_delays[:self.n_qubit],
+                            self.wave_z_delays[:self.n_qubit]])
+        self.wave_xy_delays -= min_delay
+        self.wave_z_delays -= min_delay
+        max_delay = np.max([self.wave_xy_delays[:self.n_qubit],
+                            self.wave_z_delays[:self.n_qubit]])
+        # create empty waveforms of the correct size
+        end = self.sequences[-1].t_end + max_delay
+        if self.trim_to_sequence:
+            self.n_pts = int(np.ceil(end * self.sample_rate)) + 1
+            if self.n_pts % 2 == 1:
+                # Odd n_pts give spectral leakage in FFT
+                self.n_pts += 1
+        for n in range(self.n_qubit):
+            self._wave_xy[n] = np.zeros(self.n_pts, dtype=np.complex)
+            self._wave_z[n] = np.zeros(self.n_pts, dtype=float)
+            self._wave_gate[n] = np.zeros(self.n_pts, dtype=float)
+
+        # Waveform time vector
+        self.t = np.arange(self.n_pts) / self.sample_rate
+        # readout trig
+        self.readout_trig = np.zeros(self.n_pts, dtype=float)
+        # readout i/q waveform
+        self.readout_iq = np.zeros(self.n_pts, dtype=np.complex)
+
+    def _generate_waveforms(self):
+        """Generate the waveforms corresponding to the sequence."""
+        for step in self.sequences:
+            for qubit, gate in enumerate(step.gates):
+                pulse = self._get_pulse_for_gate(qubit, gate)
+                log.log(30, '{} has pulse {}'.format(gate, pulse))
+                if pulse is None:
+                    continue
+                if pulse.pulse_type == PulseType.Z:
+                    waveform = self._wave_z[qubit]
+                    delay = self.wave_z_delays[qubit]
+                elif pulse.pulse_type == PulseType.XY:
+                    waveform = self._wave_xy[qubit]
+                    delay = self.wave_xy_delays[qubit]
+                elif pulse.pulse_type == PulseType.READOUT:
+                    waveform = self.readout_iq
+                    delay = 0
+
+                # get the range of indices in use
+                start = self._round(step.t_start + delay)
+                middle = self._round(step.t_middle + delay)
+                end = self._round(step.t_end + delay)
+                indices = np.arange(
+                    max(np.floor(start * self.sample_rate), 0),
+                    min(np.ceil(end * self.sample_rate), self.n_pts),
+                    dtype=int
+                )
+                # return directly if no indices
+                if len(indices) == 0:
+                    continue
+
+                # calculate time values for the pulse indices
+                t = indices / self.sample_rate
+                max_duration = end - start
+                if step.align == 'center':
+                    t0 = middle
+                elif step.align == 'left':
+                    t0 = middle - (max_duration - pulse.total_duration()) / 2
+                elif step.align == 'right':
+                    t0 = middle + (max_duration - pulse.total_duration()) / 2
+                # calculate the pulse waveform for the selected indices
+                waveform[indices] += gate.get_waveform(pulse, t0, t)
 
     def set_parameters(self, config={}):
         """Set base parameters using config from from Labber driver.
@@ -1023,15 +922,6 @@ class Sequence:
                 pulse.amplitude = config.get('Amplitude, 2QB' + s)
         Gate.CZ.value.new_angles(config.get('QB1 Phi 2QB #12'),
                                  config.get('QB2 Phi 2QB #12'))
-        # process tomography prepulses
-        self.perform_process_tomography = \
-            config.get('Generate process tomography prepulse', False)
-        self._process_tomography.set_parameters(config)
-
-        # tomography
-        self.perform_state_tomography = config.get(
-            'Generate tomography postpulse', False)
-        self._state_tomography.set_parameters(config)
 
         # predistortion
         self.perform_predistortion = config.get('Predistort waveforms', False)
@@ -1058,7 +948,6 @@ class Sequence:
         # readout
         self.readout_match_main_size = config.get(
             'Match main sequence waveform size')
-        self.readout_delay = config.get('Readout delay')
         self.readout_i_offset = config.get('Readout offset - I')
         self.readout_q_offset = config.get('Readout offset - Q')
         self.readout_trig_generate = config.get('Generate readout trig')

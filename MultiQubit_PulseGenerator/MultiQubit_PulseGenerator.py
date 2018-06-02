@@ -8,6 +8,7 @@ import numpy as np
 from BaseDriver import LabberDriver
 from sequence_builtin import CPMG, PulseTrain, Rabi
 from sequence_rb import SingleQubit_RB, TwoQubit_RB
+from sequence import SequenceToWaveforms
 
 # dictionary with built-in sequences
 SEQUENCES = {'Rabi': Rabi,
@@ -25,7 +26,8 @@ class Driver(LabberDriver):
         """Perform the operation of opening the instrument connection."""
         # init variables
         self.sequence = None
-        self.values = {}
+        self.sequence_to_waveforms = SequenceToWaveforms()
+        self.waveforms = {}
         # always create a sequence at startup
         name = self.getValue('Sequence')
         self.sendValueToOther('Sequence', name)
@@ -81,6 +83,7 @@ class Driver(LabberDriver):
                 # update sequence object with current driver configuation
                 config = self.instrCfg.getValuesDict()
                 self.sequence.set_parameters(config)
+                self.sequence_to_waveforms.set_parameters(config)
             # get qubit index and waveforms
             n = int(quant.name.split(', QB')[1]) - 1
             demod_iq = self.getValue('Demodulation - IQ')
@@ -92,10 +95,11 @@ class Driver(LabberDriver):
             ref = self.getValue('Demodulation - Reference')
             # perform demodulation
             if demod_iq:
-                value = self.sequence.readout.demodulate_iq(
+                value = self.sequence_to_waveforms.readout.demodulate_iq(
                     n, signal_i, signal_q, ref)
             else:
-                value = self.sequence.readout.demodulate(n, signal, ref)
+                value = self.sequence_to_waveforms.readout.demodulate(
+                    n, signal, ref)
             # average values if not single-shot
             if not quant.name.startswith('Single-shot, QB'):
                 value = np.mean(value)
@@ -106,8 +110,10 @@ class Driver(LabberDriver):
                 # update sequence object with current driver configuation
                 config = self.instrCfg.getValuesDict()
                 self.sequence.set_parameters(config)
+                self.sequence_to_waveforms.set_parameters(config)
                 # calcluate waveforms
-                self.values = self.sequence.calculate_waveforms(config)
+                self.waveforms = self.sequence_to_waveforms.get_waveforms(
+                    self.sequence.get_sequence(config), config)
             # get correct data from waveforms stored in memory
             value = self.getWaveformFromMemory(quant)
         else:
@@ -125,28 +131,28 @@ class Driver(LabberDriver):
             # get correct vector
             if name == 'Trace - I':
                 if self.getValue('Swap IQ'):
-                    value = self.values['wave_xy'][n].imag
+                    value = self.waveforms['xy'][n].imag
                 else:
-                    value = self.values['wave_xy'][n].real
+                    value = self.waveforms['xy'][n].real
             elif name == 'Trace - Q':
                 if self.getValue('Swap IQ'):
-                    value = self.values['wave_xy'][n].real
+                    value = self.waveforms['xy'][n].real
                 else:
-                    value = self.values['wave_xy'][n].imag
+                    value = self.waveforms['xy'][n].imag
             elif name == 'Trace - Z':
-                value = self.values['wave_z'][n]
+                value = self.waveforms['z'][n]
             elif name == 'Trace - G':
-                value = self.values['wave_gate'][n]
+                value = self.waveforms['gate'][n]
 
         elif quant.name == 'Trace - Readout trig':
-            value = self.values['readout_trig']
+            value = self.waveforms['readout_trig']
         elif quant.name == 'Trace - Readout I':
-            value = self.values['readout_iq'].real
+            value = self.waveforms['readout_iq'].real
         elif quant.name == 'Trace - Readout Q':
-            value = self.values['readout_iq'].imag
+            value = self.waveforms['readout_iq'].imag
 
         # return data as dict with sampling information
-        dt = 1 / self.sequence.sample_rate
+        dt = 1 / self.sequence_to_waveforms.sample_rate
         value = quant.getTraceDict(value, dt=dt)
         return value
 
