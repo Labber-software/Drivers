@@ -533,8 +533,8 @@ class SequenceToWaveforms:
             if step.dt is None and step.t0 is None:
                 # Use global pulse spacing
                 step.dt = self.dt
-
-        t_start = self.first_delay - self.sequences[0].dt
+        if self.sequences[0].t0 is None:
+            t_start = self.first_delay - self.sequences[0].dt
 
         # Longest pulse in the step needed for correct timing
         for step in self.sequences:
@@ -556,6 +556,12 @@ class SequenceToWaveforms:
 
         # Make sure that the sequence is sorted chronologically.
         self.sequences.sort(key=lambda x: x.t_end)
+
+        # Make sure that the sequnce start on first delay
+        time_diff = self._round(self.first_delay-self.sequences[0].t_start)
+        if np.abs(time_diff) > 1e-10:
+            for step in self.sequences:
+                step.time_shift(time_diff)
 
     def _get_pulse_for_gate(self, qubit, gate):
         # Virtual Z is special since it has no length
@@ -741,7 +747,6 @@ class SequenceToWaveforms:
         for step in self.sequences:
             for qubit, gate in enumerate(step.gates):
                 pulse = self._get_pulse_for_gate(qubit, gate)
-                log.log(30, '{} has pulse {}'.format(gate, pulse))
                 if pulse is None:
                     continue
                 if pulse.pulse_type == PulseType.Z:
