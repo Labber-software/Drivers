@@ -96,6 +96,27 @@ class Step:
 
 
 class Sequence:
+    """A multi qubit seqence.
+
+    Parameters
+    ----------
+    n_qubit : type
+        The number of qubits in the sequence (the default is 5).
+
+    Attributes
+    ----------
+    sequences : list of :obj:`Step`
+        Holds the steps of the sequence.
+    perform_process_tomography : bool
+        Flag for performing process tomography.
+    perform_state_tomography : bool
+        Flag for performing state tomography.
+    readout_delay : float
+        Delay time between last pulse and readout, in seconds.
+    n_qubit
+
+    """
+
     def __init__(self, n_qubit=5):
         self.n_qubit = n_qubit
 
@@ -126,6 +147,19 @@ class Sequence:
         pass
 
     def get_sequence(self, config):
+        """Compile sequence and return it.
+
+        Parameters
+        ----------
+        config : dict
+            Labber instrument configuration.
+
+        Returns
+        -------
+        list of :obj:`Step`
+            The compiled qubit sequence.
+
+        """
         self.sequences = []
 
         if self.perform_process_tomography:
@@ -412,6 +446,44 @@ class Sequence:
 
 
 class SequenceToWaveforms:
+    """Compile a multi qubit sequence into waveforms.
+
+    Parameters
+    ----------
+    n_qubit : type
+        The maximum number of qubits (the default is 5).
+
+    Attributes
+    ----------
+    dt : float
+        Pulse spacing, in seconds.
+    local_xy : bool
+        If False, collate all waveforms into one.
+    simultaneous_pulses : bool
+        If False, seperate all pulses in time.
+    sample_rate : float
+        AWG Sample rate.
+    n_pts : float
+        Number of points in the waveforms.
+    first_delay : float
+        Delay between start of waveform and start of the first pulse.
+    trim_to_sequence : bool
+        If True, adjust `n_points` to just fit the sequence.
+    align_to_end : bool
+        Align the whole sequence to the end of the waveforms.
+        Only relevant if `trim_to_sequence` is False.
+    sequences : list of :obj:`Step`
+        The qubit sequences.
+    qubits : list of :obj:`Qubit`
+        Parameters of each qubit.
+    wave_xy_delays : list of float
+        Indiviudal delays for the XY waveforms.
+    wave_z_delays : list of float
+        Indiviudal delays for the Z waveforms.
+    n_qubit
+
+    """
+
     def __init__(self, n_qubit=5):
         self.n_qubit = n_qubit
         self.dt = 10E-9
@@ -470,7 +542,20 @@ class SequenceToWaveforms:
         self.readout_trig = np.array([], dtype=float)
         self.readout_iq = np.array([], dtype=np.complex)
 
-    def get_waveforms(self, sequences, config):
+    def get_waveforms(self, sequences):
+        """Compile the given sequence into waveforms.
+
+        Parameters
+        ----------
+        sequences : list of :obj:`Step`
+            The qubit sequence to be compiled.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         self.sequences = sequences
         self._seperate_gates()
 
@@ -495,8 +580,8 @@ class SequenceToWaveforms:
 
         self._perform_crosstalk_compensation()
         self._predistort_waveforms()
-        self._add_readout_trig(config)
-        self._add_microwave_gate(config)
+        self._add_readout_trig()
+        self._add_microwave_gate()
 
         # Apply offsets
         self.readout_iq += self.readout_i_offset + 1j * self.readout_q_offset
@@ -623,7 +708,7 @@ class SequenceToWaveforms:
                 if not isinstance(gate, ReadoutGate):
                     step.gates[qubit] = gate.add_phase(phase)
 
-    def _add_microwave_gate(self, config):
+    def _add_microwave_gate(self):
         """Create waveform for gating microwave switch."""
         if not self.generate_gate_switch:
             return
@@ -635,7 +720,7 @@ class SequenceToWaveforms:
                 gate = np.ones_like(wave)
                 # if creating readout trig, turn off gate during readout
                 if self.readout_trig_generate:
-                    gate[-int((config.get('Readout trig duration') -
+                    gate[-int((self.readout_trig_duration -
                                self.gate_overlap -
                                self.gate_delay) * self.sample_rate):] = 0.0
             else:
@@ -698,7 +783,7 @@ class SequenceToWaveforms:
         """
         return int(np.round(t / acc)) * acc
 
-    def _add_readout_trig(self, config):
+    def _add_readout_trig(self):
         """Create waveform for readout trigger."""
         if not self.readout_trig_generate:
             return

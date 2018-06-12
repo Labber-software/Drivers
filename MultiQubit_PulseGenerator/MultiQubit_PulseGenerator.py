@@ -113,7 +113,7 @@ class Driver(LabberDriver):
                 self.sequence_to_waveforms.set_parameters(config)
                 # calcluate waveforms
                 self.waveforms = self.sequence_to_waveforms.get_waveforms(
-                    self.sequence.get_sequence(config), config)
+                    self.sequence.get_sequence(config))
             # get correct data from waveforms stored in memory
             value = self.getWaveformFromMemory(quant)
         else:
