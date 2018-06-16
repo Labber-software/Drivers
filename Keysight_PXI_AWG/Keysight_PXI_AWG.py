@@ -2,16 +2,22 @@
 import sys
 from BaseDriver import LabberDriver, Error, IdError
 import numpy as np
-import os
-sys.path.append('C:\Program Files (x86)\Keysight\SD1\Libraries\Python')
+sys.path.append('C:\\Program Files (x86)\\Keysight\\SD1\\Libraries\\Python')
 import keysightSD1
 
+
+class UploadFailed(Error):
+    """Handling AWG out-of-memory exception"""
+    pass
 
 class Driver(LabberDriver):
     """Keysigh PXI AWG"""
 
     def performOpen(self, options={}):
         """Perform the operation of opening the instrument connection"""
+        # add compatibility with pre-1.5.4 version of Labber
+        if not hasattr(self, 'getTrigChannel'):
+            self.getTrigChannel = self._getTrigChannel
         # timeout
         self.timeout_ms = int(1000 * self.dComCfg['Timeout'])
         # get PXI chassis
@@ -51,7 +57,10 @@ class Driver(LabberDriver):
             self.dt = 2E-9
             self.nCh = 4
         # keep track of if waveform was updated
-        self.lWaveUpdated = [False]*self.nCh
+        self.waveform_updated = [False] * self.nCh
+        self.previous_upload = {n: np.array([]) for n in range(self.nCh)}
+        self.waveform_sizes = dict()
+
         # get hardware version - changes numbering of channels
         hw_version = self.AWG.getHardwareVersion()
         if hw_version >= 4:
@@ -62,18 +71,13 @@ class Driver(LabberDriver):
             self.ch_index_zero = 0
 
         # clear old waveforms
-        self.AWG.waveformFlush()
+        self.clearOldWaveforms()
 
-        # Create and open HVI for internal triggering
-        self.HVI = keysightSD1.SD_HVI()
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        self.HVI.open(os.path.join(dir_path, 'InternalTrigger.HVI'))
-        self.HVI.assignHardwareWithIndexAndSlot(0, self.chassis,
-                                                int(self.comCfg.address))
 
     def getHwCh(self, n):
         """Get hardware channel number for channel n. n starts at 0"""
         return n + self.ch_index_zero
+
 
     def performClose(self, bError=False, options={}):
         """Perform the close instrument connection operation"""
@@ -82,198 +86,323 @@ class Driver(LabberDriver):
             # clear old waveforms and stop awg
             self.AWG.waveformFlush()
             for ch in range(self.nCh):
-                self.AWG.AWGflush(self.getHwCh(ch))
                 self.AWG.AWGstop(self.getHwCh(ch))
+                self.AWG.AWGflush(self.getHwCh(ch))
                 self.AWG.channelWaveShape(self.getHwCh(ch), -1)
-                
+
             # close instrument
             self.AWG.close()
-            self.HVI.stop()
-            self.HVI.close()
-        except:
+        except Exception:
             # never return error here
             pass
+
+
+    def initSetConfig(self):
+        """This function is run before setting values in Set Config"""
+        # clear AWG memory
+        self.clearOldWaveforms()
+        # clear waveforms
+        for n in range(self.nCh):
+            self.setValue('Ch%d - Waveform' % (n + 1), [])
+
+
+    def performArm(self, quant_names, options={}):
+        """Perform the instrument arm operation"""
+        # restart AWG to make sure queue is at first element
+        channel_mask = self.getEnabledChannelsMask()
+        self.AWG.AWGstopMultiple(channel_mask)
+        # don't start AWG if trig channel is "Run", which will start it later
+        if self.getTrigChannel(options) != 'Run':
+            self.AWG.AWGstartMultiple(channel_mask)
+        # wait a ms to allow AWG to start
+        self.wait(0.001)
+
 
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
         """Perform the Set Value instrument operation. This function should
         return the actual value set by the instrument"""
         if self.isFirstCall(options):
-            self.lWaveUpdated = [False]*self.nCh
-            # Stop all channels
-            self.AWG.AWGstopMultiple(int(2**self.nCh - 1))
-        # start with setting current quant value
+            self.waveform_updated = [False] * self.nCh
+        # set current value, necessary since we later use getValue to get config
         quant.setValue(value)
+
         # check if channel-specific, if so get channel + name
         if quant.name.startswith('Ch') and len(quant.name) > 6:
             ch = int(quant.name[2]) - 1
             name = quant.name[6:]
         else:
             ch, name = None, ''
+
         # proceed depending on command
         if quant.name in ('Trig I/O',):
             # get direction and sync from index of comboboxes
             direction = int(self.getCmdStringFromValue('Trig I/O'))
             self.AWG.triggerIOconfig(direction)
+
         elif quant.name == 'Run':
-            self.AWG.AWGstartMultiple(self.getEnabledChannelsMask())
-        elif quant.name in ('Generate internal trigger',
-                            'Internal trigger time'):
-            if self.getValue('Generate internal trigger'):
-                self.HVI.stop()
-                # Update and start HVI
-                # 110ns delay in HVI
-                wait = round(self.getValue('Internal trigger time')/10e-9)-11
-                self.HVI.writeIntegerConstantWithIndex(0, 'Wait time', wait)
-                self.HVI.compile()
-                self.HVI.load()
-                self.HVI.start()
+            # start if value is True or not given, else stop
+            if value is None or value:
+                self.AWG.AWGstartMultiple(self.getEnabledChannelsMask())
+            else:
+                self.AWG.AWGstopMultiple(self.getEnabledChannelsMask())
+
+        elif quant.name in ('Trig All',):
+            if value:
+                # mask to trig all AWG channels
+                nMask = int(2**self.nCh - 1)
+                self.AWG.AWGtriggerMultiple(nMask)
 
         elif name in ('Function', 'Enabled'):
             if self.getChannelValue(ch, 'Enabled'):
                 func = int(self.getChannelCmd(ch, 'Function'))
                 # set channel as updated if AWG mode
                 if func == 6:
-                    self.lWaveUpdated[ch] = True
+                    self.waveform_updated[ch] = True
             else:
                 func = -1
                 self.AWG.AWGstop(self.getHwCh(ch))
+            # turn off amplitude if in DC mode
+            if self.getChannelValue(ch, 'Function') == 'DC':
+                self.sendValueToOther('Ch%d - Amplitude' % (ch + 1), 0.0)
+
             self.AWG.channelWaveShape(self.getHwCh(ch), func)
+
         elif name == 'Amplitude':
             self.AWG.channelAmplitude(self.getHwCh(ch), value)
             # if in AWG mode, update waveform to scale to new range
             if self.getChannelValue(ch, 'Function') == 'AWG':
-                self.lWaveUpdated[ch] = True
+                self.waveform_updated[ch] = True
+
         elif name == 'Frequency':
             self.AWG.channelFrequency(self.getHwCh(ch), value)
+
         elif name == 'Phase':
             self.AWG.channelPhase(self.getHwCh(ch), value)
+
         elif name == 'Offset':
             self.AWG.channelOffset(self.getHwCh(ch), value)
+
         elif name in ('Trig mode', 'Cycles', 'Waveform'):
-            # mark wavefom as updated, so that it gets re-uploaded
-            self.lWaveUpdated[ch] = True
+            # mark waveform as updated, so that it gets re-uploaded
+            self.waveform_updated[ch] = True
+
+        elif name.startswith('Marker'):
+            # marker changed, wavefom needs to be re-uploaded
+            self.waveform_updated[ch] = True
+
         elif name in ('External Trig Source', 'External Trig Config'):
-            sync = int(self.getCmdStringFromValue('Trig Sync Mode'))
+            # configure external trigger mdde
+            self.configureExternalTrigger(ch)
+
+        elif quant.name == 'Trig Sync Mode':
+            # re-configure triggers for all channels
             for ch in range(self.nCh):
-                # check if external trigger is used
-                if self.getChannelValue(ch, 'Trig mode') in ('External', 'Software'):
-                    extSource = int(self.getChannelCmd(ch, 'External Trig Source'))
-                    trigBehavior = int(self.getChannelCmd(ch, 'External Trig Config'))
-                    self.AWG.AWGtriggerExternalConfig(self.getHwCh(ch),
-                                                      extSource,
-                                                      trigBehavior,
-                                                      sync)
+                self.configureExternalTrigger(ch)
+
         # For effiency, we only upload the waveform at the final call
-        if self.isFinalCall(options):
-            seq_no, n_seq = self.getHardwareLoopIndex(options)
-            if np.any(self.lWaveUpdated):
+        if self.isFinalCall(options) and np.any(self.waveform_updated):
+            # get list of AWG channels in use
+            awg_channels = self.getAWGChannelsInUse()
+
+            # do different uploading depending on normal or hardware loop
+            if self.isHardwareLoop(options):
+                seq_no, n_seq = self.getHardwareLoopIndex(options)
                 # Reset waveform ID counter if this is the first sequence
                 if seq_no == 0:
-                    self.i = 1  # WaveformID counter
-                    self.AWG.waveformFlush()
+                    self.waveform_counter = 0  # WaveformID counter
+                    self.clearOldWaveforms()
+                # report status
+                self.reportStatus(
+                    'Sending waveform (%d/%d)' % (seq_no + 1, n_seq))
 
-            for ch, updated in enumerate(self.lWaveUpdated):
-                if updated:
-                    if seq_no == 0:
-                        # Flush the AWG memory if this is the first sequence
-                        self.AWG.AWGflush(self.getHwCh(ch))
-                    if self.isHardwareLoop(options):
-                        self.reportStatus('Sending waveform (%d/%d)'
-                                          % (seq_no+1, n_seq))
-                    self.sendWaveform(ch, self.i)
-                    self.i += 1
+                # always upload all channels in use, regardless of updated
+                for ch in awg_channels:
+                    # waveform counter is unique id
+                    self.sendWaveform(ch, self.waveform_counter)
+                    self.queueWaveform(ch, self.waveform_counter)
+                    # configure channel-specific markers
+                    self.configureMarker(ch)
+                    # configure queue to run in cyclic mode
+                    self.AWG.AWGqueueConfig(self.getHwCh(ch), 1)
+                    self.waveform_counter += 1
 
+            else:
+                # standard, non-hardware loop upload, stop all
+                self.AWG.AWGstopMultiple(self.getEnabledChannelsMask())
+                # try to upload and queue
+                try:
+                    self.uploadAndQueueWaveforms()
+                except UploadFailed:
+                    # if upload fail, flush and try again (may be out of memory)
+                    self.log('Upload failed, flushing old waveforms!')
+                    self.clearOldWaveforms()
+                    self.uploadAndQueueWaveforms()
 
-            # Configure channel specific markers
-            for ch in range(self.nCh):
-                markerMode = int(self.getChannelCmd(ch, 'Marker Mode'))
-                trgPXImask = 0
-                trgIOmask = 1 if self.getChannelValue(ch, 'Marker External') else 0
-                markerValue = int(self.getChannelCmd(ch, 'Marker Value'))
-                syncMode = int(self.getChannelCmd(ch, 'Marker Sync Mode'))
-                length = int(round(self.getChannelValue(ch, 'Marker Length')/10e-9))
-                delay = int(round(self.getChannelValue(ch, 'Marker Delay')/10e-9))
+                # don't start AWG if hardware trig, will be done when arming
+                if not self.isHardwareTrig(options):
+                    self.AWG.AWGstartMultiple(self.getEnabledChannelsMask())
 
-                for i in range(8):
-                    if self.getChannelValue(ch, 'Marker PXI%d' % i):
-                        trgPXImask += 2**i
-                self.AWG.AWGqueueMarkerConfig(nAWG=self.getHwCh(ch),
-                                              markerMode=markerMode,
-                                              trgPXImask=trgPXImask,
-                                              trgIOmask=trgIOmask,
-                                              value=markerValue,
-                                              syncMode=syncMode,
-                                              length=length,
-                                              delay=delay)
-                self.AWG.AWGqueueConfig(self.getHwCh(ch), 1) # Cyclic mode
-
-            # In hardware trigger mode, outputs are turned on by the run button
-            if not self.isHardwareTrig(options):
-                self.AWG.AWGstartMultiple(self.getEnabledChannelsMask())
         return value
 
-    def performArm(self, quant_names, options={}):
-        """Perform the instrument arm operation"""
-        # Stop all channels
-        self.AWG.AWGstopMultiple(int(2**self.nCh - 1))
+
+    def configureExternalTrigger(self, ch):
+        """Configure external trig for given channel"""
+        # get parameters
+        extSource = int(self.getChannelCmd(ch, 'External Trig Source'))
+        trigBehavior = int(self.getChannelCmd(ch, 'External Trig Config'))
+        sync = int(self.getCmdStringFromValue('Trig Sync Mode'))
+        self.AWG.AWGtriggerExternalConfig(
+            self.getHwCh(ch), extSource, trigBehavior, sync)
+
+
+    def clearOldWaveforms(self):
+        """Flush AWG queue and remove all cached waveforms"""
+        self.AWG.waveformFlush()
+        self.previous_upload = {n: np.array([]) for n in range(self.nCh)}
+        self.waveform_sizes = dict()
+
+
+    def uploadAndQueueWaveforms(self):
+        """Upload and queue waveforms for all channels in use"""
+        awg_channels = self.getAWGChannelsInUse()
+        for ch in awg_channels:
+            # flush queue
+            self.AWG.AWGflush(self.getHwCh(ch))
+            # waveform counter is unique id
+            self.sendWaveform(ch, waveform_id=ch)
+            self.queueWaveform(ch, waveform_id=ch)
+            # configure channel-specific markers
+            self.configureMarker(ch)
+            # configure queue to run in cyclic mode
+            self.AWG.AWGqueueConfig(self.getHwCh(ch), 1)
+
+
+    def getAWGChannelsInUse(self):
+        """Get list with all AWG channels in use"""
+        awg_channels = []
+        for ch in range(self.nCh):
+            if (self.getChannelValue(ch, 'Enabled') and
+                    self.getChannelValue(ch, 'Function') == 'AWG'):
+                awg_channels.append(ch)
+        return awg_channels
+
 
     def getEnabledChannelsMask(self):
         """ Returns a mask for the enabled channels """
         mask = 0
-        for ch in range(self.nCh):
-            if self.getValue('Ch%d - Enabled' % (ch + 1)):
-                        func = int(self.getChannelCmd(ch, 'Function'))
-                        # start AWG if AWG mode
-                        if func == 6:
-                            mask += 2**ch
+        for ch in self.getAWGChannelsInUse():
+            mask += 2**ch
         return int(mask)
 
-    def sendWaveform(self, ch, i):
+
+    def sendWaveform(self, ch, waveform_id):
         """Send waveform to AWG channel"""
+        # get data
+        data = self.getValueArray('Ch%d - Waveform' % (ch + 1))
+        # make sure we have at least 30 elements
+        if len(data) < 30:
+            # pad start or end, depending on trig alignment
+            if self.getValue('Waveform alignment') == 'Start at trig':
+                data = np.pad(data, (0, 30 - len(data)), 'constant')
+            else:
+                data = np.pad(data, (30 - len(data), 0), 'constant')
+        # granularity of the awg is 10
+        if len(data) % 10 > 0:
+            # pad start or end, depending on trig alignment
+            if self.getValue('Waveform alignment') == 'Start at trig':
+                data = np.pad(data, (0, 10 - (len(data) % 10)), 'constant')
+            else:
+                data = np.pad(data, (10 - (len(data) % 10), 0), 'constant')
+        # scale to range
+        amp = self.getChannelValue(ch, 'Amplitude')
+        data_norm = data / amp
+        data_norm = np.clip(data_norm, -1.0, 1.0, out=data_norm)
 
+        # check if data changed compared to last upload
+        if waveform_id in self.previous_upload:
+            if np.array_equal(data_norm, self.previous_upload[waveform_id]):
+                # data has not changed, no need to upload
+                return
+            # data has changed, update previous value
+            self.previous_upload[waveform_id] = data_norm
+
+        # keep track of waveform lengths
+        self.waveform_sizes[waveform_id] = len(data_norm)
+
+        # upload waveform
+        wave = keysightSD1.SD_Wave()
+        waveformType = 0
+        wave.newFromArrayDouble(waveformType, data_norm)
+        ret = self.AWG.waveformLoad(wave, waveform_id)
+        if ret < 0:
+            self.log('Upload error:', keysightSD1.SD_Error.getErrorMessage(ret))
+            raise UploadFailed()
+
+
+    def queueWaveform(self, ch, waveform_id):
+        """Queue waveform to AWG channel"""
+        # get trig parameters
         trigMode = int(self.getChannelCmd(ch, 'Trig mode'))
-        delay = int(0)
-
-       
-        if self.getChannelValue(ch, 'Trig mode') in ('Software',
+        if self.getChannelValue(ch, 'Trig mode') in ('Software / HVI',
                                                      'External'):
             cycles = int(self.getChannelValue(ch, 'Cycles'))
         else:
             cycles = 1
+        delay = int(round(self.getValue('Trig delay') / 10E-9))
+        # if aligning waveform to end of trig, adjust delay
+        if self.getValue('Waveform alignment') == 'End at trig':
+            delay -= round(self.waveform_sizes[waveform_id] * self.dt / 10E-9)
+            # add extra after waveform ends
+            delay -= int(round(self.getValue('Delay after end') / 10E-9))
+            # raise error if delay is negative
+            if delay < 0:
+                raise Error('"Trig delay" must be larger than waveform length')
 
         prescaler = 0
-        waveformType = 0
-        quant = self.getQuantity('Ch%d - Waveform' % (ch+1))
-        data = quant.getValueArray()
-        # make sure we have at least 30 elements
-        if len(data) < 30:
-            data = np.pad(data, (0, 30-len(data)), 'constant')
-        # granularity of the awg is 10
-        if len(data) % 10 > 0:
-            data = np.pad(data, (0, 10-(len(data) % 10)), 'constant')
-        # scale to range
-        amp = self.getChannelValue(ch, 'Amplitude')
-        dataNorm = data / amp
-        dataNorm = np.clip(dataNorm, -1.0, 1.0, out=dataNorm)
+        self.AWG.AWGqueueWaveform(self.getHwCh(ch), waveform_id, trigMode,
+                                  delay, cycles, prescaler)
 
-        self.uploadWaveform(dataNorm, waveformType, i)
-        self.AWG.AWGqueueWaveform(self.getHwCh(ch), i, trigMode, delay,
-                                  cycles, prescaler)
 
-    def uploadWaveform(self, data, waveformType, i):
-        """ Uploads the given waveform with an id i """
-        wave = keysightSD1.SD_Wave()
-        wave.newFromArrayDouble(waveformType, data)
-        self.AWG.waveformLoad(wave, i)
+    def configureMarker(self, ch):
+        """Configure marker for given channel, must be done after queueing"""
+        markerMode = int(self.getChannelCmd(ch, 'Marker Mode'))
+        trgIOmask = int(self.getChannelValue(ch, 'Marker External'))
+        markerValue = int(self.getChannelCmd(ch, 'Marker Value'))
+        syncMode = int(self.getChannelCmd(ch, 'Marker Sync Mode'))
+        length = int(round(
+            self.getChannelValue(ch, 'Marker Length') / 10e-9))
+        delay = int(round(
+            self.getChannelValue(ch, 'Marker Delay') / 10e-9))
+        # trig mask
+        trgPXImask = 0
+        for i in range(8):
+            if self.getChannelValue(ch, 'Marker PXI%d' % i):
+                trgPXImask += 2**i
+        # configure
+        self.AWG.AWGqueueMarkerConfig(nAWG=self.getHwCh(ch),
+                                      markerMode=markerMode,
+                                      trgPXImask=trgPXImask,
+                                      trgIOmask=trgIOmask,
+                                      value=markerValue,
+                                      syncMode=syncMode,
+                                      length=length,
+                                      delay=delay)
+
 
     def getChannelValue(self, ch, value):
         """ Returns a channel specific value """
-        return self.getValue('Ch{} - {}'.format(ch+1, value))
+        return self.getValue('Ch{} - {}'.format(ch + 1, value))
+
 
     def getChannelCmd(self, ch, value):
         """ Returns a channel specific command string """
-        return self.getCmdStringFromValue('Ch{} - {}'.format(ch+1, value))
+        return self.getCmdStringFromValue('Ch{} - {}'.format(ch + 1, value))
 
+
+    def _getTrigChannel(self, options):
+        """Helper function, get trig channel for instrument, or None if N/A"""
+        trig_channel = options.get('trig_channel', None)
+        return trig_channel
 
 if __name__ == '__main__':
     pass
