@@ -7,11 +7,19 @@ import numpy as np
 class Driver(VISA_Driver):
     """ This class implements the Tektronix AWG5014 driver"""
     
+    def _getTrigChannel(self, options):
+        """Helper function, get trig channel for instrument, or None if N/A"""
+        trig_channel = options.get('trig_channel', None)
+        return trig_channel
+
     def performOpen(self, options={}):
         """Perform the operation of opening the instrument connection"""
         # add compatibility with pre-python 3 version of Labber
         if not hasattr(self, 'write_raw'):
             self.write_raw = self.write
+        # add compatibility with pre-1.5.4 version of Labber
+        if not hasattr(self, 'getTrigChannel'):
+            self.getTrigChannel = self._getTrigChannel
         # start by calling the generic VISA open to make sure we have a connection
         VISA_Driver.performOpen(self, options)
         # check for strange bug by reading the status bit
@@ -93,14 +101,18 @@ class Driver(VISA_Driver):
             quant.setValue(value)
             self.bWaveUpdated = True
         elif quant.name in ('Run'):
-            self.writeAndLog(':AWGC:RUN')
-            # turn on channels again, to avoid issues when turning on/off run mode
-            sOutput = ''
-            for n, bUpdate in enumerate(self.lInUse):
-                if bUpdate:
-                    sOutput += (':OUTP%d:STAT 1;' % (n+1))
-            if sOutput != '':
-                self.writeAndLog(sOutput)
+            if value:
+                self.writeAndLog(':AWGC:RUN')
+                # turn on channels again, to avoid issues when switch run mode
+                sOutput = ''
+                for n, bUpdate in enumerate(self.lInUse):
+                    if bUpdate:
+                        sOutput += (':OUTP%d:STAT 1;' % (n + 1))
+                if sOutput != '':
+                    self.writeAndLog(sOutput)
+            else:
+                # stop AWG
+                self.writeAndLog(':AWGC:STOP;')
         else:
             # for all other cases, call VISA driver
             value = VISA_Driver.performSetValue(self, quant, value, sweepRate,
@@ -113,7 +125,13 @@ class Driver(VISA_Driver):
                 self.reportStatus('Sending waveform (%d/%d)' % (seq_no+1, n_seq))
             else:
                 seq = None
-            bStart = not self.isHardwareTrig(options)
+
+            # in trig mode, don't start AWG if trig channel will start it later
+            if ((self.isHardwareTrig(options) and
+                 self.getTrigChannel(options) == 'Run')):
+                bStart = False
+            else:
+                bStart = True
             self.sendWaveformAndStartTek(seq=seq, n_seq=n_seq, bStart=bStart)
         return value
 
