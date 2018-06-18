@@ -172,9 +172,8 @@ class Sequence:
 
         if self.readout_delay > 0:
             delay = IdentityGate(width=self.readout_delay)
-            self.add_gate_to_all(delay, dt=0, simultaneous=True)
-        self.add_gate_to_all(ReadoutGate(), dt=0, align='left',
-                             simultaneous=True)
+            self.add_gate_to_all(delay, dt=0)
+        self.add_gate_to_all(ReadoutGate(), dt=0, align='left')
 
         return self.sequences
 
@@ -244,8 +243,7 @@ class Sequence:
         else:
             self.add_gate(qubit, gate, t0, dt, 'center')
 
-    def add_gate(self, qubit, gate, t0=None, dt=None, align='center',
-                 simultaneous=None):
+    def add_gate(self, qubit, gate, t0=None, dt=None, align='center'):
         """Add a set of gates to the given qubit sequences.
 
         For the qubits with no specificied gate, an IdentityGate will be given.
@@ -291,8 +289,7 @@ class Sequence:
 
         self._add_step(qubit, gate, t0, dt, align)
 
-    def add_gate_to_all(self, gate, t0=None, dt=None, align='center',
-                        simultaneous=None):
+    def add_gate_to_all(self, gate, t0=None, dt=None, align='center'):
         """Add a single gate to all qubits.
 
         Pulses are added at the end
@@ -300,7 +297,7 @@ class Sequence:
         """
         self.add_gate([n for n in range(self.n_qubit)],
                       [gate for n in range(self.n_qubit)], t0=t0, dt=dt,
-                      align=align, simultaneous=simultaneous)
+                      align=align)
 
     def add_gates(self, gates):
         """Add multiple gates to the qubit waveform.
@@ -625,9 +622,12 @@ class SequenceToWaveforms:
         for step in self.sequences:
             max_duration = -np.inf
             for q, g in enumerate(step.gates):
-                pulse = self._get_pulse_for_gate(q, g)
-                if pulse is not None:
-                    duration = pulse.total_duration()
+                if isinstance(g, IdentityGate) and g.width is not None:
+                    duration = g.width
+                else:
+                    pulse = self._get_pulse_for_gate(q, g)
+                    if pulse is not None:
+                        duration = pulse.total_duration()
                 if duration > max_duration:
                     max_duration = duration
             if step.t0 is None:
