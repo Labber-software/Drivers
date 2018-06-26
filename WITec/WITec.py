@@ -1,6 +1,7 @@
 import InstrumentDriver
 import platform
 import comtypes as com
+from comtypes import client
 import os, sys, inspect, re, math
 
 #Some stuff to import win32gui and win32con from a relative path independent from system wide installations
@@ -19,7 +20,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         """Perform the operation of opening the instrument connection"""
         com.CoInitialize()
         try:
-            self.bucsLib = com.client.GetModule("BasicUniversalCOMServer.tlb")
+            self.bucsLib = client.GetModule("BasicUniversalCOMServer.tlb")
         except:
             raise InstrumentDriver.CommunicationError("Could not connect to WITec Control. Make sure that it is running and that remote access has been granted.")
         self.rememberWITecWindows()
@@ -94,7 +95,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             del self.IBUCSCore
         except:
             pass
-        self.IBUCSCore = com.client.CreateObject(self.bucsLib.CBUCSCore, None, platform.node(), self.bucsLib.IBUCSCore)
+        self.IBUCSCore = client.CreateObject(self.bucsLib.CBUCSCore, None, platform.node(), self.bucsLib.IBUCSCore)
         IBUCSAccess = self.IBUCSCore.QueryInterface(self.bucsLib.IBUCSAccess)
         if not IBUCSAccess.RequestWriteAccess(True):
             raise InstrumentDriver.CommunicationError("Could not get write access for WITec Control. Make sure that remote write access has been granted.")

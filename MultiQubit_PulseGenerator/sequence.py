@@ -444,7 +444,7 @@ class Sequence(object):
             return
         # get time for adding tomograph pulse
         t = self.find_range_of_sequence()[1]
-        # TODO(morten): add code to add tomography pulses
+        # Add pulses
         self.tomography.add_pulses(self, t)
 
 

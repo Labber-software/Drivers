@@ -40,21 +40,26 @@ class CPMG(Sequence):
         pi_to_q = config['Add pi pulses to Q']
         duration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
-        if self.pulses_1qb[0].shape != PulseShape.SQUARE:  # non-square pulses
+        if self.pulses_1qb[0].shape == PulseShape.GAUSSIAN:
+            # Only gaussian pulses has a truncation range
             truncation = config['Truncation range']
-        else:  # square pulses
+        else:
             truncation = 0.0
-        # center pulses in add_gates mode; ensure sufficient pulse spacing in CPMG mode
-        t0 = self.first_delay + (self.pulses_1qb[0].width*2*truncation + self.pulses_1qb[0].plateau)*0.5
+
+        max_width = np.max([p.total_duration() for p in self.pulses_1qb[:self.n_qubit]])
         # select type of refocusing pi pulse
         gate_pi = Gate.Yp if pi_to_q else Gate.Xp
 
         # add pulses for all active qubits
         for n, pulse in enumerate(self.pulses_1qb[:self.n_qubit]):
             # get effective pulse durations, for timing purposes
-            width = (2*truncation*pulse.width + pulse.plateau) if edge_to_edge else 0.0
+            width = self.pulses_1qb[n].total_duration() if edge_to_edge else 0.0
             pulse_total = width * (n_pulse + 1)
-
+            # center pulses in add_gates mode; ensure sufficient pulse spacing in CPMG mode
+            t0 = self.first_delay + self.pulses_1qb[n].total_duration()/2
+            # Align everything to the end of the last pulse of the one with the longest pulse width
+            t0 += (max_width - self.pulses_1qb[n].total_duration()) * (n_pulse + 1) if edge_to_edge else 0.0
+            t0 += (max_width - self.pulses_1qb[n].total_duration())
             # special case for -1 pulses => T1 experiment
             if n_pulse < 0:
                 # add pi pulse
@@ -83,6 +88,8 @@ class CPMG(Sequence):
             # add pi pulses, one by one
             for t in time_pi:
                 self.add_single_gate(n, gate_pi, t)
+
+
 
 
 
