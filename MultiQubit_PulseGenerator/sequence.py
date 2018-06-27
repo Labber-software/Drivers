@@ -596,6 +596,12 @@ class SequenceToWaveforms:
         if not self.simultaneous_pulses:
             new_sequences = []
             for step in self.sequences:
+                if any(isinstance(gate, (ReadoutGate, IdentityGate))
+                    for gate in step.gates):
+                    # Don't seperate I gates or readouts since we do
+                    # multiplexed readout
+                    new_sequences.append(step)
+                    continue
                 for i, gate in enumerate(step.gates):
                     if gate is not None:
                         new_step = Step(n_qubit=step.n_qubit, t0=step.t0,
