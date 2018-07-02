@@ -3,19 +3,17 @@
 import numpy as np
 from scipy.linalg import inv
 
-class Crosstalk(object):
-    """This class is used to compensate crosstalk qubit Z control
 
-    """
+class Crosstalk(object):
+    """This class is used to compensate crosstalk qubit Z control."""
 
     def __init__(self):
         # define variables
         self.matrix_path = ''
         # TODO(dan): define variables for matrix, etc
 
-
     def set_parameters(self, config={}):
-        """Set base parameters using config from from Labber driver
+        """Set base parameters using config from from Labber driver.
 
         Parameters
         ----------
@@ -25,7 +23,7 @@ class Crosstalk(object):
         """
         # return directly if not in use
         if not config.get('Compensate cross-talk'):
-            return        
+            return
         # check if cross-talk matrix has been updated
         path = config.get('Cross-talk (CT) matrix')
         # only reload if file changed
@@ -33,7 +31,8 @@ class Crosstalk(object):
             path = config.get('Cross-talk (CT) matrix')
             self.import_crosstalk_matrix(path)
 
-        dTranslate = {'One': int(1), 'Two': int(2), 'Three': int(3), 'Four': int(4), 'Five': int(5)}
+        dTranslate = {'One': int(1), 'Two': int(
+            2), 'Three': int(3), 'Four': int(4), 'Five': int(5)}
         nQBs = dTranslate[config.get('Number of qubits')]
 
         if config.get('1-1 QB <--> Crosstalk matrix'):
@@ -44,24 +43,25 @@ class Crosstalk(object):
             self.Sequence = []
             if nQBs > 0:
                 for QB in range(0, nQBs):
-                    element = config.get('CT-matrix element #%d'%(QB+1))
+                    element = config.get('CT-matrix element #%d' % (QB + 1))
                     if element == 'None':
                         continue
                     else:
                         self.Sequence.append(dTranslate[element])
                     if self.compensation_matrix.shape[0] < dTranslate[element]:
-                        raise 'Element of Cross-talk matrix is too large for actual matrix size'
-
+                        raise 'Element of Cross-talk matrix is too large for '\
+                            'actual matrix size'
 
         mat_length = len(self.Sequence)
         self.phi0_vs_voltage = np.matrix(np.zeros((mat_length, mat_length)))
 
         for index_r, element_r in enumerate(self.Sequence):
             for index_c, element_c in enumerate(self.Sequence):
-                self.phi0_vs_voltage[index_r, index_c] = self.compensation_matrix[element_r-1, element_c-1]
+                self.phi0_vs_voltage[index_r, index_c] = \
+                    self.compensation_matrix[element_r - 1, element_c - 1]
 
     def import_crosstalk_matrix(self, path):
-        """Import crosstalk matrix data
+        """Import crosstalk matrix data.
 
         Parameters
         ----------
@@ -75,7 +75,7 @@ class Crosstalk(object):
         # TODO(dan): load crosstalk data
 
     def compensate(self, waveforms):
-        """Compensate crosstalk on Z-control waveforms
+        """Compensate crosstalk on Z-control waveforms.
 
         Parameters
         ----------
@@ -99,15 +99,16 @@ class Crosstalk(object):
                 wav_array[index] = waveform
                 wav_toCorrect.append(index)
 
-        #new_array = np.dot(mat_voltage_vs_phi0, wav_array)
+        # new_array = np.dot(mat_voltage_vs_phi0, wav_array)
 
-        new_array = np.einsum('ij,jk->ik', mat_voltage_vs_phi0, wav_array) # this is a dot product between the matrix and the waveforms at each timestep
+        # dot product between the matrix and the waveforms at each timestep
+        new_array = np.einsum('ij,jk->ik', mat_voltage_vs_phi0, wav_array)
 
-        for Corr_index, index in zip(wav_toCorrect, range(0,len(self.Sequence))):
+        for Corr_index, index in zip(wav_toCorrect,
+                                     range(0, len(self.Sequence))):
             waveforms[Corr_index] = new_array[index]
 
         return waveforms
-
 
 
 if __name__ == '__main__':
