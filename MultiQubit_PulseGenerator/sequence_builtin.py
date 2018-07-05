@@ -34,10 +34,11 @@ class CPMG(Sequence):
         gate_pi = Gate.Yp if pi_to_q else Gate.Xp
 
         if edge_to_edge:
-            self.add_gate_to_all(Gate.X2p)
             if n_pulse < 0:
+                self.add_gate_to_all(gate_pi)
                 self.add_gate_to_all(IdentityGate(width=0), dt=duration)
             else:
+                self.add_gate_to_all(Gate.X2p)
                 dt = duration/(n_pulse+1)
                 for i in range(n_pulse):
                     self.add_gate_to_all(gate_pi, dt=dt)
