@@ -58,7 +58,7 @@ class Driver(LabberDriver):
             self.nCh = 4
         # keep track of if waveform was updated
         self.waveform_updated = [False] * self.nCh
-        self.previous_upload = {n: np.array([]) for n in range(self.nCh)}
+        self.previous_upload = dict()
         self.waveform_sizes = dict()
 
         # get hardware version - changes numbering of channels
@@ -218,13 +218,13 @@ class Driver(LabberDriver):
                 # always upload all channels in use, regardless of updated
                 for ch in awg_channels:
                     # waveform counter is unique id
+                    self.waveform_counter += 1
                     self.sendWaveform(ch, self.waveform_counter)
                     self.queueWaveform(ch, self.waveform_counter)
                     # configure channel-specific markers
                     self.configureMarker(ch)
                     # configure queue to run in cyclic mode
                     self.AWG.AWGqueueConfig(self.getHwCh(ch), 1)
-                    self.waveform_counter += 1
 
             else:
                 # standard, non-hardware loop upload, stop all
@@ -258,8 +258,17 @@ class Driver(LabberDriver):
     def clearOldWaveforms(self):
         """Flush AWG queue and remove all cached waveforms"""
         self.AWG.waveformFlush()
-        self.previous_upload = {n: np.array([]) for n in range(self.nCh)}
+        self.previous_upload = {(n + 1): np.array([]) for n in range(self.nCh)}
         self.waveform_sizes = dict()
+        # waveform zero is 1us empty waveform used for delays
+        waveform_id = 0
+        data_zero = np.zeros(int(round(1E-6 / self.dt)))
+        wave = keysightSD1.SD_Wave()
+        wave.newFromArrayDouble(0, data_zero)
+        self.AWG.waveformLoad(wave, waveform_id)
+        # update cached parameters
+        self.previous_upload[waveform_id] = data_zero
+        self.waveform_sizes[waveform_id] = len(data_zero)
 
 
     def uploadAndQueueWaveforms(self):
@@ -269,8 +278,9 @@ class Driver(LabberDriver):
             # flush queue
             self.AWG.AWGflush(self.getHwCh(ch))
             # waveform counter is unique id
-            self.sendWaveform(ch, waveform_id=ch)
-            self.queueWaveform(ch, waveform_id=ch)
+            waveform_id = ch + 1
+            self.sendWaveform(ch, waveform_id=waveform_id)
+            self.queueWaveform(ch, waveform_id=waveform_id)
             # configure channel-specific markers
             self.configureMarker(ch)
             # configure queue to run in cyclic mode
@@ -323,9 +333,9 @@ class Driver(LabberDriver):
             if np.array_equal(data_norm, self.previous_upload[waveform_id]):
                 # data has not changed, no need to upload
                 return
-            # data has changed, update previous value
+            # data has changed, update previous value. note: this only happens
+            # for pre-defined waveform_id 1-4, to avoid caching hw looping data
             self.previous_upload[waveform_id] = data_norm
-
         # keep track of waveform lengths
         self.waveform_sizes[waveform_id] = len(data_norm)
 
@@ -348,6 +358,7 @@ class Driver(LabberDriver):
             cycles = int(self.getChannelValue(ch, 'Cycles'))
         else:
             cycles = 1
+        prescaler = 0
         delay = int(round(self.getValue('Trig delay') / 10E-9))
         # if aligning waveform to end of trig, adjust delay
         if self.getValue('Waveform alignment') == 'End at trig':
@@ -357,10 +368,25 @@ class Driver(LabberDriver):
             # raise error if delay is negative
             if delay < 0:
                 raise Error('"Trig delay" must be larger than waveform length')
+            # if delay is longer than 50 us, fix by using empty waveform
+            if delay > 5000:
+                # empty waveform is 1us long, find number of empty waves needed
+                (n_empty, final_delay) = divmod(delay, 100)
+                # queue empty waveforms
+                s = self.AWG.AWGqueueWaveform(self.getHwCh(ch), 0, trigMode,
+                                              0, n_empty, prescaler)
+                self.check_keysight_error(s)
+                # queue the actual waveform
+                s = self.AWG.AWGqueueWaveform(self.getHwCh(ch), waveform_id, 0,
+                                              final_delay, cycles, prescaler)
+                self.check_keysight_error(s)
+                return
 
-        prescaler = 0
-        self.AWG.AWGqueueWaveform(self.getHwCh(ch), waveform_id, trigMode,
-                                  delay, cycles, prescaler)
+
+        # queue waveform, inform user if an error happens
+        s = self.AWG.AWGqueueWaveform(self.getHwCh(ch), waveform_id, trigMode,
+                                      delay, cycles, prescaler)
+        self.check_keysight_error(s)
 
 
     def configureMarker(self, ch):
@@ -403,6 +429,15 @@ class Driver(LabberDriver):
         """Helper function, get trig channel for instrument, or None if N/A"""
         trig_channel = options.get('trig_channel', None)
         return trig_channel
+
+
+    def check_keysight_error(self, code):
+        """Check and raise error"""
+        if code >= 0:
+            return
+        # get error message
+        raise Error(keysightSD1.SD_Error.getErrorMessage(code))
+
 
 if __name__ == '__main__':
     pass
