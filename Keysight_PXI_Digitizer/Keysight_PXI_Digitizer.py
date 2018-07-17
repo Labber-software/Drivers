@@ -186,7 +186,7 @@ class Driver(LabberDriver):
 
         nAv = int(self.getValue('Number of averages'))
         # trigger delay is in 1/sample rate
-        nTrigDelay = int(self.getValue('Trig Delay') / self.dt)
+        nTrigDelay = int(round(self.getValue('Trig Delay') / self.dt))
 
         if bArm:
             # clear old data
