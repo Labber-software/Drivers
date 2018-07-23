@@ -2,6 +2,7 @@
 
 from VISA_Driver import VISA_Driver
 import numpy as np
+import os.path
 
 __version__ = "0.0.1"
 
@@ -23,6 +24,22 @@ class Driver(VISA_Driver):
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
         """Perform the Set Value instrument operation. This function should
         return the actual value set by the instrument"""
+        if self.isFinalCall(options) and self.getValue('Sweep type') == 'Lorentzian':
+                 # get parameters
+                centerFreq = self.getValue('Center frequency')
+                qEst = self.getValue('Q Value')
+                thetaMax = self.getValue('Maximum Angle')
+                numPoints = self.getValue('# of points')
+                # calculate distribution
+                frequencies = self.calcLorentzianDistr(thetaMax, numPoints, qEst, centerFreq)
+                data = []
+                for freq in frequencies:
+                    data.append('1')
+                    data.append('1')
+                    data.append(str(freq))
+                    data.append(str(freq))
+                dataset = ','.join(data)
+                self.writeAndLog('SENS:SEGM:LIST SSTOP, %s, %s' % (numPoints, dataset))
         # update visa commands for triggers
         if quant.name in ('S11 - Enabled', 'S21 - Enabled', 'S12 - Enabled',
                           'S22 - Enabled'):
@@ -72,6 +89,18 @@ class Driver(VISA_Driver):
         elif quant.name in ('Wait for new trace',):
             # do nothing
             pass
+        elif quant.name in ('Sweep type'):
+            # if linear:
+            if self.getValue('Sweep type') == 'Linear':
+                self.writeAndLog(':SENS:SWE:TYPE LIN')
+            #if log:
+            elif self.getValue('Sweep type') == 'Log':
+                self.writeAndLog(':SENS:SWE:TYPE LOG')
+            # if Lorentzian:
+            elif self.getValue('Sweep type') == 'Lorentzian':
+                # prepare VNA for segment sweep
+                self.writeAndLog(':SENS:SWE:TYPE SEGM') 
+                self.writeAndLog('DISP:WIND:TABL SEGM') 
         else:
             # run standard VISA case 
             value = VISA_Driver.performSetValue(self, quant, value, sweepRate, options)
@@ -152,13 +181,22 @@ class Driver(VISA_Driver):
                 mC = vData.reshape((nPts,2))
                 vComplex = mC[:,0] + 1j*mC[:,1]
                 # get start/stop frequencies
-                startFreq = self.readValueFromOther('Start frequency')
-                stopFreq = self.readValueFromOther('Stop frequency')
+                centerFreq = self.readValueFromOther('Center frequency')
                 sweepType = self.readValueFromOther('Sweep type')
                 # if log scale, take log of start/stop frequencies
                 logX = (sweepType == 'Log')
-                value = quant.getTraceDict(vComplex, x0=startFreq, x1=stopFreq,
-                                           logX=logX)
+                lorX = (sweepType == 'Lorentzian')
+                if lorX:
+                    qEst = self.getValue('Q Value')
+                    thetaMax = self.getValue('Maximum Angle')
+                    numPoints = self.getValue('# of points')
+                    value = quant.getTraceDict(vComplex, x=self.calcLorentzianDistr(thetaMax, numPoints, qEst, centerFreq))
+                else:
+                    span = self.readValueFromOther('Span')
+                    startFreq = centerFreq - (span/2)
+                    stopFreq = centerFreq + (span/2)
+                    value = quant.getTraceDict(vComplex, x0=startFreq, x1=stopFreq,
+                                               logX=logX)
             else:
                 # not enabled, return empty array
                 value = quant.getTraceDict([])
@@ -200,7 +238,13 @@ class Driver(VISA_Driver):
                 else:
                     # add to existing list
                     self.dMeasParam[sParam].append(sName)
-
+    
+    # helper function to calculate Lorentzian frequency distribution 
+    def calcLorentzianDistr(self, thetaMax, numPoints, qEst, centerFreq):
+        theta = np.linspace(-thetaMax, thetaMax, numPoints)
+        freq = np.multiply(centerFreq, (1 - np.multiply(1 / (2*qEst), np.tan(np.divide(theta, 2)))))
+        return freq
+    
 
 
 if __name__ == '__main__':
