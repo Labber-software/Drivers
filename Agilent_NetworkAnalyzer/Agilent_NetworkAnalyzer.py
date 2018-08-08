@@ -89,6 +89,12 @@ class Driver(VISA_Driver):
         elif quant.name in ('Wait for new trace',):
             # do nothing
             pass
+        elif quant.name in ('Range type',):
+            # change range if single point
+            if value == 'Single frequency':
+                self.writeAndLog(':SENS:FREQ:SPAN 0')
+                self.writeAndLog(':SENS:SWE:POIN 1')
+
         elif quant.name in ('Sweep type'):
             # if linear:
             if self.getValue('Sweep type') == 'Linear':
@@ -117,6 +123,10 @@ class Driver(VISA_Driver):
             # get selected parameter
             param = quant.name[:3]
             value = (param in self.dMeasParam)
+        elif quant.name in ('S11 - Value', 'S21 - Value', 'S12 - Value', 'S22 - Value'):
+            # read trace, return averaged data
+            data = self.readValueFromOther(quant.name[:3])
+            return np.mean(data['y'])
         elif quant.name in ('S11', 'S21', 'S12', 'S22'):
             # check if channel is on
             if quant.name not in self.dMeasParam:
