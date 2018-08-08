@@ -105,24 +105,27 @@ class Driver(LabberDriver):
             dir_path = os.path.dirname(os.path.realpath(__file__))
             self.HVI.open(os.path.join(dir_path, 'HVI', hvi_name))
 
-            # assign hardware
-            awg_number = 0
-            dig_number = 0
-            for n, unit in enumerate(units):
-                # if unit in use, assign to module
-                if unit == 0:
-                    continue
-                elif unit == 1:
-                    # AWG
-                    module_name = 'Module %d' % awg_number
-                    awg_number += 1
-                elif unit == 2:
-                    # digitizer
-                    module_name = 'DAQ %d' % dig_number
-                    dig_number += 1
-                r = self.HVI.assignHardwareWithUserNameAndSlot(
-                    module_name, self.chassis, n + 1)
-                self.check_keysight_error(r)
+            # assign units, run twice to ignore errors before all units are set
+            for m in range(2):
+                awg_number = 0
+                dig_number = 0
+                for n, unit in enumerate(units):
+                    # if unit in use, assign to module
+                    if unit == 0:
+                        continue
+                    elif unit == 1:
+                        # AWG
+                        module_name = 'Module %d' % awg_number
+                        awg_number += 1
+                    elif unit == 2:
+                        # digitizer
+                        module_name = 'DAQ %d' % dig_number
+                        dig_number += 1
+                    r = self.HVI.assignHardwareWithUserNameAndSlot(
+                        module_name, self.chassis, n + 1)
+                    # only check for errors after second run
+                    if m > 0:
+                        self.check_keysight_error(r)
             # clear old trig period to force update
             self.old_trig_period = 0.0
 
