@@ -159,7 +159,6 @@ class Readout(object):
         vQ = signal_q['y']
         if vI.shape != vQ.shape:
             raise ValueError('I and Q must have the same shape.')
-
         # override segment parameter if input data has more than one dimension
         shape = signal_i.get('shape', vI.shape)
         if len(shape) > 1:
