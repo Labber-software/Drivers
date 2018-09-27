@@ -368,25 +368,25 @@ class Driver(LabberDriver):
             # raise error if delay is negative
             if delay < 0:
                 raise Error('"Trig delay" must be larger than waveform length')
-            # if delay is longer than 50 us, fix by using empty waveform
-            if delay > 5000:
-                # empty waveform is 1us long, find number of empty waves needed
-                (n_empty, final_delay) = divmod(delay, 100)
-                # queue empty waveforms
-                s = self.AWG.AWGqueueWaveform(self.getHwCh(ch), 0, trigMode,
-                                              0, n_empty, prescaler)
-                self.check_keysight_error(s)
-                # queue the actual waveform
-                s = self.AWG.AWGqueueWaveform(self.getHwCh(ch), waveform_id, 0,
-                                              final_delay, cycles, prescaler)
-                self.check_keysight_error(s)
-                return
 
+        # if delay is longer than 50 us, fix by using empty waveform
+        if delay > 5000:
+            # empty waveform is 1us long, find number of empty waves needed
+            (n_empty, final_delay) = divmod(delay, 100)
+            # queue empty waveforms
+            s = self.AWG.AWGqueueWaveform(self.getHwCh(ch), 0, trigMode,
+                                          0, n_empty, prescaler)
+            self.check_keysight_error(s)
+            # queue the actual waveform
+            s = self.AWG.AWGqueueWaveform(self.getHwCh(ch), waveform_id, 0,
+                                          final_delay, cycles, prescaler)
+            self.check_keysight_error(s)
 
-        # queue waveform, inform user if an error happens
-        s = self.AWG.AWGqueueWaveform(self.getHwCh(ch), waveform_id, trigMode,
-                                      delay, cycles, prescaler)
-        self.check_keysight_error(s)
+        else:
+            # queue waveform, inform user if an error happens
+            s = self.AWG.AWGqueueWaveform(self.getHwCh(ch), waveform_id, trigMode,
+                                          delay, cycles, prescaler)
+            self.check_keysight_error(s)
 
 
     def configureMarker(self, ch):
