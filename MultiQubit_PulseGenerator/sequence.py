@@ -797,7 +797,7 @@ class SequenceToWaveforms:
         start = (np.abs(self.readout_iq) > 0.0).nonzero()[0][0]
         end = int(np.min((start +
                           self.readout_trig_duration * self.sample_rate,
-                          self.n_pts)))
+                          self.n_pts_readout)))
         trig[start:end] = self.readout_trig_amplitude
 
         # make sure trig starts and ends in 0.
