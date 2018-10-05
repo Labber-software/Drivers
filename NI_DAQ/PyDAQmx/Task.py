@@ -1,6 +1,6 @@
-from DAQmxTypes import TaskHandle
-import DAQmxFunctions
-from DAQmxFunctions import *
+from .DAQmxTypes import TaskHandle
+from . import DAQmxFunctions
+from .DAQmxFunctions import *
 import ctypes
 
 
@@ -8,7 +8,7 @@ import ctypes
 # All the function of this list will be converted to method of the task object
 # The name of the method will be the same name as the name of the DAQmx function without the 
 # the DAQmx in front of the name
-task_function_list = [name for name in function_dict.keys() if \
+task_function_list = [name for name in list(function_dict.keys()) if \
                  len(function_dict[name]['arg_type'])>0 and \
                  (function_dict[name]['arg_type'][0] is TaskHandle) and\
                  'task' in function_dict[name]['arg_name'][0]]
@@ -17,13 +17,13 @@ task_function_list = [name for name in function_dict.keys() if \
 task_function_list = [name for name in task_function_list if name not in ['DAQmxClearTask']]
 
 try :
-    from DAQmxCallBack import *
+    from .DAQmxCallBack import *
     _callback = True
 except NotImplementedError:
     _callback = False
 
 if _callback:
-    class CallbackParent():
+    class CallbackParent(object):
         _EveryNSamplesEvent_already_register = False
         def AutoRegisterEveryNSamplesEvent(self, everyNsamplesEventType,nSamples,options, name='EveryNCallback'):
             """Register the method named name as the callback function for EveryNSamplesEvent
@@ -95,17 +95,24 @@ if _callback:
 
 else:
 
-    class CallbackParent():
+    class CallbackParent(object):
         def __getattr__(self, name):
             if name in ['AutoRegisterEveryNSamplesEvent', 'AutoRegisterDoneEvent', 'AutoRegisterSignalEvent']:
-                raise NotImplementedError, 'Callback methods are not available'
+                raise NotImplementedError('Callback methods are not available')
             return super(CallbackParent, self).__getattr__(name)
 
 
 class Task(CallbackParent):
-    def __init__(self):
+    def __init__(self, name=""):
         self.taskHandle = TaskHandle(0)
-        DAQmxCreateTask(b"",byref(self.taskHandle))
+        DAQmxCreateTask(name,byref(self.taskHandle))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        self.ClearTask()
+
     def __del__(self):
         """ Clear automatically the task to be able to reallocate resources """ 
         # Clear the task before deleting the object
@@ -116,7 +123,7 @@ class Task(CallbackParent):
         # b has the same taskHandle as a, and deleting a will clear the task of b   
         try: 
             self.ClearTask()
-        except DAQError:
+        except Exception:
             pass
     def ClearTask(self):
         if self.taskHandle:
