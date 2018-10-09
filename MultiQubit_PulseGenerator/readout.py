@@ -180,12 +180,11 @@ class Readout(object):
         vData = np.reshape(vI + 1j * vQ, (n_segment, int(n_total / n_segment)))
         # calculate cos/sin vectors, allow segmenting
         vTime = dt * (n0 + np.arange(length, dtype=float))
-        vS = np.exp(-2j * np.pi * vTime * frequency)
+        vS = np.exp(2j * np.pi * vTime * frequency)
 
         # calc I/Q
         dI = np.trapz((vS * vData[:, n0:n0 + length]).real) / float(length - 1)
-        dQ = -np.trapz((vS * vData[:, n0:n0 + length]
-                        ).imag) / float(length - 1)
+        dQ = -np.trapz((vS * vData[:, n0:n0 + length]).imag) / float(length - 1)
         values = dI + 1j * dQ
         if self.use_phase_ref and ref is not None:
             # skip reference if trace length doesn't match
