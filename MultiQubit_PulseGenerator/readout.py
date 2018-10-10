@@ -191,12 +191,10 @@ class Readout(object):
             if len(ref['y']) != len(vI):
                 return values
             vRef = np.reshape(ref['y'], (n_segment, int(n_total / n_segment)))
-            vCos = np.cos(2 * np.pi * vTime * frequency)
-            vSin = np.sin(2 * np.pi * vTime * frequency)
-            Iref = (2 * np.trapz(vCos * vRef[:, n0:n0 + length]) /
-                    float(length - 1))
-            Qref = (2 * np.trapz(vSin * vRef[:, n0:n0 + length]) /
-                    float(length - 1))
+            Iref = (np.trapz((vS * vRef[:, n0:n0 + length]).real)
+                    / float(length - 1))
+            Qref = (-np.trapz((vS * vRef[:, n0:n0 + length]).imag)
+                    / float(length - 1))
             # subtract the reference angle
             dAngleRef = np.arctan2(Qref, Iref)
             values /= (np.cos(dAngleRef) + 1j * np.sin(dAngleRef))
