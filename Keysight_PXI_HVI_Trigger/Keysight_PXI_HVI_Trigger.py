@@ -34,7 +34,8 @@ class Driver(LabberDriver):
         # keep track of current PXI configuration
         # 0: None, 1: AWG, 2: Digitizer
         self.units = [0] * self.n_slot
-        self.old_trig_period = 0.0
+        self.old_trig_period = -1.0
+        self.old_dig_delay = -1.0
 
         # Create HVI object
         self.HVI = keysightSD1.SD_HVI()
@@ -103,7 +104,7 @@ class Driver(LabberDriver):
             # get HVI name and open
             hvi_name = 'InternalTrigger_%d_%d.HVI' % (n_awg, n_dig)
             dir_path = os.path.dirname(os.path.realpath(__file__))
-            self.HVI.open(os.path.join(dir_path, 'HVI', hvi_name))
+            self.HVI.open(os.path.join(dir_path, 'HVI_Delay', hvi_name))
 
             # assign units, run twice to ignore errors before all units are set
             for m in range(2):
@@ -130,15 +131,26 @@ class Driver(LabberDriver):
             self.old_trig_period = 0.0
 
         # only update trig period if necessary, takes time to re-compile
-        if self.getValue('Trig period') != self.old_trig_period:
+        if (self.getValue('Trig period') != self.old_trig_period or
+                self.getValue('Digitizer delay') != self.old_dig_delay):
             self.old_trig_period = self.getValue('Trig period')
+            self.old_dig_delay = self.getValue('Digitizer delay')
             # update trig period, include 460 ns delay in HVI
             wait = round(self.getValue('Trig period') / 10E-9) - 46
+            digi_wait = round(self.getValue('Digitizer delay') / 10E-9)
             # special case if only one module: add 240 ns extra delay
             if (n_awg + n_dig) == 1:
                 wait += 24
-            r = self.HVI.writeIntegerConstantWithIndex(0, 'Wait time', wait)
+            # r = self.HVI.writeIntegerConstantWithIndex(0, 'Wait time', wait)
+            r = self.HVI.writeIntegerConstantWithUserName(
+                'Module 0', 'Wait time', wait)
             self.check_keysight_error(r)
+            self.log('Number of modules', self.HVI.getNumberOfModules())
+            if n_dig > 0:
+                r = self.HVI.writeIntegerConstantWithUserName(
+                    'DAQ 0', 'Digi wait', digi_wait)
+                self.check_keysight_error(r)
+
             # need to recompile after setting wait time, not sure why
             self.check_keysight_error(self.HVI.compile())
             self.check_keysight_error(self.HVI.load())
