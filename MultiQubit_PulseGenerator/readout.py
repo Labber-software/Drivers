@@ -180,24 +180,21 @@ class Readout(object):
         vData = np.reshape(vI + 1j * vQ, (n_segment, int(n_total / n_segment)))
         # calculate cos/sin vectors, allow segmenting
         vTime = dt * (n0 + np.arange(length, dtype=float))
-        vS = np.exp(-2j * np.pi * vTime * frequency)
+        vS = np.exp(2j * np.pi * vTime * frequency)
 
         # calc I/Q
         dI = np.trapz((vS * vData[:, n0:n0 + length]).real) / float(length - 1)
-        dQ = -np.trapz((vS * vData[:, n0:n0 + length]
-                        ).imag) / float(length - 1)
+        dQ = -np.trapz((vS * vData[:, n0:n0 + length]).imag) / float(length - 1)
         values = dI + 1j * dQ
         if self.use_phase_ref and ref is not None:
             # skip reference if trace length doesn't match
             if len(ref['y']) != len(vI):
                 return values
             vRef = np.reshape(ref['y'], (n_segment, int(n_total / n_segment)))
-            vCos = np.cos(2 * np.pi * vTime * frequency)
-            vSin = np.sin(2 * np.pi * vTime * frequency)
-            Iref = (2 * np.trapz(vCos * vRef[:, n0:n0 + length]) /
-                    float(length - 1))
-            Qref = (2 * np.trapz(vSin * vRef[:, n0:n0 + length]) /
-                    float(length - 1))
+            Iref = (np.trapz((vS * vRef[:, n0:n0 + length]).real)
+                    / float(length - 1))
+            Qref = (-np.trapz((vS * vRef[:, n0:n0 + length]).imag)
+                    / float(length - 1))
             # subtract the reference angle
             dAngleRef = np.arctan2(Qref, Iref)
             values /= (np.cos(dAngleRef) + 1j * np.sin(dAngleRef))

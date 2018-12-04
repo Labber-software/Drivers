@@ -44,10 +44,14 @@ class CPMG(Sequence):
                     self.add_gate_to_all(gate_pi, dt=dt)
                 self.add_gate_to_all(Gate.X2p, dt=dt)
         else:
-            self.add_gate_to_all(Gate.X2p, t0=0)
-            for i in range(n_pulse):
-                self.add_gate_to_all(gate_pi, t0=duration/(n_pulse+1)*(i+1))
-            self.add_gate_to_all(Gate.X2p, t0=duration)
+            if n_pulse < 0:
+                self.add_gate_to_all(gate_pi, t0=0)
+                self.add_gate_to_all(IdentityGate(width=0), t0=duration)
+            else:
+                self.add_gate_to_all(Gate.X2p, t0=0)
+                for i in range(n_pulse):
+                    self.add_gate_to_all(gate_pi, t0=duration/(n_pulse+1)*(i+1))
+                self.add_gate_to_all(Gate.X2p, t0=duration)
 
 
 class PulseTrain(Sequence):

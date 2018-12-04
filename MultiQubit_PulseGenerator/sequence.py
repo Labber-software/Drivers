@@ -797,7 +797,7 @@ class SequenceToWaveforms:
         start = (np.abs(self.readout_iq) > 0.0).nonzero()[0][0]
         end = int(np.min((start +
                           self.readout_trig_duration * self.sample_rate,
-                          self.n_pts)))
+                          self.n_pts_readout)))
         trig[start:end] = self.readout_trig_amplitude
 
         # make sure trig starts and ends in 0.
@@ -814,8 +814,16 @@ class SequenceToWaveforms:
         self.wave_z_delays -= min_delay
         max_delay = np.max([self.wave_xy_delays[:self.n_qubit],
                             self.wave_z_delays[:self.n_qubit]])
+
+        # only include readout in size estimate if all waveforms have same size
+        if self.readout_match_main_size:
+            # -1 is the position of readout pulse
+            end = self.sequences[-1].t_end + max_delay
+        else:
+            # -2 is the position of last pulse, excluding the readout
+            end = self.sequences[-2].t_end + max_delay
+
         # create empty waveforms of the correct size
-        end = self.sequences[-1].t_end + max_delay
         if self.trim_to_sequence:
             self.n_pts = int(np.ceil(end * self.sample_rate)) + 1
             if self.n_pts % 2 == 1:
@@ -828,10 +836,22 @@ class SequenceToWaveforms:
 
         # Waveform time vector
         self.t = np.arange(self.n_pts) / self.sample_rate
-        # readout trig
-        self.readout_trig = np.zeros(self.n_pts, dtype=float)
-        # readout i/q waveform
-        self.readout_iq = np.zeros(self.n_pts, dtype=np.complex)
+
+        # readout trig and i/q waveforms
+        if self.readout_match_main_size:
+            # same number of points for readout and main waveform
+            self.n_pts_readout = self.n_pts
+        else:
+            # different number of points for readout and main waveform
+            self.n_pts_readout = 1 + int(
+                np.ceil(self.sample_rate *
+                (self.sequences[-1].t_end - self.sequences[-1].t_start)))
+            if self.n_pts_readout % 2 == 1:
+                # Odd n_pts give spectral leakage in FFT
+                self.n_pts_readout += 1
+
+        self.readout_trig = np.zeros(self.n_pts_readout, dtype=float)
+        self.readout_iq = np.zeros(self.n_pts_readout, dtype=np.complex)
 
     def _generate_waveforms(self):
         """Generate the waveforms corresponding to the sequence."""
@@ -851,14 +871,23 @@ class SequenceToWaveforms:
                     delay = 0
 
                 # get the range of indices in use
-                start = self._round(step.t_start + delay)
-                middle = self._round(step.t_middle + delay)
-                end = self._round(step.t_end + delay)
+                if (pulse.pulse_type == PulseType.READOUT and not
+                        self.readout_match_main_size):
+                    # special case for readout if not matching main wave size
+                    start = 0.0
+                    middle = self._round(step.t_middle - step.t_start)
+                    end = self._round(step.t_end - step.t_start)
+                else:
+                    start = self._round(step.t_start + delay)
+                    middle = self._round(step.t_middle + delay)
+                    end = self._round(step.t_end + delay)
+
                 indices = np.arange(
                     max(np.floor(start * self.sample_rate), 0),
-                    min(np.ceil(end * self.sample_rate), self.n_pts),
+                    min(np.ceil(end * self.sample_rate), len(waveform)),
                     dtype=int
                 )
+
                 # return directly if no indices
                 if len(indices) == 0:
                     continue

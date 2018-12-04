@@ -38,8 +38,8 @@ class Driver(VISA_Driver):
         
     def checkIfSweeping(self, quant, options={}):
         target = self.askAndLog('R8')
-	self.wait(0.1)
-	# strip first character
+        self.wait(0.1)
+        # strip first character
         target = float(target[1:])
         currentValue = Driver.performGetValue(self,quant,options)
         if abs(target-currentValue) < float(quant.sweep_res):
@@ -51,7 +51,7 @@ class Driver(VISA_Driver):
         return(True)
 
     def performStopSweep(self, quant, options={}):
-	self.writeAndLog('$A0')
+        self.writeAndLog('$A0')
 
 if __name__ == '__main__':
     pass

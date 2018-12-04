@@ -68,36 +68,6 @@ Signadyne_Digitizer/signadyne.py
 
 Signadyne_AWG/signadyne.py
 
-NI_USB_6218/PyDAQmx/__init__.py
-
-NI_USB_6218/PyDAQmx/DAQmxCallBack.py
-
-NI_USB_6218/PyDAQmx/DAQmxConfig.py
-
-NI_USB_6218/PyDAQmx/DAQmxConstants.py
-
-NI_USB_6218/PyDAQmx/DAQmxFunctions.py
-
-NI_USB_6218/PyDAQmx/DAQmxTypes.py
-
-NI_USB_6218/PyDAQmx/example/__init__.py
-
-NI_USB_6218/PyDAQmx/example/callback_oo.py
-
-NI_USB_6218/PyDAQmx/example/callback_Task_synchronous.py
-
-NI_USB_6218/PyDAQmx/example/callback_Task.py
-
-NI_USB_6218/PyDAQmx/example/callback_test_unregister.py
-
-NI_USB_6218/PyDAQmx/example/callback.py
-
-NI_USB_6218/PyDAQmx/example/ContinuousPulseTrainGeneration.py
-
-NI_USB_6218/PyDAQmx/example/MultiChannelAnalogInput.py
-
-NI_USB_6218/PyDAQmx/Task.py
-
 Keysight_PXI_AWG/signadyne.py
 
 Keysight_PXI_Digitizer/signadyne.py
@@ -111,3 +81,4 @@ Keysight_PXI_Digitizer/signadyne.py
 .Trashes
 ehthumbs.db
 Thumbs.db
+*.bak
