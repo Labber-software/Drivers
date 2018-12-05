@@ -320,6 +320,12 @@ class Driver(LabberDriver):
     def getRange(self, ch):
         """Get channel range, as voltage.  Index start at 0"""
         rang = float(self.getCmdStringFromValue('Ch%d - Range' % (ch + 1)))
+        # range depends on impedance
+        if self.getValue('Ch%d - Impedance' % (ch + 1)) == 'High':
+            rang = rang * 2
+            # special case if range is .25, 0.5, or 1, scale to 0.2, .4, .8
+            if rang < 1.1:
+                rang *= 0.8
         return rang
 
 
