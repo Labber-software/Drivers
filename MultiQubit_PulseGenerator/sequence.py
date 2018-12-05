@@ -855,6 +855,18 @@ class SequenceToWaveforms:
 
     def _generate_waveforms(self):
         """Generate the waveforms corresponding to the sequence."""
+        # find out if CZ pulses are used, if so pre-calc envelope to save time
+        pulses_cz = set()
+        # find set of all CZ pulses in use
+        for step in self.sequences:
+            for qubit, gate in enumerate(step.gates):
+                pulse = self._get_pulse_for_gate(qubit, gate)
+                if pulse is not None and pulse.shape == PulseShape.CZ:
+                    pulses_cz.add(pulse)
+        # once we've gone through all pulses, pre-calculate the waveforms
+        for pulse in pulses_cz:
+            pulse.calculate_cz_waveform()
+
         for step in self.sequences:
             for qubit, gate in enumerate(step.gates):
                 pulse = self._get_pulse_for_gate(qubit, gate)
