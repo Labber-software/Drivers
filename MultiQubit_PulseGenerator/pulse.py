@@ -210,8 +210,8 @@ class Pulse(object):
             theta_tau = np.zeros(n_points)
             for i in range(n_points):
                 theta_tau[i] = np.sum((self.Lcoeff *
-                                       (1 - np.cos(2 * np.pi * n * tau[i]))) +
-                                      theta_i)
+                                       (1 - np.cos(2 * np.pi * n *tau[i])))
+                                       ) + theta_i
             t_tau = np.trapz(np.sin(theta_tau), x=tau)
             Width_tau = self.width / t_tau
 
@@ -221,7 +221,7 @@ class Pulse(object):
             for i in range(n_points):
                 theta_tau[i] = np.sum((self.Lcoeff *
                                        (1 - np.cos(2 * np.pi * n * tau[i] /
-                                                   Width_tau))) + theta_i)
+                                                   Width_tau)))) + theta_i
                 if i > 0:
                     t_tau[i] = np.trapz(np.sin(theta_tau[0:i]), x=tau[0:i])
 
