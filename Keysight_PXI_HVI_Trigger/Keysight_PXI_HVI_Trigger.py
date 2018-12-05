@@ -153,7 +153,16 @@ class Driver(LabberDriver):
 
             # need to recompile after setting wait time, not sure why
             self.check_keysight_error(self.HVI.compile())
-            self.check_keysight_error(self.HVI.load())
+            # try to load twice, sometimes hangs on first try
+            n_try = 2
+            while True:
+                try:
+                    self.check_keysight_error(self.HVI.load())
+                    break
+                except Exception:
+                    n_try -= 1
+                    if n_try <= 0:
+                        raise
 
         # start or stop the HVI, depending on output state
         if self.getValue('Output'):
