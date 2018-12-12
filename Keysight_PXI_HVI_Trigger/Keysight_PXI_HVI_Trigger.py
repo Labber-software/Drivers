@@ -97,9 +97,9 @@ class Driver(LabberDriver):
             # we need at least one AWG
             if n_awg == 0:
                 raise Error('This driver requires at least one AWG.')
-            # currently only support 1 digitizer
-            if n_dig > 1:
-                raise Error('This driver only supports one digitizer.')
+            # currently only support 2 digitizers
+            if n_dig > 2:
+                raise Error('This driver only supports up to two digitizers.')
 
             # get HVI name and open
             hvi_name = 'InternalTrigger_%d_%d.HVI' % (n_awg, n_dig)
@@ -146,9 +146,9 @@ class Driver(LabberDriver):
                 'Module 0', 'Wait time', wait)
             self.check_keysight_error(r)
             self.log('Number of modules', self.HVI.getNumberOfModules())
-            if n_dig > 0:
+            for n in n_dig:
                 r = self.HVI.writeIntegerConstantWithUserName(
-                    'DAQ 0', 'Digi wait', digi_wait)
+                    'DAQ %d' % n, 'Digi wait', digi_wait)
                 self.check_keysight_error(r)
 
             # need to recompile after setting wait time, not sure why
