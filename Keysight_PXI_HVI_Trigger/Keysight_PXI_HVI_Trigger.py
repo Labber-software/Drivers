@@ -146,7 +146,7 @@ class Driver(LabberDriver):
                 'Module 0', 'Wait time', wait)
             self.check_keysight_error(r)
             self.log('Number of modules', self.HVI.getNumberOfModules())
-            for n in n_dig:
+            for n in range(n_dig):
                 r = self.HVI.writeIntegerConstantWithUserName(
                     'DAQ %d' % n, 'Digi wait', digi_wait)
                 self.check_keysight_error(r)
