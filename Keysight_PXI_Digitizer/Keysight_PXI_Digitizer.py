@@ -154,9 +154,23 @@ class Driver(LabberDriver):
 
         # arm by calling get traces
         if self.isHardwareLoop(options):
-            # in hardware looping, number of records is set by the hardware looping
+            # in hardware looping, number of records is set by the hw loop
             (seq_no, n_seq) = self.getHardwareLoopIndex(options)
+            nSample = int(self.getValue('Number of samples'))
+
+            # arm instrument, then report completed to allow client to continue
+            self.reportStatus('Digitizer - Waiting for signal')
             self.getTraces(bArm=True, bMeasure=False, n_seq=n_seq)
+            self.report_arm_completed()
+            # directly start collecting data (digitizer buffer is limited)
+            self.getTraces(bArm=False, bMeasure=True, n_seq=n_seq)
+            # re-shape data and place in trace buffer
+            self.reshaped_traces = []
+            for trace in self.lTrace:
+                if len(trace) > 0:
+                    trace = trace.reshape((n_seq, nSample))
+                self.reshaped_traces.append(trace)
+
         else:
             self.getTraces(bArm=True, bMeasure=False)
 
@@ -344,23 +358,10 @@ class Driver(LabberDriver):
         else:
             return keysightSD1.SD_Error.MODULE_NOT_OPENED
 
+
     def getSignalHardwareLoop(self, ch, quant, options):
         """Get data from round-robin type averaging"""
         (seq_no, n_seq) = self.getHardwareLoopIndex(options)
-        nSample = int(self.getValue('Number of samples'))
-        # if first sequence call, get data
-        if seq_no == 0 and self.isFirstCall(options):
-            # show status before starting acquisition
-            self.reportStatus('Digitizer - Waiting for signal')
-            # get data
-            # self.getTracesHardware(n_seq)
-            self.getTraces(bArm=False, bMeasure=True, n_seq=n_seq)
-            # re-shape data and place in trace buffer
-            self.reshaped_traces = []
-            for trace in self.lTrace:
-                if len(trace) > 0:
-                    trace = trace.reshape((n_seq, nSample))
-                self.reshaped_traces.append(trace)
         # after getting data, pick values to return
         return quant.getTraceDict(self.reshaped_traces[ch][seq_no], dt=self.dt)
 
