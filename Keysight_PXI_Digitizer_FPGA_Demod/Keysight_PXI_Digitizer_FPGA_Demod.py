@@ -59,6 +59,7 @@ class Driver(LabberDriver):
         # create list of sampled data
         self.lTrace = [np.array([])] * self.nCh
         self.demod_output_ssb = np.zeros((0,), dtype='complex')
+        self.demod_buffer = np.zeros((0,), dtype=np.int16)
 
         self.dig.openWithSlot(AWGPart, self.chassis, int(self.comCfg.address))
         # get hardware version - changes numbering of channels
@@ -279,7 +280,9 @@ class Driver(LabberDriver):
             self.reportStatus('Digitizer - Waiting for signal')
             # get data
             self.getTraces(bArm=True, bMeasure=False, n_seq=n_seq)
+            # report arm completed, to allow client to continue
             self.report_arm_completed()
+            # directly start collecting data (digitizer buffer is limited)
             self.getTraces(bArm=False, bMeasure=True, n_seq=n_seq)
             # after measurement is done, re-shape data and place in buffer
             self.reshaped_traces = []
@@ -338,6 +341,13 @@ class Driver(LabberDriver):
         nAv = int(self.getValue('Number of averages'))
         # trigger delay is in 1/sample rate
         nTrigDelay = int(round(self.getValue('Trig Delay') / self.dt))
+        # special high-speed FPGA mode, don't convert, just transfer
+        if (self.fpga_config == 'Only FPGA I/Q' and
+                self.getValue('Hide I/Q') and
+                not self.getValue('Convert data while streaming')):
+            only_transfer_fgpa = True
+        else:
+            only_transfer_fgpa = False
 
         if bArm:
             # clear old data
@@ -353,6 +363,10 @@ class Driver(LabberDriver):
                 # matrix has right size, just reshape
                 self.demod_output_ssb = self.demod_output_ssb.reshape(
                     (self.num_of_demods, nSeg * nAv))
+            # create new binary demod data buffer, if size changed
+            buf = (nPts * nSeg * nAv) if only_transfer_fgpa else (nPts * nSeg)
+            if self.demod_buffer.size != buf:
+                self.demod_buffer = np.zeros(buf, dtype=np.int16)
 
             # only initiate diagnostic traces if in use
             if not self.getValue('Hide I/Q'):
@@ -422,7 +436,39 @@ class Driver(LabberDriver):
         # self.log('nCall:' + str(nCall), level = 30)
 
         # proceed depending on segment or not segment
-        if nSeg <= 1:
+        if only_transfer_fgpa:
+            # just transfer fpga data, do conversion after to allow fast stream
+            ch = self.getHwCh(3)
+            count = 0
+            for n in range(nCall):
+                # number of cycles for this call, could be fewer for last call
+                nCycle = min(nCyclePerCall, nCycleTotal - (n * nCyclePerCall))
+
+                # channel number depens on hardware version
+                data = self.DAQread(self.dig, ch, nPts * nCycle,
+                                    int(1000 + self.timeout_ms / nCall))
+                # stop if no data
+                if data.size == 0:
+                    return
+                # store data in long vector, convert later
+                self.demod_buffer[count:(count + data.size)] = data
+                count += data.size
+                # report progress, only report integer percent
+                if nCall >= 1:
+                    new_percent = int(100 * n / nCall)
+                    if new_percent > old_percent:
+                        old_percent = new_percent
+                        self.reportStatus(
+                            'Acquiring traces ({}%)'.format(new_percent) +
+                            ', FPGA Demod buffer: ' +
+                            ', '.join(self.smsb_info_str))
+                # break if stopped from outside
+                if self.isStopped():
+                    break
+            # finally, get demod values
+            self.getDemodValues(self.demod_buffer, nPts, nSeg, nSeg)
+
+        elif nSeg <= 1:
             # non-segmented acquisiton
             for n in range(nCall):
                 # number of cycles for this call, could be fewer for last call
@@ -502,12 +548,12 @@ class Driver(LabberDriver):
                                 data * lScale[nCh]
                         else:
                             # store raw demod data, will be extracted later
-                            self.lTrace[nCh][count:(count + data.size)] = data
+                            self.demod_buffer[count:(count + data.size)] = data
 
                     count += data.size
                 # after one full set of records, convert demod data
                 if self.fpga_config != 'Only signals':
-                    self.getDemodValues(self.lTrace[3], nPts, nSeg, nSeg)
+                    self.getDemodValues(self.demod_buffer, nPts, nSeg, nSeg)
 
                 # report progress, only report integer percent
                 if nAv >= 1:
@@ -562,6 +608,7 @@ class Driver(LabberDriver):
                 return keysightSD1.SD_Error.INVALID_VALUE
         else:
             return keysightSD1.SD_Error.MODULE_NOT_OPENED
+
 
     def getDemodValues(self, demod_raw, nPts, nSeg, nCycle):
         """get Demod IQ data from Ch1/2/3 Trace"""
