@@ -193,21 +193,7 @@ class Driver(LabberDriver):
             if self.isHardwareLoop(options):
                 """Get data from round-robin type averaging"""
                 (seq_no, n_seq) = self.getHardwareLoopIndex(options)
-                nSample = int(self.getValue('Number of samples'))
-                # if first sequence call, get data
-                if seq_no == 0 and self.isFirstCall(options):
-                    # show status before starting acquisition
-                    self.reportStatus('Digitizer - Waiting for signal')
-                    # get data
-                    # self.getTracesHardware(n_seq)
-                    self.getTraces(bArm=False, bMeasure=True, n_seq=n_seq)
-                    # re-shape data and place in trace buffer
-                    self.reshaped_traces = []
-                    for trace in self.lTrace:
-                        if len(trace) > 0:
-                            trace = trace.reshape((n_seq, trace.size // n_seq))
-                        self.reshaped_traces.append(trace)
-                # after getting data, pick values to return
+                # acquisition was started when arming, just read data
                 if name == 'Signal':
                     return quant.getTraceDict(
                         self.reshaped_traces[ch][seq_no], dt=self.dt)
@@ -274,12 +260,34 @@ class Driver(LabberDriver):
 
     def performArm(self, quant_names, options={}):
         """Perform the instrument arm operation"""
+        # only arm digitizer if about to measure read-only values
+        for name in quant_names:
+            quant = self.getQuantity(name)
+            if quant.isPermissionRead():
+                break
+        else:
+            # loop fell through, no read-only quantity, don't arm
+            return
 
         # arm by calling get traces
         if self.isHardwareLoop(options):
             # in hardware looping, number of records is set by the looping
             (seq_no, n_seq) = self.getHardwareLoopIndex(options)
+            # self.getTraces(bArm=True, bMeasure=False, n_seq=n_seq)
+
+            # show status before starting acquisition
+            self.reportStatus('Digitizer - Waiting for signal')
+            # get data
             self.getTraces(bArm=True, bMeasure=False, n_seq=n_seq)
+            self.report_arm_completed()
+            self.getTraces(bArm=False, bMeasure=True, n_seq=n_seq)
+            # after measurement is done, re-shape data and place in buffer
+            self.reshaped_traces = []
+            for trace in self.lTrace:
+                if len(trace) > 0:
+                    trace = trace.reshape((n_seq, trace.size // n_seq))
+                self.reshaped_traces.append(trace)
+
         else:
             self.getTraces(bArm=True, bMeasure=False)
 
