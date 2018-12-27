@@ -230,8 +230,9 @@ class Driver(LabberDriver):
                         dt=1)
             # get traces if first call
             if self.isFirstCall(options):
-                # don't arm if in hardware trig mode
-                self.getTraces(bArm=(not self.isHardwareTrig(options)))
+                # don't arm and measure if in arm/trig mode, was done at arm
+                if not self.isHardwareTrig(options):
+                    self.getTraces()
             # return correct data
             if name == 'Signal':
                 value = quant.getTraceDict(self.lTrace[ch], dt=self.dt)
@@ -286,7 +287,6 @@ class Driver(LabberDriver):
         if self.isHardwareLoop(options):
             # in hardware looping, number of records is set by the looping
             (seq_no, n_seq) = self.getHardwareLoopIndex(options)
-            # self.getTraces(bArm=True, bMeasure=False, n_seq=n_seq)
 
             # show status before starting acquisition
             self.reportStatus('Digitizer - Waiting for signal')
@@ -305,6 +305,9 @@ class Driver(LabberDriver):
 
         else:
             self.getTraces(bArm=True, bMeasure=False)
+            # report arm completed, to allow client to continue
+            self.report_arm_completed()
+            self.getTraces(bArm=False, bMeasure=True)
 
 
     def getTraces(self, bArm=True, bMeasure=True, n_seq=0):
