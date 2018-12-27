@@ -19,6 +19,7 @@ class Driver(LabberDriver):
         self.num_of_demods = 5
         # self.demod_n_pts = self.num_of_demods * 15
         self.demod_n_pts = 80
+        self.bit_stream_name = ''
 
         # set time step and resolution
         self.nBit = 16
@@ -79,17 +80,22 @@ class Driver(LabberDriver):
         self.fpga_config = self.getValue('FPGA Hardware')
 
         if reset or self.fpga_config == 'Only signals':
-            Bitstream = os.path.join(
+            bitstream = os.path.join(
                 os.path.dirname(__file__),
                 'firmware_FPGAFlow_Clean_2018-05-31T22_22_11.sbp')
         elif self.fpga_config in ('FPGA I/Q and signals', 'Only FPGA I/Q'):
-            Bitstream = os.path.join(
+            bitstream = os.path.join(
                 os.path.dirname(__file__),
                 'firmware_FPGAFlow_Demod_v4_IQx5_2018-09-02T19_14_50.sbp')
 
-        if (self.dig.FPGAload(Bitstream)) < 0:
+        # don't reload if correct bitstream is already loaded
+        if bitstream == self.bit_stream_name:
+            return
+
+        if (self.dig.FPGAload(bitstream)) < 0:
             if self.fpga_config != 'Only signals':
                 raise Error('FPGA not loaded, check FPGA version...')
+        self.bit_stream_name = bitstream
 
         if self.fpga_config != 'Only signals':
             for n in range(self.num_of_demods):
