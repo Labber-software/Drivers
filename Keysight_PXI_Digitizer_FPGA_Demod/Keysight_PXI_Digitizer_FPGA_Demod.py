@@ -204,27 +204,27 @@ class Driver(LabberDriver):
                 if name == 'Signal':
                     return quant.getTraceDict(
                         self.reshaped_traces[ch][seq_no], dt=self.dt)
-                elif quant.name.startswith('FPGA Voltage I'):
+                elif quant.name.startswith('FPGA Voltage I,'):
                     return self.demod_output_I[demod_num]
-                elif quant.name.startswith('FPGA Single-shot I'):
+                elif quant.name.startswith('FPGA Single-shot I,'):
                     return quant.getTraceDict(
                         self.demod_output_vector_I[demod_num][seq_no], dt=1)
-                elif quant.name.startswith('FPGA Voltage Q'):
+                elif quant.name.startswith('FPGA Voltage Q,'):
                     return self.demod_output_Q[demod_num]
-                elif quant.name.startswith('FPGA Single-shot Q'):
+                elif quant.name.startswith('FPGA Single-shot Q,'):
                     return quant.getTraceDict(
                         self.demod_output_vector_Q[demod_num][seq_no], dt=1)
-                elif quant.name.startswith('FPGA Single-shot REF'):
+                elif quant.name.startswith('FPGA Single-shot REF,'):
                     return quant.getTraceDict(
                         self.demod_output_vector_ref[demod_num][seq_no], dt=1)
-                elif quant.name.startswith('FPGA Voltage NP'):
+                elif quant.name.startswith('FPGA Voltage NP,'):
                     return self.demod_output_NP[demod_num]
-                elif quant.name.startswith('FPGA Single-shot NP'):
+                elif quant.name.startswith('FPGA Single-shot NP,'):
                     return quant.getTraceDict(
                         self.demod_output_vector_NP[demod_num][seq_no], dt=1)
-                elif quant.name.startswith('FPGA Voltage'):
+                elif quant.name.startswith('FPGA Voltage,'):
                     return self.demod_output_ssb[demod_num, :, seq_no].mean()
-                elif quant.name.startswith('FPGA Single-shot'):
+                elif quant.name.startswith('FPGA Single-shot,'):
                     return quant.getTraceDict(
                         self.demod_output_ssb[demod_num, :, seq_no],
                         dt=1)
@@ -235,27 +235,27 @@ class Driver(LabberDriver):
             # return correct data
             if name == 'Signal':
                 value = quant.getTraceDict(self.lTrace[ch], dt=self.dt)
-            elif quant.name.startswith('FPGA Voltage I'):
+            elif quant.name.startswith('FPGA Voltage I,'):
                 value = self.demod_output_I[demod_num]
-            elif quant.name.startswith('FPGA Single-shot I'):
+            elif quant.name.startswith('FPGA Single-shot I,'):
                 value = quant.getTraceDict(
                     self.demod_output_vector_I[demod_num], dt=1)
-            elif quant.name.startswith('FPGA Voltage Q'):
+            elif quant.name.startswith('FPGA Voltage Q,'):
                 value = self.demod_output_Q[demod_num]
-            elif quant.name.startswith('FPGA Single-shot Q'):
+            elif quant.name.startswith('FPGA Single-shot Q,'):
                 value = quant.getTraceDict(
                     self.demod_output_vector_Q[demod_num], dt=1)
-            elif quant.name.startswith('FPGA Single-shot REF'):
+            elif quant.name.startswith('FPGA Single-shot REF,'):
                 value = quant.getTraceDict(
                     self.demod_output_vector_ref[demod_num], dt=1)
-            elif quant.name.startswith('FPGA Voltage NP'):
+            elif quant.name.startswith('FPGA Voltage NP,'):
                 return self.demod_output_NP[demod_num]
-            elif quant.name.startswith('FPGA Single-shot NP'):
+            elif quant.name.startswith('FPGA Single-shot NP,'):
                 return quant.getTraceDict(
                     self.demod_output_vector_NP[demod_num], dt=1)
-            elif quant.name.startswith('FPGA Voltage'):
+            elif quant.name.startswith('FPGA Voltage,'):
                 value = np.mean(self.demod_output_ssb[demod_num])
-            elif quant.name.startswith('FPGA Single-shot'):
+            elif quant.name.startswith('FPGA Single-shot,'):
                 # if no records, don't average over number of averages
                 if self.demod_output_ssb.shape[2] <= 1:
                     value = quant.getTraceDict(
@@ -397,9 +397,8 @@ class Driver(LabberDriver):
                 self.demod_output_SSB = np.zeros(
                     self.num_of_demods, dtype='complex')
                 self.demod_output_vector_NP = np.zeros(
-                    [self.num_of_demods, nSeg], dtype='complex')
-                self.demod_output_NP = np.zeros(
-                    self.num_of_demods, dtype='complex')
+                    [self.num_of_demods, nSeg])
+                self.demod_output_NP = np.zeros(self.num_of_demods)
                 self.moment_I2 = np.zeros(
                     [self.num_of_demods, nSeg], dtype='complex')
                 self.moment_Q2 = np.zeros(
@@ -801,7 +800,7 @@ class Driver(LabberDriver):
     def setFPGATrigger(self):
         FPGA_PcPort_channel = 0
         skip_time = np.int32(np.floor(self.getValue('Skip time')/10e-9) - 4)
-        accum_length = np.int32(np.floor(self.getValue('Integration time')/10e-9))
+        accum_length = np.int32(np.floor(1 + self.getValue('Integration time')/10e-9))
         wait_time = 100 # hardcoded wait time of 100ns in the FPGA
         total_window = skip_time + accum_length + wait_time # total_window is just a safe mechanism
         buffer = np.zeros((2,1),dtype = int)            
