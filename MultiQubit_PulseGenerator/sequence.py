@@ -646,7 +646,7 @@ class SequenceToWaveforms:
             t_start = step.t_end
 
         # Make sure that the sequence is sorted chronologically.
-        self.sequences.sort(key=lambda x: x.t_end)
+        self.sequences.sort(key=lambda x: x.t_start)
 
         # Make sure that the sequnce start on first delay
         time_diff = self._round(self.first_delay-self.sequences[0].t_start)
@@ -815,13 +815,12 @@ class SequenceToWaveforms:
         max_delay = np.max([self.wave_xy_delays[:self.n_qubit],
                             self.wave_z_delays[:self.n_qubit]])
 
+        # find the end of the sequence
         # only include readout in size estimate if all waveforms have same size
         if self.readout_match_main_size:
-            # -1 is the position of readout pulse
-            end = self.sequences[-1].t_end + max_delay
+            end = np.max([s.t_end for s in self.sequences]) + max_delay
         else:
-            # -2 is the position of last pulse, excluding the readout
-            end = self.sequences[-2].t_end + max_delay
+            end = np.max([s.t_end for s in self.sequences[0:-1]]) + max_delay
 
         # create empty waveforms of the correct size
         if self.trim_to_sequence:
@@ -855,6 +854,18 @@ class SequenceToWaveforms:
 
     def _generate_waveforms(self):
         """Generate the waveforms corresponding to the sequence."""
+        # find out if CZ pulses are used, if so pre-calc envelope to save time
+        pulses_cz = set()
+        # find set of all CZ pulses in use
+        for step in self.sequences:
+            for qubit, gate in enumerate(step.gates):
+                pulse = self._get_pulse_for_gate(qubit, gate)
+                if pulse is not None and pulse.shape == PulseShape.CZ:
+                    pulses_cz.add(pulse)
+        # once we've gone through all pulses, pre-calculate the waveforms
+        for pulse in pulses_cz:
+            pulse.calculate_cz_waveform()
+
         for step in self.sequences:
             for qubit, gate in enumerate(step.gates):
                 pulse = self._get_pulse_for_gate(qubit, gate)
