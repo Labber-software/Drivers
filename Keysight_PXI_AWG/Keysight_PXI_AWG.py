@@ -260,9 +260,9 @@ class Driver(LabberDriver):
         self.AWG.waveformFlush()
         self.previous_upload = {(n + 1): np.array([]) for n in range(self.nCh)}
         self.waveform_sizes = dict()
-        # waveform zero is 1us empty waveform used for delays
+        # waveform zero is a 50 us empty waveform used for delays
         waveform_id = 0
-        data_zero = np.zeros(int(round(1E-6 / self.dt)))
+        data_zero = np.zeros(int(round(50E-6 / self.dt)))
         wave = keysightSD1.SD_Wave()
         wave.newFromArrayDouble(0, data_zero)
         self.AWG.waveformLoad(wave, waveform_id)
@@ -369,10 +369,10 @@ class Driver(LabberDriver):
             if delay < 0:
                 raise Error('"Trig delay" must be larger than waveform length')
 
-        # if delay is longer than 50 us, fix by using empty waveform
+        # if delay is longer than 50 us, fix bug by using empty waveform
         if delay > 5000:
-            # empty waveform is 1us long, find number of empty waves needed
-            (n_empty, final_delay) = divmod(delay, 100)
+            # empty waveform is 10 us long, find number of empty waves needed
+            (n_empty, final_delay) = divmod(delay, 5000)
             # queue empty waveforms
             s = self.AWG.AWGqueueWaveform(self.getHwCh(ch), 0, trigMode,
                                           0, n_empty, prescaler)

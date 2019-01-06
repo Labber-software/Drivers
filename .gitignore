@@ -81,3 +81,4 @@ Keysight_PXI_Digitizer/signadyne.py
 .Trashes
 ehthumbs.db
 Thumbs.db
+*.bak

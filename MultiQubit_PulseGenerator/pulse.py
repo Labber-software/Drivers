@@ -191,57 +191,26 @@ class Pulse(object):
             # notation and calculations are based on
             # "Fast adiabatic qubit gates using only sigma_z control"
             # PRA 90, 022307 (2014)
-
-            # Initial and final angles on the |11>-|02> bloch sphere
-            theta_i = np.arctan(self.Coupling / self.Offset)
-            theta_f = np.arctan(self.Coupling / self.amplitude)
-
-            # Normalize fouriere coefficients to initial and final angles
-            self.Lcoeff *= ((theta_f - theta_i) /
-                            (2 * np.sum(self.Lcoeff[range(0,
-                                                          self.F_Terms, 2)])))
-
-            # defining helper variabels
-            n = np.arange(1, self.F_Terms + 1, 1)
-            n_points = 1000  # Number of points in the numerical integration
-
-            # Calculate pulse width in tau variable - See paper for details
-            tau = np.linspace(0, 1, n_points)
-            theta_tau = np.zeros(n_points)
-            for i in range(n_points):
-                theta_tau[i] = np.sum((self.Lcoeff *
-                                       (1 - np.cos(2 * np.pi * n * tau[i]))) +
-                                      theta_i)
-            t_tau = np.trapz(np.sin(theta_tau), x=tau)
-            Width_tau = self.width / t_tau
-
-            # Calculating angle and time as functions of tau
-            tau = np.linspace(0, Width_tau, n_points)
-            t_tau = np.zeros(n_points)
-            for i in range(n_points):
-                theta_tau[i] = np.sum((self.Lcoeff *
-                                       (1 - np.cos(2 * np.pi * n * tau[i] /
-                                                   Width_tau))) + theta_i)
-                if i > 0:
-                    t_tau[i] = np.trapz(np.sin(theta_tau[0:i]), x=tau[0:i])
+            # self.calculate_cz_waveform()
 
             # Plateau is added as an extra extension of theta_f.
-            theta_t = np.ones(len(t)) * theta_i
+            theta_t = np.ones(len(t)) * self.theta_i
             for i in range(len(t)):
                 if 0 < (t[i] - t0 + self.plateau / 2) < self.plateau:
-                    theta_t[i] = theta_f
+                    theta_t[i] = self.theta_f
                 elif (0 < (t[i] - t0 + self.width / 2 + self.plateau / 2) <
                         (self.width + self.plateau) / 2):
                     theta_t[i] = np.interp(
                         t[i] - t0 + self.width / 2 + self.plateau / 2,
-                        t_tau, theta_tau)
+                        self.t_tau, self.theta_tau)
                 elif (0 < (t[i] - t0 + self.width / 2 + self.plateau / 2) <
                       (self.width + self.plateau)):
                     theta_t[i] = np.interp(
                         t[i] - t0 + self.width / 2 - self.plateau / 2,
-                        t_tau, theta_tau)
+                        self.t_tau, self.theta_tau)
 
-            df = self.Coupling * (1 / np.tan(theta_t) - 1 / np.tan(theta_i))
+            df = self.Coupling * (
+                1 / np.tan(theta_t) - 1 / np.tan(self.theta_i))
             if self.qubit is None:
                 # Use linear dependence if no qubit was given
                 values = df / self.dfdV
@@ -268,6 +237,7 @@ class Pulse(object):
         values[t < (t0 - self.total_duration() / 2)] = 0
         values[t > (t0 + self.total_duration() / 2)] = 0
         return values
+
 
     def calculate_waveform(self, t0, t):
         """Calculate pulse waveform including phase shifts and SSB-mixing.
@@ -308,6 +278,43 @@ class Pulse(object):
             y = data_i + 1j * data_q
         return y
 
+    def calculate_cz_waveform(self):
+        """Calculate waveform for c-phase and store in object"""
+        # notation and calculations are based on
+        # "Fast adiabatic qubit gates using only sigma_z control"
+        # PRA 90, 022307 (2014)
+        # Initial and final angles on the |11>-|02> bloch sphere
+        self.theta_i = np.arctan(self.Coupling / self.Offset)
+        self.theta_f = np.arctan(self.Coupling / self.amplitude)
+
+        # Normalize fouriere coefficients to initial and final angles
+        Lcoeff = self.Lcoeff * (
+            (self.theta_f - self.theta_i) /
+            (2 * np.sum(self.Lcoeff[range(0, self.F_Terms, 2)])))
+
+        # defining helper variabels
+        n = np.arange(1, self.F_Terms + 1, 1)
+        n_points = 1000  # Number of points in the numerical integration
+
+        # Calculate pulse width in tau variable - See paper for details
+        tau = np.linspace(0, 1, n_points)
+        self.theta_tau = np.zeros(n_points)
+        for i in range(n_points):
+            self.theta_tau[i] = np.sum(
+                (Lcoeff * (1 - np.cos(2 * np.pi * n * tau[i]))) + self.theta_i)
+        t_tau = np.trapz(np.sin(self.theta_tau), x=tau)
+        Width_tau = self.width / t_tau
+
+        # Calculating angle and time as functions of tau
+        tau = np.linspace(0, Width_tau, n_points)
+        self.t_tau = np.zeros(n_points)
+        for i in range(n_points):
+            self.theta_tau[i] = np.sum(
+                (Lcoeff * (1 - np.cos(2 * np.pi * n * tau[i] / Width_tau))) +
+                self.theta_i)
+            if i > 0:
+                self.t_tau[i] = np.trapz(
+                    np.sin(self.theta_tau[0:i]), x=tau[0:i])
 
 if __name__ == '__main__':
     pass

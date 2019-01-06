@@ -60,7 +60,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
 					self.initiateFlag = False;
 				self.sighound.saGetSweep_32f(self.handle,self.min.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),self.max.ctypes.data_as(ctypes.POINTER(ctypes.c_double)));
 			if quant.name=="Signal":
-				return quant.getTraceDict(self.min, x0=self.startFreq, dx=self.binSize);
+				return quant.getTraceDict(self.min, x0=self.startFreq.value, dx=self.binSize.value);
 			else:
 				return 10.0*np.log10(np.average(10.0**(self.min/10.0)));
 				
