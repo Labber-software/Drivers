@@ -179,6 +179,23 @@ def add_singleQ_S1_Y2p(index, gate_seq):
         gate_seq.append(Gate.Y2m)
         gate_seq.append(Gate.X2m)
 
+def add_singleQ_S1_Z2p(index, gate_seq):
+    """Add single qubit clifford from S1_Z2p.
+
+    (Z2p-like-subset of single qubit clifford group) (3)
+    """
+    if index == 0:
+        gate_seq.append(Gate.X2p)
+        gate_seq.append(Gate.Y2m) 
+        gate_seq.append(Gate.X2m)  
+    elif index == 1:
+        gate_seq.append(Gate.Y2m)
+        gate_seq.append(Gate.I)  # auxiliary
+        gate_seq.append(Gate.I)  # auxiliary
+    elif index == 2:
+        gate_seq.append(Gate.Ym)
+        gate_seq.append(Gate.X2m)
+        gate_seq.append(Gate.I)  # auxiliary
 
 def add_singleQ_based_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
     """Add single-qubit-gates-only-based two Qubit Clifford.
@@ -214,8 +231,19 @@ def add_CNOT_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
         gate_seq_2.append(Gate.CZ)
         add_singleQ_clifford(index_3, gate_seq_1)
         add_singleQ_clifford(index_4, gate_seq_2)
+
     elif generator == 'iSWAP':
-        pass
+        add_singleQ_S1(index_1, gate_seq_1)
+        add_singleQ_S1_Z2p(index_2, gate_seq_2)
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.iSWAP)
+        gate_seq_1.append(Gate.X2p)
+        gate_seq_2.append(Gate.I)
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.iSWAP)
+        add_singleQ_clifford(index_3, gate_seq_1)
+        add_singleQ_clifford(index_4, gate_seq_2)
+
 
 
 def add_iSWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
@@ -243,8 +271,14 @@ def add_iSWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
         gate_seq_2.append(Gate.CZ)
         add_singleQ_clifford(index_3, gate_seq_1)
         add_singleQ_clifford(index_4, gate_seq_2)
+
     elif generator == 'iSWAP':
-        pass
+        add_singleQ_S1(index_1, gate_seq_1)
+        add_singleQ_S1(index_2, gate_seq_2)
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.iSWAP)
+        add_singleQ_clifford(index_3, gate_seq_1)
+        add_singleQ_clifford(index_4, gate_seq_2)
 
 
 def add_SWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
@@ -274,7 +308,20 @@ def add_SWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
         add_singleQ_clifford(index_2, gate_seq_2)
 
     elif generator == 'iSWAP':
-        pass
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.X2m)
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.iSWAP)
+        gate_seq_1.append(Gate.X2m)
+        gate_seq_2.append(Gate.I)
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.iSWAP)
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.X2m)
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.iSWAP)
+        add_singleQ_clifford(index_1, gate_seq_1)
+        add_singleQ_clifford(index_2, gate_seq_2)
 
 
 class SingleQubit_RB(Sequence):
