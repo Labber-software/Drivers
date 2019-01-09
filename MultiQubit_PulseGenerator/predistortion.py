@@ -200,9 +200,14 @@ class ExponentialPredistortion:
             Pre-distorted waveform
 
         """
-        Y = np.fft.rfft(waveform, norm='ortho')
+        # pad with zeros at end to make sure response has time to go to zero
+        pad_time = 6 * max([self.tau1, self.tau2, self.tau3])
+        padded = np.zeros(len(waveform) + round(pad_time / self.dt))
+        padded[:len(waveform)] = waveform
 
-        omega = 2 * np.pi * np.fft.rfftfreq(len(waveform), self.dt)
+        Y = np.fft.rfft(padded, norm='ortho')
+
+        omega = 2 * np.pi * np.fft.rfftfreq(len(padded), self.dt)
         H = (1 +
              (1j * self.A1 * omega * self.tau1) /
              (1j * omega * self.tau1 + 1) +
@@ -210,10 +215,11 @@ class ExponentialPredistortion:
              (1j * omega * self.tau2 + 1) +
              (1j * self.A3 * omega * self.tau3) /
              (1j * omega * self.tau3 + 1))
+
         Yc = Y / H
 
         yc = np.fft.irfft(Yc, norm='ortho')
-        return yc
+        return yc[:len(waveform)]
 
 
 if __name__ == '__main__':
