@@ -4,7 +4,7 @@ import logging
 
 import numpy as np
 
-from gates import Gate, IdentityGate
+from gates import Gate, IdentityGate, RabiGate
 from sequence import Sequence
 
 log = logging.getLogger('LabberDriver')
@@ -75,6 +75,47 @@ class PulseTrain(Sequence):
                 gate = Gate.__getattr__(pulse_type)
             self.add_gate_to_all(gate)
 
+class SpinLocking(Sequence):
+    """ Custom sequence for spin locking experiment.
+
+    Parameters
+    ----------
+    Parameter #1 : Amplitude of the drive pulse.
+    Parameter #2 : Duration of the drive pulse (tau).
+    Parameter #3 : Phase of the drive pulse.
+    Parameter #4 : The spin locking sequence (-1 = SL-3, 0 = SL-5a, 1 = SL-5b)
+
+    """
+
+    def generate_sequence(self, config):
+        """Generate sequence by adding gates/pulses to waveforms."""
+
+        pulse_amp = float(config['Drive pulse amplitude'])
+        pulse_duration = float(config['Drive pulse duration'])
+        pulse_phase = float(config['Drive pulse phase'])
+        pulse_sequence = int(config['Pulse sequence']) # -1 = SL-3, 0 = SL-5a, 1 = SL-5b
+        if pulse_sequence == -1:
+            self.add_gates([[Gate.Yp]])
+        if pulse_sequence == 0:
+            self.add_gates([[Gate.Y2m]])
+        if pulse_sequence == 1:
+            self.add_gates([[Gate.Y2p]])
+        
+        rabi_gate = RabiGate(pulse_amp,pulse_duration,pulse_phase)
+        if pulse_sequence != -1:
+            self.add_gates([[Gate.Xp]])
+        self.add_gates([[rabi_gate]])
+        if pulse_sequence != -1:
+            self.add_gates([[Gate.Xp]])
+
+        if pulse_sequence == -1:
+            self.add_gates([[Gate.Yp]])
+        if pulse_sequence == 0:
+            self.add_gates([[Gate.Y2m]])
+        if pulse_sequence == 1:
+            self.add_gates([[Gate.Y2p]])
+
+        return
 
 if __name__ == '__main__':
     pass
