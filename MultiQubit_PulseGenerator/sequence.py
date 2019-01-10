@@ -160,22 +160,43 @@ class Sequence:
             The compiled qubit sequence.
 
         """
-        self.sequences = []
 
-        if self.perform_process_tomography:
-            self._process_tomography.add_pulses(self)
+        if (config.get('Output multiple sequences', False) == False):
+            self.sequences = []
 
-        self.generate_sequence(config)
+            if self.perform_process_tomography:
+                self._process_tomography.add_pulses(self)
 
-        if self.perform_state_tomography:
-            self._state_tomography.add_pulses(self)
+            self.generate_sequence(config)
 
-        if self.readout_delay > 0:
-            delay = IdentityGate(width=self.readout_delay)
-            self.add_gate_to_all(delay, dt=0)
-        self.add_gate_to_all(ReadoutGate(), dt=0, align='left')
+            if self.perform_state_tomography:
+                self._state_tomography.add_pulses(self)
 
-        return self.sequences
+            if self.readout_delay > 0:
+                delay = IdentityGate(width=self.readout_delay)
+                self.add_gate_to_all(delay, dt=0)
+            self.add_gate_to_all(ReadoutGate(), dt=0, align='left')
+
+            return self.sequences
+        else:
+            self.multi_sequences = []
+            for i in range(int(config.get('Number of multiple sequences', 1))):
+                self.sequences = []
+
+                if self.perform_process_tomography:
+                    self._process_tomography.add_pulses(self)
+
+                self.generate_sequence(config)
+
+                if self.perform_state_tomography:
+                    self._state_tomography.add_pulses(self)
+
+                if self.readout_delay > 0:
+                    delay = IdentityGate(width=self.readout_delay)
+                    self.add_gate_to_all(delay, dt=0)
+                self.add_gate_to_all(ReadoutGate(), dt=0, align='left')
+                self.multi_sequences.append(self.sequences)
+            return self.multi_sequences
 
     # Public methods for adding pulses and gates to the sequence.
     def add_single_pulse(self, qubit, pulse, t0=None, dt=None,
@@ -495,6 +516,7 @@ class SequenceToWaveforms:
         self.align_to_end = False
 
         self.sequences = []
+        self.multi_sequences = []
         self.qubits = [Qubit() for n in range(MAX_QUBIT)]
 
         # waveforms
@@ -544,6 +566,7 @@ class SequenceToWaveforms:
 
         Parameters
         ----------
+
         sequences : list of :obj:`Step`
             The qubit sequence to be compiled.
 
@@ -553,43 +576,105 @@ class SequenceToWaveforms:
             Description of returned object.
 
         """
-        self.sequences = sequences
-        self._seperate_gates()
+        if self.multi_seq == True:
+            # create and return dictionary with waveforms
+            waveforms = dict()
+            list_xy = []
+            list_z = []
+            list_gate = []
+            for i in range(self.N_multiseq):
+                # self.sequences = sequences
+                self.sequences = sequences[i]
 
-        self._add_timings()
-        self._init_waveforms()
+                # initialize waveforms
+                self._wave_xy = [np.zeros(0, dtype=np.complex)
+                                 for n in range(MAX_QUBIT)]
+                self._wave_z = [np.zeros(0) for n in range(MAX_QUBIT)]
+                self._wave_gate = [np.zeros(0) for n in range(MAX_QUBIT)]
 
-        if self.align_to_end:
-            shift = self._round((self.n_pts - 2) / self.sample_rate -
-                                self.sequences[-1].t_end)
-            for step in self.sequences:
-                step.time_shift(shift)
+                self._seperate_gates()
 
-        self._perform_virtual_z()
-        self._generate_waveforms()
-        # collapse all xy pulses to one waveform if no local XY control
-        if not self.local_xy:
-            # sum all waveforms to first one
-            self._wave_xy[0] = np.sum(self._wave_xy[:self.n_qubit], 0)
-            # clear other waveforms
-            for n in range(1, self.n_qubit):
-                self._wave_xy[n][:] = 0.0
+                self._add_timings()
+                self._init_waveforms()
 
-        self._perform_crosstalk_compensation()
-        self._predistort_waveforms()
-        self._add_readout_trig()
-        self._add_microwave_gate()
+                if self.align_to_end:
+                    shift = self._round((self.n_pts - 2) / self.sample_rate -
+                                        self.sequences[-1].t_end)
+                    for step in self.sequences:
+                        step.time_shift(shift)
 
-        # Apply offsets
-        self.readout_iq += self.readout_i_offset + 1j * self.readout_q_offset
+                self._perform_virtual_z()
+                self._generate_waveforms()
+                # collapse all xy pulses to one waveform if no local XY control
+                if not self.local_xy:
+                    # sum all waveforms to first one
+                    self._wave_xy[0] = np.sum(self._wave_xy[:self.n_qubit], 0)
+                    # clear other waveforms
+                    for n in range(1, self.n_qubit):
+                        self._wave_xy[n][:] = 0.0
 
-        # create and return dictionary with waveforms
-        waveforms = dict()
-        waveforms['xy'] = self._wave_xy
-        waveforms['z'] = self._wave_z
-        waveforms['gate'] = self._wave_gate
-        waveforms['readout_trig'] = self.readout_trig
-        waveforms['readout_iq'] = self.readout_iq
+                self._perform_crosstalk_compensation()
+                self._predistort_waveforms()
+                self._add_readout_trig()
+                self._add_microwave_gate()
+
+                # Apply offsets
+                self.readout_iq += self.readout_i_offset + 1j * self.readout_q_offset
+                _xy, _z, _gate = np.hstack(self._wave_xy), np.hstack(self._wave_z), np.hstack(self._wave_gate)
+                list_xy.append(_xy)
+                list_z.append(_z)
+                list_gate.append(_gate)
+                waveforms['readout_trig'] = self.readout_trig
+                waveforms['readout_iq'] = self.readout_iq
+
+            list_xy = np.hstack(list_xy)
+            list_xy = list_xy.reshape(self.N_multiseq, self.n_qubit, int(len(list_xy)/self.n_qubit/self.N_multiseq))
+            list_z = np.hstack(list_z)
+            list_z = list_z.reshape(self.N_multiseq, self.n_qubit, int(len(list_z)/self.n_qubit/self.N_multiseq))
+            list_gate = np.hstack(list_gate)
+            list_gate = list_gate.reshape(self.N_multiseq, self.n_qubit, int(len(list_gate)/self.n_qubit/self.N_multiseq))
+
+            waveforms['xy'] = np.swapaxes((list_xy),0,1)
+            waveforms['z'] = np.swapaxes(list_z,0,1)
+            waveforms['gate'] = np.swapaxes(list_gate,0,1)
+        else:
+            self.sequences = sequences
+            self._seperate_gates()
+
+            self._add_timings()
+            self._init_waveforms()
+
+            if self.align_to_end:
+                shift = self._round((self.n_pts - 2) / self.sample_rate -
+                                    self.sequences[-1].t_end)
+                for step in self.sequences:
+                    step.time_shift(shift)
+
+            self._perform_virtual_z()
+            self._generate_waveforms()
+            # collapse all xy pulses to one waveform if no local XY control
+            if not self.local_xy:
+                # sum all waveforms to first one
+                self._wave_xy[0] = np.sum(self._wave_xy[:self.n_qubit], 0)
+                # clear other waveforms
+                for n in range(1, self.n_qubit):
+                    self._wave_xy[n][:] = 0.0
+
+            self._perform_crosstalk_compensation()
+            self._predistort_waveforms()
+            self._add_readout_trig()
+            self._add_microwave_gate()
+
+            # Apply offsets
+            self.readout_iq += self.readout_i_offset + 1j * self.readout_q_offset
+
+            # create and return dictionary with waveforms
+            waveforms = dict()
+            waveforms['xy'] = self._wave_xy
+            waveforms['z'] = self._wave_z
+            waveforms['gate'] = self._wave_gate
+            waveforms['readout_trig'] = self.readout_trig
+            waveforms['readout_iq'] = self.readout_iq
         return waveforms
 
     def _seperate_gates(self):
@@ -828,6 +913,7 @@ class SequenceToWaveforms:
             if self.n_pts % 2 == 1:
                 # Odd n_pts give spectral leakage in FFT
                 self.n_pts += 1
+
         for n in range(self.n_qubit):
             self._wave_xy[n] = np.zeros(self.n_pts, dtype=np.complex)
             self._wave_z[n] = np.zeros(self.n_pts, dtype=float)
@@ -939,6 +1025,10 @@ class SequenceToWaveforms:
         self.trim_to_sequence = config.get('Trim waveform to sequence')
         self.trim_start = config.get('Trim both start and end')
         self.align_to_end = config.get('Align pulses to end of waveform')
+        self.multi_seq = config.get('Output multiple sequences')
+        self.N_multiseq = int(config.get('Number of multiple sequences', 1))
+        if (self.N_multiseq <= 0):
+            self.N_multiseq = 1 
 
         # qubit spectra
         for n in range(self.n_qubit):

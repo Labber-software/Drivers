@@ -342,6 +342,7 @@ class SingleQubit_RB(Sequence):
         N_cliffords = int(config['Number of Cliffords'])
         randomize = config['Randomize']
         interleave = config['Interleave 1-QB Gate']
+        multi_seq = config['Output multiple sequences']
         if interleave is True:
             interleaved_gate = config['Interleaved 1-QB Gate']
         else:
@@ -351,6 +352,7 @@ class SingleQubit_RB(Sequence):
             self.prev_randomize != randomize or
             self.prev_N_cliffords != N_cliffords or
             self.prev_interleave != interleave or
+            multi_seq == True or 
                 self.prev_interleaved_gate != interleaved_gate):
 
             self.prev_randomize = randomize
@@ -474,6 +476,7 @@ class TwoQubit_RB(Sequence):
         N_cliffords = int(config['Number of Cliffords'])
         randomize = config['Randomize']
         interleave = config['Interleave 2-QB Gate']
+        multi_seq = config['Output multiple sequences']
         if interleave is True:
             interleaved_gate = config['Interleaved 2-QB Gate']
         else:
@@ -484,6 +487,7 @@ class TwoQubit_RB(Sequence):
             self.prev_randomize != randomize or
             self.prev_N_cliffords != N_cliffords or
             self.prev_interleave != interleave or
+            multi_seq == True or 
                 self.prev_interleaved_gate != interleaved_gate):
 
             self.prev_randomize = randomize
