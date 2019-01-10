@@ -185,7 +185,7 @@ class RabiGate(IdentityGate):
         super().__init__(plateau)
         self.amplitude = amplitude
         self.plateau = plateau
-        self.phase = phase
+        self.phase = phase/180.0*np.pi
 
     def get_waveform(self, pulse, t0, t):  # noqa: D102
         pulse = copy(pulse)
