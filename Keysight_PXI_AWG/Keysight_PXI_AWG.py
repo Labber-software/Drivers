@@ -274,13 +274,28 @@ class Driver(LabberDriver):
     def uploadAndQueueWaveforms(self):
         """Upload and queue waveforms for all channels in use"""
         awg_channels = self.getAWGChannelsInUse()
+        # waveform memory is shared by all channels, use counter to increment
+        waveform_counter = 0
+
         for ch in awg_channels:
             # flush queue
             self.AWG.AWGflush(self.getHwCh(ch))
-            # waveform counter is unique id
-            waveform_id = ch + 1
-            self.sendWaveform(ch, waveform_id=waveform_id)
-            self.queueWaveform(ch, waveform_id=waveform_id)
+
+            # check data dimensions
+            data = self.getValueArray('Ch%d - Waveform' % (ch + 1))
+            self.log('Data shape', data.shape)
+            if len(data.shape) == 1:
+                # single traces, upload and queue
+                waveform_counter += 1
+                self.sendWaveform(ch, waveform_counter)
+                self.queueWaveform(ch, waveform_counter)
+            else:
+                # 2D data, upload and queue traces by trace
+                for n in range(data.shape[0]):
+                    waveform_counter += 1
+                    self.sendWaveform(ch, waveform_counter, data[n])
+                    self.queueWaveform(ch, waveform_counter)
+
             # configure channel-specific markers
             self.configureMarker(ch)
             # configure queue to run in cyclic mode
@@ -305,10 +320,11 @@ class Driver(LabberDriver):
         return int(mask)
 
 
-    def sendWaveform(self, ch, waveform_id):
+    def sendWaveform(self, ch, waveform_id, data=None):
         """Send waveform to AWG channel"""
-        # get data
-        data = self.getValueArray('Ch%d - Waveform' % (ch + 1))
+        # get data from channel, if not available
+        if data is None:
+            data = self.getValueArray('Ch%d - Waveform' % (ch + 1))
         # make sure we have at least 30 elements
         if len(data) < 30:
             # pad start or end, depending on trig alignment
@@ -384,8 +400,9 @@ class Driver(LabberDriver):
 
         else:
             # queue waveform, inform user if an error happens
-            s = self.AWG.AWGqueueWaveform(self.getHwCh(ch), waveform_id, trigMode,
-                                          delay, cycles, prescaler)
+            s = self.AWG.AWGqueueWaveform(
+                self.getHwCh(ch), waveform_id, trigMode, delay, cycles,
+                prescaler)
             self.check_keysight_error(s)
 
 

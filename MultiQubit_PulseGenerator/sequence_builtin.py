@@ -4,7 +4,7 @@ import logging
 
 import numpy as np
 
-from gates import Gate, IdentityGate
+from gates import Gate, IdentityGate, RabiGate
 from sequence import Sequence
 
 log = logging.getLogger('LabberDriver')
@@ -75,6 +75,55 @@ class PulseTrain(Sequence):
                 gate = Gate.__getattr__(pulse_type)
             self.add_gate_to_all(gate)
 
+class SpinLocking(Sequence):
+    """ Sequence for spin-locking experiment.
+
+    """
+
+    def generate_sequence(self, config):
+        """Generate sequence by adding gates/pulses to waveforms."""
+
+        pulse_amps = []
+        for ii in range(9):
+            pulse_amps.append(float(config['Drive pulse amplitude #' + str(ii+1)]))
+        #pulse_amp = float(config['Drive pulse amplitude #1'])
+        pulse_duration = float(config['Drive pulse duration'])
+        pulse_phase = float(config['Drive pulse phase'])/180.0*np.pi # Phase in radians
+        pulse_sequence = config['Pulse sequence'] # -1 = SL-3, 0 = SL-5a, 1 = SL-5b
+        #number_of_qubits = 
+        if pulse_sequence == 'SL-3':
+            #self.add_gates([[Gate.Y2p]])
+           self.add_gate_to_all(Gate.Y2p)
+        if pulse_sequence == 'SL-5a':
+            #self.add_gates([[Gate.Y2m]])
+            self.add_gate_to_all(Gate.Y2m)
+        if pulse_sequence == 'SL-5b':
+            #self.add_gates([[Gate.Y2p]])
+            self.add_gate_to_all(Gate.Y2p)
+        
+        if pulse_sequence != 'SL-3':
+            #self.add_gates([[Gate.Xp]])
+            self.add_gate_to_all(Gate.Xp)
+        #self.add_gates([[rabi_gate]])
+        rabi_gates = []
+        for ii in range(5):
+            rabi_gates.append(RabiGate(pulse_amps[ii],pulse_duration,pulse_phase))
+        self.add_gate(list(range(5)),rabi_gates)
+        if pulse_sequence != 'SL-3':
+            #self.add_gates([[Gate.Xp]])
+            self.add_gate_to_all(Gate.Xp)
+
+        if pulse_sequence == 'SL-3':
+            #self.add_gates([[Gate.Y2p]])
+            self.add_gate_to_all(Gate.Y2p)
+        if pulse_sequence == 'SL-5a':
+            #self.add_gates([[Gate.Y2m]])
+            self.add_gate_to_all(Gate.Y2m)
+        if pulse_sequence == 'SL-5b':
+            #self.add_gates([[Gate.Y2p]])
+            self.add_gate_to_all(Gate.Y2p)
+
+        return
 
 if __name__ == '__main__':
     pass

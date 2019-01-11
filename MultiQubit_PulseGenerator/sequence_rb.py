@@ -179,6 +179,23 @@ def add_singleQ_S1_Y2p(index, gate_seq):
         gate_seq.append(Gate.Y2m)
         gate_seq.append(Gate.X2m)
 
+def add_singleQ_S1_Z2p(index, gate_seq):
+    """Add single qubit clifford from S1_Z2p.
+
+    (Z2p-like-subset of single qubit clifford group) (3)
+    """
+    if index == 0:
+        gate_seq.append(Gate.X2p)
+        gate_seq.append(Gate.Y2m) 
+        gate_seq.append(Gate.X2m)  
+    elif index == 1:
+        gate_seq.append(Gate.Y2m)
+        gate_seq.append(Gate.I)  # auxiliary
+        gate_seq.append(Gate.I)  # auxiliary
+    elif index == 2:
+        gate_seq.append(Gate.Ym)
+        gate_seq.append(Gate.X2m)
+        gate_seq.append(Gate.I)  # auxiliary
 
 def add_singleQ_based_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
     """Add single-qubit-gates-only-based two Qubit Clifford.
@@ -214,8 +231,19 @@ def add_CNOT_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
         gate_seq_2.append(Gate.CZ)
         add_singleQ_clifford(index_3, gate_seq_1)
         add_singleQ_clifford(index_4, gate_seq_2)
+
     elif generator == 'iSWAP':
-        pass
+        add_singleQ_S1(index_1, gate_seq_1)
+        add_singleQ_S1_Z2p(index_2, gate_seq_2)
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.iSWAP)
+        gate_seq_1.append(Gate.X2p)
+        gate_seq_2.append(Gate.I)
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.iSWAP)
+        add_singleQ_clifford(index_3, gate_seq_1)
+        add_singleQ_clifford(index_4, gate_seq_2)
+
 
 
 def add_iSWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
@@ -243,8 +271,14 @@ def add_iSWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
         gate_seq_2.append(Gate.CZ)
         add_singleQ_clifford(index_3, gate_seq_1)
         add_singleQ_clifford(index_4, gate_seq_2)
+
     elif generator == 'iSWAP':
-        pass
+        add_singleQ_S1(index_1, gate_seq_1)
+        add_singleQ_S1(index_2, gate_seq_2)
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.iSWAP)
+        add_singleQ_clifford(index_3, gate_seq_1)
+        add_singleQ_clifford(index_4, gate_seq_2)
 
 
 def add_SWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
@@ -274,7 +308,20 @@ def add_SWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
         add_singleQ_clifford(index_2, gate_seq_2)
 
     elif generator == 'iSWAP':
-        pass
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.X2m)
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.iSWAP)
+        gate_seq_1.append(Gate.X2m)
+        gate_seq_2.append(Gate.I)
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.iSWAP)
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.X2m)
+        gate_seq_1.append(Gate.I)
+        gate_seq_2.append(Gate.iSWAP)
+        add_singleQ_clifford(index_1, gate_seq_1)
+        add_singleQ_clifford(index_2, gate_seq_2)
 
 
 class SingleQubit_RB(Sequence):
@@ -295,15 +342,17 @@ class SingleQubit_RB(Sequence):
         N_cliffords = int(config['Number of Cliffords'])
         randomize = config['Randomize']
         interleave = config['Interleave 1-QB Gate']
+        multi_seq = config.get('Output multiple sequences', False)
         if interleave is True:
             interleaved_gate = config['Interleaved 1-QB Gate']
         else:
             interleaved_gate = -999.999
         # generate new randomized clifford gates only if configuration changes
         if (self.prev_sequence != sequence or
-            self.prev_randomize != randomize or
-            self.prev_N_cliffords != N_cliffords or
-            self.prev_interleave != interleave or
+                self.prev_randomize != randomize or
+                self.prev_N_cliffords != N_cliffords or
+                self.prev_interleave != interleave or
+                multi_seq or
                 self.prev_interleaved_gate != interleaved_gate):
 
             self.prev_randomize = randomize
@@ -427,6 +476,7 @@ class TwoQubit_RB(Sequence):
         N_cliffords = int(config['Number of Cliffords'])
         randomize = config['Randomize']
         interleave = config['Interleave 2-QB Gate']
+        multi_seq = config.get('Output multiple sequences', False)
         if interleave is True:
             interleaved_gate = config['Interleaved 2-QB Gate']
         else:
@@ -434,9 +484,10 @@ class TwoQubit_RB(Sequence):
 
         # generate new randomized clifford gates only if configuration changes
         if (self.prev_sequence != sequence or
-            self.prev_randomize != randomize or
-            self.prev_N_cliffords != N_cliffords or
-            self.prev_interleave != interleave or
+                self.prev_randomize != randomize or
+                self.prev_N_cliffords != N_cliffords or
+                self.prev_interleave != interleave or
+                multi_seq or
                 self.prev_interleaved_gate != interleaved_gate):
 
             self.prev_randomize = randomize
