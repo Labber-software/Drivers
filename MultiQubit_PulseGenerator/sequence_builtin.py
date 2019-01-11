@@ -88,7 +88,7 @@ class SpinLocking(Sequence):
             pulse_amps.append(float(config['Drive pulse amplitude #' + str(ii+1)]))
         #pulse_amp = float(config['Drive pulse amplitude #1'])
         pulse_duration = float(config['Drive pulse duration'])
-        pulse_phase = float(config['Drive pulse phase'])
+        pulse_phase = float(config['Drive pulse phase'])/180.0*np.pi # Phase in radians
         pulse_sequence = config['Pulse sequence'] # -1 = SL-3, 0 = SL-5a, 1 = SL-5b
         #number_of_qubits = 
         if pulse_sequence == 'SL-3':
