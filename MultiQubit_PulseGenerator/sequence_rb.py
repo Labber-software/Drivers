@@ -342,17 +342,17 @@ class SingleQubit_RB(Sequence):
         N_cliffords = int(config['Number of Cliffords'])
         randomize = config['Randomize']
         interleave = config['Interleave 1-QB Gate']
-        multi_seq = config['Output multiple sequences']
+        multi_seq = config.get('Output multiple sequences', False)
         if interleave is True:
             interleaved_gate = config['Interleaved 1-QB Gate']
         else:
             interleaved_gate = -999.999
         # generate new randomized clifford gates only if configuration changes
         if (self.prev_sequence != sequence or
-            self.prev_randomize != randomize or
-            self.prev_N_cliffords != N_cliffords or
-            self.prev_interleave != interleave or
-            multi_seq == True or 
+                self.prev_randomize != randomize or
+                self.prev_N_cliffords != N_cliffords or
+                self.prev_interleave != interleave or
+                multi_seq or
                 self.prev_interleaved_gate != interleaved_gate):
 
             self.prev_randomize = randomize
@@ -476,7 +476,7 @@ class TwoQubit_RB(Sequence):
         N_cliffords = int(config['Number of Cliffords'])
         randomize = config['Randomize']
         interleave = config['Interleave 2-QB Gate']
-        multi_seq = config['Output multiple sequences']
+        multi_seq = config.get('Output multiple sequences', False)
         if interleave is True:
             interleaved_gate = config['Interleaved 2-QB Gate']
         else:
@@ -484,10 +484,10 @@ class TwoQubit_RB(Sequence):
 
         # generate new randomized clifford gates only if configuration changes
         if (self.prev_sequence != sequence or
-            self.prev_randomize != randomize or
-            self.prev_N_cliffords != N_cliffords or
-            self.prev_interleave != interleave or
-            multi_seq == True or 
+                self.prev_randomize != randomize or
+                self.prev_N_cliffords != N_cliffords or
+                self.prev_interleave != interleave or
+                multi_seq or
                 self.prev_interleaved_gate != interleaved_gate):
 
             self.prev_randomize = randomize
