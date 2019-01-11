@@ -2,6 +2,7 @@
 import importlib
 import os
 import sys
+import copy
 
 import numpy as np
 
@@ -111,9 +112,47 @@ class Driver(LabberDriver):
                 config = self.instrCfg.getValuesDict()
                 self.sequence.set_parameters(config)
                 self.sequence_to_waveforms.set_parameters(config)
-                # calcluate waveforms
-                self.waveforms = self.sequence_to_waveforms.get_waveforms(
-                    self.sequence.get_sequence(config))
+
+                # check if calculating multiple sequences, for randomization
+                if config.get('Output multiple sequences', False):
+                    # create multiple randomizations, store in memory
+                    n_call = int(config.get('Number of multiple sequences', 1))
+                    calls = []
+                    for n in range(n_call):
+                        calls.append(
+                            copy.deepcopy(
+                                self.sequence_to_waveforms.get_waveforms(
+                                    self.sequence.get_sequence(config))))
+
+                    # after all calls are done, convert output to matrix form
+                    self.waveforms = dict()
+                    n_qubit = self.sequence.n_qubit
+                    # start with xy, z and gate waveforms, list of data
+                    for key in ['xy', 'z', 'gate']:
+                        # get size of longest waveform
+                        self.waveforms[key] = []
+                        for n in range(n_qubit):
+                            length = max([len(call[key][n]) for call in calls])
+                            # build matrix
+                            datatype = calls[0][key][n].dtype
+                            data = np.zeros((n_call, length), dtype=datatype)
+                            for m, call in enumerate(calls):
+                                data[m][:len(call[key][n])] = call[key][n]
+                            self.waveforms[key].append(data)
+
+                    # same for readout waveforms
+                    for key in ['readout_trig', 'readout_iq']:
+                        length = max([len(call[key]) for call in calls])
+                        datatype = calls[0][key].dtype
+                        data = np.zeros((n_call, length), dtype=datatype)
+                        for m, call in enumerate(calls):
+                            data[m][:len(call[key])] = call[key]
+                        self.waveforms[key] = data
+
+                else:
+                    # normal operation, calcluate waveforms
+                    self.waveforms = self.sequence_to_waveforms.get_waveforms(
+                        self.sequence.get_sequence(config))
             # get correct data from waveforms stored in memory
             value = self.getWaveformFromMemory(quant)
         else:
