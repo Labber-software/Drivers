@@ -131,7 +131,7 @@ class Predistortion(object):
 
 
 class ExponentialPredistortion:
-    """Implement a three-pole predistortion on the Z waveforms.
+    """Implement a four-pole predistortion on the Z waveforms.
 
     Parameters
     ----------
@@ -152,6 +152,10 @@ class ExponentialPredistortion:
         Amplitude for the third pole.
     tau3 : float
         Time constant for the third pole.
+    A4 : float
+        Amplitude for the fourth pole.
+    tau4 : float
+        Time constant for the fourth pole.
     dt : float
         Sample spacing for the waveform.
 
@@ -164,6 +168,8 @@ class ExponentialPredistortion:
         self.tau2 = 0
         self.A3 = 0
         self.tau3 = 0
+        self.A4 = 0
+        self.tau4 = 0
         self.dt = 1
         self.n = int(waveform_number)
 
@@ -184,6 +190,9 @@ class ExponentialPredistortion:
 
         self.A3 = config.get('Predistort Z{} - A3'.format(m))
         self.tau3 = config.get('Predistort Z{} - tau3'.format(m))
+        self.A4 = config.get('Predistort Z{} - A4'.format(m))
+        self.tau4 = config.get('Predistort Z{} - tau4'.format(m))
+
         self.dt = 1 / config.get('Sample rate')
 
     def predistort(self, waveform):
@@ -214,7 +223,9 @@ class ExponentialPredistortion:
              (1j * self.A2 * omega * self.tau2) /
              (1j * omega * self.tau2 + 1) +
              (1j * self.A3 * omega * self.tau3) /
-             (1j * omega * self.tau3 + 1))
+             (1j * omega * self.tau3 + 1) +
+             (1j * self.A4 * omega * self.tau4) /
+             (1j * omega * self.tau4 + 1))
 
         Yc = Y / H
 
