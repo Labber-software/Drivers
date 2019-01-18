@@ -3,12 +3,15 @@ import logging
 import random as rnd
 
 import numpy as np
+import cliffords
+import copy
 
 from gates import Gate
 from sequence import Sequence
 
 log = logging.getLogger('LabberDriver')
-
+import os
+path_currentdir  = os.path.dirname(os.path.realpath(__file__)) # curret directory
 
 def add_singleQ_clifford(index, gate_seq, pad_with_I=True):
     """Add single qubit clifford (24)."""
@@ -386,8 +389,21 @@ class SingleQubit_RB(Sequence):
             self.add_gates(self.prev_gate_seq)
 
     def evaluate_sequence(self, gate_seq):
-        """Evaluate Single Qubit Gate Sequence."""
-# http://www.vcpc.univie.ac.at/~ian/hotlist/qc/talks/bloch-sphere-rotations.pdf
+        """
+        Evaluate a single qubit gate sequence.
+        (Reference: http://www.vcpc.univie.ac.at/~ian/hotlist/qc/talks/bloch-sphere-rotations.pdf)
+
+        Parameters
+        ----------
+        gate_seq_1: list of class Gate (defined in "gates.py")
+            The gate sequence applied to a qubit
+
+        Returns
+        -------
+        singleQ_gate: np.matrix
+            The evaulation result.
+        """
+
         singleQ_gate = np.matrix([[1, 0], [0, 1]])
         for i in range(len(gate_seq)):
             if (gate_seq[i] == Gate.I):
@@ -422,7 +438,20 @@ class SingleQubit_RB(Sequence):
         return singleQ_gate
 
     def get_recovery_gate(self, gate_seq):
-        """Get recovery gate."""
+        """
+        Get the recovery (the inverse) gate
+        
+        Parameters
+        ----------
+        gate_seq: list of class Gate
+            The gate sequence applied to a qubit
+
+        Returns
+        -------
+        recovery_gate: Gate
+            The recovery gate
+        """
+
         qubit_state = np.matrix('1; 0')
         # initial state: ground state, following the QC community's convention
         qubit_state = np.matmul(self.evaluate_sequence(gate_seq), qubit_state)
@@ -467,7 +496,18 @@ class TwoQubit_RB(Sequence):
     prev_gate_seq = []
 
     def generate_sequence(self, config):
-        """Generate sequence by adding gates/pulses to waveforms."""
+        """
+        Generate sequence by adding gates/pulses to waveforms.
+        
+        Parameters
+        ----------
+        config: dict
+            configuration
+
+        Returns
+        -------
+        """
+
         # get parameters
         sequence = config['Sequence']
         qubits_to_benchmark = np.fromstring(
@@ -516,8 +556,8 @@ class TwoQubit_RB(Sequence):
                             gate_seq_1.append(g[0])
                             gate_seq_2.append(g[1])
                     elif interleaved_gate == 'I':
-                        log.info('Qubits to benchmark: ' + str(qubits_to_benchmark))
-                        #gate = Gate.I(width = self.pulses_2qb[qubit]).value
+                        # log.info('Qubits to benchmark: ' + str(qubits_to_benchmark))
+                        # gate = Gate.I(width = self.pulses_2qb[qubit]).value
                         gate_seq_1.append(Gate.I)
                         gate_seq_2.append(Gate.I)
                         
@@ -528,6 +568,14 @@ class TwoQubit_RB(Sequence):
             gate_seq_1.extend(recovery_seq_1)
             gate_seq_2.extend(recovery_seq_2)
 
+            # test the recovery gate
+            psi_gnd = np.matrix('1; 0; 0; 0') # ground state |00>
+            print(gate_seq_1, gate_seq_2)
+            psi = np.matmul(self.evaluate_sequence(gate_seq_1, gate_seq_2), psi_gnd)
+            log.info('--- TESTING THE RECOVERY GATE ---')
+            log.info('The probability amplitude of the final state vector: ' + str(np.matrix(psi).flatten()))
+            log.info('The population of the ground state after the gate sequence: %.4f'%(np.abs(psi[0,0])**2))
+            log.info('-------------------------------------------')
             # Assign two qubit gate sequence to where we want
             if (self.n_qubit > qubits_to_benchmark[0]):
                 for i in range(qubits_to_benchmark[0] - 1):
@@ -564,10 +612,10 @@ class TwoQubit_RB(Sequence):
         
         Parameters
         ----------
-        gate_seq_1: list of class Gate
+        gate_seq_1: list of class Gate (defined in "gates.py")
             The gate sequence applied to Qubit "1"
 
-        gate_seq_2: list of class Gate
+        gate_seq_2: list of class Gate (defined in "gates.py")
             The gate sequence applied to Qubit "2"
 
         Returns
@@ -631,6 +679,11 @@ class TwoQubit_RB(Sequence):
                 gate_12 = np.matmul(
                     np.matrix([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0],
                                [0, 0, 0, -1]]), gate_12)
+            # iSWAP <- To be added.
+            # elif (gate_seq_1[i] == Gate.iSWAP or gate_seq_2[i] == Gate.iSWAP):
+            #     gate_12 = np.matmul(
+            #         np.matrix([[1, 0, 0, 0], [0, 0, 1j, 0], [0, 1j, 0, 0],
+            #                    [0, 0, 0, 1]]), gate_12)
 
             twoQ_gate = np.matmul(gate_12, twoQ_gate)
 
@@ -653,7 +706,7 @@ class TwoQubit_RB(Sequence):
 
         Returns
         -------
-        (recovery_seq_1, recovery_seq_2): tuple (shape = (2))
+        (recovery_seq_1, recovery_seq_2): tuple of the lists 
             The recovery gate
         """
 
@@ -671,18 +724,43 @@ class TwoQubit_RB(Sequence):
 
         # Search the recovery gate in two Qubit clifford group
         find_cheapest = config['Find the cheapest recovery Clifford']
+
+        cheapest_recovery_seq_1 = []
+        cheapest_recovery_seq_2 = []
         if (find_cheapest == True):
             min_N_2QB_gate = np.inf
             min_N_1QB_gate = np.inf
             max_N_I_gate = -np.inf
-            cheapest_recovery_seq_1 = []
-            cheapest_recovery_seq_2 = []
+            cheapest_index = None
+
+            use_lookup_table = config['Use a look-up table']
+            if (use_lookup_table == True):
+                filepath_lookup_table = config['File path of the look-up table']
+                dict_lookup_table = cliffords.loadData(filepath_lookup_table)
+                stabilizer = cliffords.get_stabilizer(qubit_state)
+                for index, item in enumerate(dict_lookup_table['psi_stabilizer']):
+                    if stabilizer == item:
+                        seq1 = dict_lookup_table['recovery_gates_QB1'][index]
+                        for str_Gate in seq1:
+                            cheapest_recovery_seq_1.append(cliffords.strGate_to_Gate(str_Gate))
+                        seq2 = dict_lookup_table['recovery_gates_QB2'][index]
+                        for str_Gate in seq2:
+                            cheapest_recovery_seq_2.append(cliffords.strGate_to_Gate(str_Gate))
+                        
+                        log.info("=== FOUND THE CHEAPEST RECOVERY GATE IN THE LOOK-UP TABLE. ===")
+                        log.info("QB1 recovery gate sequence: " + str(seq1))
+                        log.info("QB2 recovery gate sequence: " + str(seq2))
+                        log.info("=================================================")
+                        return(cheapest_recovery_seq_1, cheapest_recovery_seq_2)
+
+            log.info("--- COULDN'T FIND THE RECOVERY GATE IN THE LOOK-UP TABLE... ---")
 
         for i in range(total_num_cliffords):
+            recovery_seq_1 = []
+            recovery_seq_2 = []
             add_twoQ_clifford(i, recovery_seq_1, recovery_seq_2)
             qubit_final_state = np.matmul(self.evaluate_sequence(
                 recovery_seq_1, recovery_seq_2), qubit_state)
-            # numerical error threshold: 1e-4
             if np.abs(np.abs(qubit_final_state[0]) - 1) < 1e-6:
                 if (find_cheapest == True):
                     # Less 2QB Gates, Less 1QB Gates, and More I Gates = the cheapest gate.
@@ -692,14 +770,14 @@ class TwoQubit_RB(Sequence):
                     N_I_gate = 0
 
                     # count the numbers of the gates
-                    for i in range(len(recovery_seq_1)):
-                        if (gate_seq_1[i] == Gate.CZ or gate_seq_2[i] == Gate.CZ):
+                    for j in range(len(recovery_seq_1)):
+                        if (gate_seq_1[j] == Gate.CZ or gate_seq_2[j] == Gate.CZ):
                             N_2QB_gate += 1
                         else:
                             N_1QB_gate += 2
-                        if (gate_seq_1[i] == Gate.I):
+                        if (gate_seq_1[j] == Gate.I):
                             N_I_gate += 1
-                        if (gate_seq_2[i] == Gate.I):
+                        if (gate_seq_2[j] == Gate.I):
                             N_I_gate += 1
 
                     if (N_2QB_gate < min_N_2QB_gate): # less 2QB gates
@@ -708,41 +786,25 @@ class TwoQubit_RB(Sequence):
                                 min_N_2QB_gate = N_2QB_gate
                                 min_N_1QB_gate = N_1QB_gate
                                 max_N_I_gate = N_I_gate
-                                cheapest_recovery_seq_1 = recovery_seq_1
-                                cheapest_recovery_seq_2 = recovery_seq_1
+                                cheapest_index = i
 
                 else:
                     break
-            else:
-                recovery_seq_1 = []
-                recovery_seq_2 = []
+
+        if (find_cheapest == True):
+            recovery_seq_1 = []
+            recovery_seq_2 = []
+            log.info('The index of the cheapest recovery clifford: %d'%(cheapest_index))
+            add_twoQ_clifford(cheapest_index, recovery_seq_1, recovery_seq_2)
+
 
         if (recovery_seq_1 == [] and recovery_seq_2 == []):
             recovery_seq_1 = [None]
             recovery_seq_2 = [None]
-        if (find_cheapest == True):
-            #log.info('Final state: ')
-            #log.info('Number of 2QB gates: %d, Number of 1QB gates: %d, Number of I gates: %d'%(N_2QB_gate, N_1QB_gate, N_I_gate))
-            log.info(str(cheapest_recovery_seq_1)+str(cheapest_recovery_seq_2))
-            return (cheapest_recovery_seq_1, cheapest_recovery_seq_2)
-        else: 
-            return (recovery_seq_1, recovery_seq_2)
 
-
-    def find_stabilizer_group(qubit_state):
-        """
-        Get the stabilizer group corresponding the qubit_state
         
-        Parameters
-        ----------
-        qubit_state: np.matrix (4x4)
-            
+        return (recovery_seq_1, recovery_seq_2)
 
-        Returns
-        -------
-        stabilizer: list (length =2)
-            The stabilizer group
-        """
 
 if __name__ == '__main__':
     pass
