@@ -1056,8 +1056,8 @@ class SequenceToWaveforms:
                     pulse.plateau = config.get('Plateau, 2QB' + s)
                 # pulse-specific parameters
                 pulse.amplitude = config.get('Amplitude, 2QB' + s)
-        Gate.CZ.value.new_angles(config.get('QB1 Phi 2QB #12'),
-                                 config.get('QB2 Phi 2QB #12'))
+            Gate.CZ.value.new_angles(config.get('QB1 Phi 2QB #12'),
+                                     config.get('QB2 Phi 2QB #12'))
 
         # predistortion
         self.perform_predistortion = config.get('Predistort waveforms', False)
