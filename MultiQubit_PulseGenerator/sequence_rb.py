@@ -495,6 +495,13 @@ class TwoQubit_RB(Sequence):
     prev_sequence = ''
     prev_gate_seq = []
 
+    filepath_lookup_table = ""
+
+    # def __init__(self, *args, **kwargs):        
+    #     log.info(str(args)+ str(kwargs))
+    #     super(Sequence, self).__init__(*args, **kwargs)
+    #     self.filepath_lookup_table = ""
+
     def generate_sequence(self, config):
         """
         Generate sequence by adding gates/pulses to waveforms.
@@ -569,13 +576,13 @@ class TwoQubit_RB(Sequence):
             gate_seq_2.extend(recovery_seq_2)
 
             # test the recovery gate
-            psi_gnd = np.matrix('1; 0; 0; 0') # ground state |00>
-            print(gate_seq_1, gate_seq_2)
-            psi = np.matmul(self.evaluate_sequence(gate_seq_1, gate_seq_2), psi_gnd)
-            log.info('--- TESTING THE RECOVERY GATE ---')
-            log.info('The probability amplitude of the final state vector: ' + str(np.matrix(psi).flatten()))
-            log.info('The population of the ground state after the gate sequence: %.4f'%(np.abs(psi[0,0])**2))
-            log.info('-------------------------------------------')
+            # psi_gnd = np.matrix('1; 0; 0; 0') # ground state |00>
+            # print(gate_seq_1, gate_seq_2)
+            # psi = np.matmul(self.evaluate_sequence(gate_seq_1, gate_seq_2), psi_gnd)
+            # log.info('--- TESTING THE RECOVERY GATE ---')
+            # log.info('The probability amplitude of the final state vector: ' + str(np.matrix(psi).flatten()))
+            # log.info('The population of the ground state after the gate sequence: %.4f'%(np.abs(psi[0,0])**2))
+            # log.info('-------------------------------------------')
             # Assign two qubit gate sequence to where we want
             if (self.n_qubit > qubits_to_benchmark[0]):
                 for i in range(qubits_to_benchmark[0] - 1):
@@ -736,14 +743,19 @@ class TwoQubit_RB(Sequence):
             use_lookup_table = config['Use a look-up table']
             if (use_lookup_table == True):
                 filepath_lookup_table = config['File path of the look-up table']
-                dict_lookup_table = cliffords.loadData(filepath_lookup_table)
+                if len(filepath_lookup_table) == 0:
+                    filepath_lookup_table = os.path.join(path_currentdir, 'recovery_rb_table.pickle')
+                if filepath_lookup_table != self.filepath_lookup_table:
+                    log.info("Load Look-up table.")
+                    self.filepath_lookup_table = filepath_lookup_table
+                    self.dict_lookup_table = cliffords.loadData(filepath_lookup_table)
                 stabilizer = cliffords.get_stabilizer(qubit_state)
-                for index, item in enumerate(dict_lookup_table['psi_stabilizer']):
+                for index, item in enumerate(self.dict_lookup_table['psi_stabilizer']):
                     if stabilizer == item:
-                        seq1 = dict_lookup_table['recovery_gates_QB1'][index]
+                        seq1 = self.dict_lookup_table['recovery_gates_QB1'][index]
                         for str_Gate in seq1:
                             cheapest_recovery_seq_1.append(cliffords.strGate_to_Gate(str_Gate))
-                        seq2 = dict_lookup_table['recovery_gates_QB2'][index]
+                        seq2 = self.dict_lookup_table['recovery_gates_QB2'][index]
                         for str_Gate in seq2:
                             cheapest_recovery_seq_2.append(cliffords.strGate_to_Gate(str_Gate))
                         
@@ -780,13 +792,34 @@ class TwoQubit_RB(Sequence):
                         if (gate_seq_2[j] == Gate.I):
                             N_I_gate += 1
 
-                    if (N_2QB_gate < min_N_2QB_gate): # less 2QB gates
-                        if (N_1QB_gate < min_N_1QB_gate): # less 1QB gates
-                            if (N_I_gate > max_N_I_gate): # more I gates
-                                min_N_2QB_gate = N_2QB_gate
-                                min_N_1QB_gate = N_1QB_gate
-                                max_N_I_gate = N_I_gate
-                                cheapest_index = i
+                    if (N_2QB_gate <= min_N_2QB_gate): # if it has less 2QB gates, always update it
+                        min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
+                        
+                        if (N_1QB_gate <= min_N_1QB_gate): # *only if it has less 2QB gates*, check whether it has less 1QB gates
+                            min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
+
+                            if (N_I_gate >= max_N_I_gate): # *only if it has less 2QB gates & only if it has less 1QB gates*, check whether it has more I gates
+                                min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
+
+                    # check whether it is the cheapest
+                    # if it has less 2QB gates, always update it
+                    if (N_2QB_gate < min_N_2QB_gate): 
+                        min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
+                        log.info('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
+                    else:
+                        # if it has equal # of 2QB gates and less 1QB gates, update it
+                        if (N_2QB_gate == min_N_2QB_gate and 
+                            N_1QB_gate < min_N_1QB_gate): # *only if it has less 2QB gates*, check whether it has less 1QB gates
+                            min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
+                            log.info('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
+                        else:
+                            # if it has equal # of 1QB gates and more 1QB gates, update it
+                            if (N_2QB_gate == min_N_2QB_gate and 
+                                N_1QB_gate == min_N_1QB_gate and 
+                                N_I_gate >= max_N_I_gate): # *only if it has less 2QB gates & only if it has less 1QB gates*, check whether it has more I gates
+                                min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
+                                log.info('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
+
 
                 else:
                     break

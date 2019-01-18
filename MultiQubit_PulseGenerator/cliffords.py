@@ -292,7 +292,7 @@ def loadData(file_path):
     print(file_path)
     return data
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
     # -------------------------------------------------------------------
     # ----- THIS IS FOR GENERATING RECOVERY CLIFFORD LOOK-UP TABLE ------
     # -------------------------------------------------------------------
@@ -328,8 +328,6 @@ def loadData(file_path):
             min_N_1QB_gate = np.inf
             max_N_I_gate = -np.inf
             cheapest_index = None
-            # cheapest_recovery_seq_QB1 = []
-            # cheapest_recovery_seq_QB2 = []
 
             for j in range(N_2QBcliffords):
                 recovery_gate = generate_2QB_Cliffords(j)
@@ -340,9 +338,7 @@ def loadData(file_path):
                 if np.abs(1-np.abs(dot(recovery_gate, psi)[0,0])) < 1e-6: # if the gate is recovery, check if it is the cheapest.
                     # Less 2QB Gates, Less 1QB Gates, and More I Gates = the cheapest gate.
                     # The priority: less 2QB gates > less 1QB gates > more I gates
-                    N_2QB_gate = 0
-                    N_1QB_gate = 0
-                    N_I_gate = 0
+                    N_2QB_gate, N_1QB_gate, N_I_gate = 0, 0, 0
 
                     # count the numbers of the gates
                     for k in range(len(seq_QB1)):
@@ -356,15 +352,25 @@ def loadData(file_path):
                             N_I_gate += 1
 
                     # check whether it is the cheapest
-                    if (N_2QB_gate < min_N_2QB_gate): # less 2QB gates
-                        if (N_1QB_gate < min_N_1QB_gate): # less 1QB gates
-                            if (N_I_gate > max_N_I_gate): # more I gates
-                                min_N_2QB_gate = N_2QB_gate
-                                min_N_1QB_gate = N_1QB_gate
-                                max_N_I_gate = N_I_gate
-                                cheapest_index = j
-                                # cheapest_recovery_seq_QB1 = seq_QB1
-                                # cheapest_recovery_seq_QB2 = seq_QB2
+                    # if it has less 2QB gates, always update it
+                    if (N_2QB_gate < min_N_2QB_gate): 
+                        min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
+                        print('the cheapest sequence update! ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
+                    else:
+                        # if it has equal # of 2QB gates and less 1QB gates, update it
+                        if (N_2QB_gate == min_N_2QB_gate and 
+                            N_1QB_gate < min_N_1QB_gate): # *only if it has less 2QB gates*, check whether it has less 1QB gates
+                            min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
+                            print('the cheapest sequence update! ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
+                        else:
+                            # if it has equal # of 1QB gates and more 1QB gates, update it
+                            if (N_2QB_gate == min_N_2QB_gate and 
+                                N_1QB_gate == min_N_1QB_gate and 
+                                N_I_gate >= max_N_I_gate): # *only if it has less 2QB gates & only if it has less 1QB gates*, check whether it has more I gates
+                                min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
+                                print('the cheapest sequence update! ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
+
+
 
             seq_recovery_QB1 = []
             seq_recovery_QB2 = []
