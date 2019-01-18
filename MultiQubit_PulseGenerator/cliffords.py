@@ -291,7 +291,7 @@ def loadData(file_path):
     print('--- File Load Success! --- ')
     print(file_path)
     return data
-    
+
 # if __name__ == "__main__":
     # -------------------------------------------------------------------
     # ----- THIS IS FOR GENERATING RECOVERY CLIFFORD LOOK-UP TABLE ------
@@ -394,8 +394,8 @@ def loadData(file_path):
     dict_result['psi'] = list_psi
     dict_result['recovery_gates_QB1'] = list_recovery_gates_QB1
     dict_result['recovery_gates_QB2'] = list_recovery_gates_QB2
-    saveData_pickle('recovery_rb_table.pickle', dict_result)
+    saveData('recovery_rb_table.pickle', dict_result)
     
     # load the results.
-    # dict_result =loadData_dill('recovery_rb_table.dill')
+    # dict_result =loadData('recovery_rb_table.dill')
     # print(dict_result['psi_stabilizer'])
