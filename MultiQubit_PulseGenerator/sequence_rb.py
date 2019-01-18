@@ -802,21 +802,21 @@ class TwoQubit_RB(Sequence):
                                 min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
 
                     # check whether it is the cheapest
-                    # if it has less 2QB gates, always update it
+                    # if it has less 2QB gates, always update it.
                     if (N_2QB_gate < min_N_2QB_gate): 
                         min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
                         log.info('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
                     else:
-                        # if it has equal # of 2QB gates and less 1QB gates, update it
+                        # if it has equal # of 2QB gates and less 1QB gates, update it.
                         if (N_2QB_gate == min_N_2QB_gate and 
-                            N_1QB_gate < min_N_1QB_gate): # *only if it has less 2QB gates*, check whether it has less 1QB gates
+                            N_1QB_gate < min_N_1QB_gate): 
                             min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
                             log.info('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
                         else:
-                            # if it has equal # of 1QB gates and more 1QB gates, update it
+                            # if it has equal # of 2QB & 1QB gates, and more 1QB gates, update it.
                             if (N_2QB_gate == min_N_2QB_gate and 
                                 N_1QB_gate == min_N_1QB_gate and 
-                                N_I_gate >= max_N_I_gate): # *only if it has less 2QB gates & only if it has less 1QB gates*, check whether it has more I gates
+                                N_I_gate >= max_N_I_gate): 
                                 min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
                                 log.info('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
 
