@@ -4,7 +4,7 @@ from numpy.linalg import inv as inv
 from numpy.linalg import eig as eig
 from numpy import tensordot as tensor
 from numpy import dot
-import dill as pickle
+import pickle
 
 import itertools
 import sequence_rb
@@ -250,7 +250,7 @@ def generate_2QB_Cliffords(_index):
 def saveData(file_path, data):
 
     """
-    Create a log file.
+    Create a log file. (Use the built-in pickle module)
     
     Parameters
     ----------
@@ -272,7 +272,7 @@ def saveData(file_path, data):
 def loadData(file_path):
 
     """
-    Load a log file.
+    Load a log file. (Use the built-in pickle module)
     
     Parameters
     ----------
@@ -291,8 +291,8 @@ def loadData(file_path):
     print('--- File Load Success! --- ')
     print(file_path)
     return data
-
-if __name__ == "__main__":
+    
+# if __name__ == "__main__":
     # -------------------------------------------------------------------
     # ----- THIS IS FOR GENERATING RECOVERY CLIFFORD LOOK-UP TABLE ------
     # -------------------------------------------------------------------
@@ -388,10 +388,14 @@ if __name__ == "__main__":
             print('The cheapest recovery clifford gate (QB2): ' + str(seq_recovery_QB2))
             print('\n')
 
+    # save the results.
     dict_result ={}
     dict_result['psi_stabilizer'] = list_stabilizer
     dict_result['psi'] = list_psi
     dict_result['recovery_gates_QB1'] = list_recovery_gates_QB1
     dict_result['recovery_gates_QB2'] = list_recovery_gates_QB2
-
-    saveData('recovery_rb_table.pickle', dict_result)
+    saveData_pickle('recovery_rb_table.pickle', dict_result)
+    
+    # load the results.
+    # dict_result =loadData_dill('recovery_rb_table.dill')
+    # print(dict_result['psi_stabilizer'])
