@@ -120,6 +120,7 @@ class Driver(LabberDriver):
                     n_call = int(config.get('Number of multiple sequences', 1))
                     calls = []
                     for n in range(n_call):
+                        config['Randomize'] += 1
                         calls.append(
                             copy.deepcopy(
                                 self.sequence_to_waveforms.get_waveforms(
@@ -128,6 +129,8 @@ class Driver(LabberDriver):
                     # after all calls are done, convert output to matrix form
                     self.waveforms = dict()
                     n_qubit = self.sequence.n_qubit
+                    # Align RB waveforms to end
+                    align_RB_to_end = config.get('Align RB waveforms to end', False)
                     # start with xy, z and gate waveforms, list of data
                     for key in ['xy', 'z', 'gate']:
                         # get size of longest waveform
@@ -138,7 +141,10 @@ class Driver(LabberDriver):
                             datatype = calls[0][key][n].dtype
                             data = np.zeros((n_call, length), dtype=datatype)
                             for m, call in enumerate(calls):
-                                data[m][:len(call[key][n])] = call[key][n]
+                                if align_RB_to_end:
+                                    data[m][-len(call[key][n]):] = call[key][n]
+                                else:
+                                    data[m][:len(call[key][n])] = call[key][n]
                             self.waveforms[key].append(data)
 
                     # same for readout waveforms
@@ -147,7 +153,10 @@ class Driver(LabberDriver):
                         datatype = calls[0][key].dtype
                         data = np.zeros((n_call, length), dtype=datatype)
                         for m, call in enumerate(calls):
-                            data[m][:len(call[key])] = call[key]
+                            if align_RB_to_end:
+                                data[m][-len(call[key]):] = call[key]
+                            else:
+                                data[m][:len(call[key])] = call[key]
                         self.waveforms[key] = data
 
                 else:

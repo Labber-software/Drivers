@@ -189,8 +189,8 @@ def add_singleQ_S1_Z2p(index, gate_seq):
     """
     if index == 0:
         gate_seq.append(Gate.X2p)
-        gate_seq.append(Gate.Y2m) 
-        gate_seq.append(Gate.X2m)  
+        gate_seq.append(Gate.Y2m)
+        gate_seq.append(Gate.X2m)
     elif index == 1:
         gate_seq.append(Gate.Y2m)
         gate_seq.append(Gate.I)  # auxiliary
@@ -344,8 +344,11 @@ class SingleQubit_RB(Sequence):
         # Number of Cliffords to generate
         N_cliffords = int(config['Number of Cliffords'])
         randomize = config['Randomize']
+        log.info('Assign seed %d' %(randomize))
         interleave = config['Interleave 1-QB Gate']
         multi_seq = config.get('Output multiple sequences', False)
+
+        rnd.seed(randomize)
         if interleave is True:
             interleaved_gate = config['Interleaved 1-QB Gate']
         else:
@@ -367,8 +370,10 @@ class SingleQubit_RB(Sequence):
             for n in range(self.n_qubit):
                 # Generate 1QB RB sequence
                 single_gate_seq = []
+
                 for i in range(N_cliffords):
                     rndnum = rnd.randint(0, 23)
+                    log.info('Random number %d' %(rndnum))
                     add_singleQ_clifford(rndnum, single_gate_seq,
                                          pad_with_I=False)
                     # If interleave gate,
@@ -440,7 +445,7 @@ class SingleQubit_RB(Sequence):
     def get_recovery_gate(self, gate_seq):
         """
         Get the recovery (the inverse) gate
-        
+
         Parameters
         ----------
         gate_seq: list of class Gate
@@ -497,7 +502,7 @@ class TwoQubit_RB(Sequence):
 
     filepath_lookup_table = ""
 
-    # def __init__(self, *args, **kwargs):        
+    # def __init__(self, *args, **kwargs):
     #     log.info(str(args)+ str(kwargs))
     #     super(Sequence, self).__init__(*args, **kwargs)
     #     self.filepath_lookup_table = ""
@@ -505,7 +510,7 @@ class TwoQubit_RB(Sequence):
     def generate_sequence(self, config):
         """
         Generate sequence by adding gates/pulses to waveforms.
-        
+
         Parameters
         ----------
         config: dict
@@ -567,7 +572,7 @@ class TwoQubit_RB(Sequence):
                         # gate = Gate.I(width = self.pulses_2qb[qubit]).value
                         gate_seq_1.append(Gate.I)
                         gate_seq_2.append(Gate.I)
-                        
+
 
             # get recovery gate seq
             (recovery_seq_1, recovery_seq_2) = self.get_recovery_gate(
@@ -616,7 +621,7 @@ class TwoQubit_RB(Sequence):
     def evaluate_sequence(self, gate_seq_1, gate_seq_2):
         """
         Evaluate the two qubit gate sequence.
-        
+
         Parameters
         ----------
         gate_seq_1: list of class Gate (defined in "gates.py")
@@ -699,7 +704,7 @@ class TwoQubit_RB(Sequence):
     def get_recovery_gate(self, gate_seq_1, gate_seq_2, config):
         """
         Get the recovery (the inverse) gate
-        
+
         Parameters
         ----------
         gate_seq_1: list of class Gate
@@ -713,7 +718,7 @@ class TwoQubit_RB(Sequence):
 
         Returns
         -------
-        (recovery_seq_1, recovery_seq_2): tuple of the lists 
+        (recovery_seq_1, recovery_seq_2): tuple of the lists
             The recovery gate
         """
 
@@ -758,7 +763,7 @@ class TwoQubit_RB(Sequence):
                         seq2 = self.dict_lookup_table['recovery_gates_QB2'][index]
                         for str_Gate in seq2:
                             cheapest_recovery_seq_2.append(cliffords.strGate_to_Gate(str_Gate))
-                        
+
                         log.info("=== FOUND THE CHEAPEST RECOVERY GATE IN THE LOOK-UP TABLE. ===")
                         log.info("QB1 recovery gate sequence: " + str(seq1))
                         log.info("QB2 recovery gate sequence: " + str(seq2))
@@ -794,7 +799,7 @@ class TwoQubit_RB(Sequence):
 
                     if (N_2QB_gate <= min_N_2QB_gate): # if it has less 2QB gates, always update it
                         min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
-                        
+
                         if (N_1QB_gate <= min_N_1QB_gate): # *only if it has less 2QB gates*, check whether it has less 1QB gates
                             min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
 
@@ -803,20 +808,20 @@ class TwoQubit_RB(Sequence):
 
                     # check whether it is the cheapest
                     # if it has less 2QB gates, always update it.
-                    if (N_2QB_gate < min_N_2QB_gate): 
+                    if (N_2QB_gate < min_N_2QB_gate):
                         min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
                         log.info('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
                     else:
                         # if it has equal # of 2QB gates and less 1QB gates, update it.
-                        if (N_2QB_gate == min_N_2QB_gate and 
-                            N_1QB_gate < min_N_1QB_gate): 
+                        if (N_2QB_gate == min_N_2QB_gate and
+                            N_1QB_gate < min_N_1QB_gate):
                             min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
                             log.info('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
                         else:
                             # if it has equal # of 2QB & 1QB gates, and more 1QB gates, update it.
-                            if (N_2QB_gate == min_N_2QB_gate and 
-                                N_1QB_gate == min_N_1QB_gate and 
-                                N_I_gate >= max_N_I_gate): 
+                            if (N_2QB_gate == min_N_2QB_gate and
+                                N_1QB_gate == min_N_1QB_gate and
+                                N_I_gate >= max_N_I_gate):
                                 min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
                                 log.info('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
 
@@ -835,7 +840,7 @@ class TwoQubit_RB(Sequence):
             recovery_seq_1 = [None]
             recovery_seq_2 = [None]
 
-        
+
         return (recovery_seq_1, recovery_seq_2)
 
 
