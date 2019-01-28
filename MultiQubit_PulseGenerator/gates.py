@@ -169,32 +169,23 @@ class CustomGate(BaseGate):
     def get_waveform(self, pulse, t0, t):  # noqa: D102
         return super().get_waveform(self.pulse, t0, t)
 
-class RabiGate(IdentityGate):
-    """Creates the Rabi gate used in the spinlocking sequence.
+
+class RabiGate(BaseGate):
+    """Creates the Rabi gate used in the spin-locking sequence.
 
     Parameters
     ----------
     amplitude : Amplitude of the pulse
-    plateua : The duration of the pulse. The minumum value is capped to the
-    Pi-pulse length
+    plateau : The duration of the pulse.
     phase : Phase of the Rabi gate. 0 corresponds to rotation around X axis.
     """
 
     def __init__(self, amplitude, plateau, phase):
-        #super().__init__(axis='Y', angle=np.pi)
-        super().__init__(plateau)
+        super().__init__()
         self.amplitude = amplitude
         self.plateau = plateau
         self.phase = phase
 
-    def get_waveform(self, pulse, t0, t):  # noqa: D102
-        pulse = copy(pulse)
-        pulse.amplitude = self.amplitude
-        pulse.plateau = self.plateau
-        pulse.phase += self.phase # Make it a 'Y' pulse
-
-        return pulse.calculate_waveform(t0,t)
-        #return super().get_waveform(pulse, t0, t)
 
 class CompositeGate:
     """Multiple gates in one object.

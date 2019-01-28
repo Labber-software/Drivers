@@ -7,7 +7,7 @@ import numpy as np
 
 from crosstalk import Crosstalk
 from gates import (CompositeGate, CustomGate, Gate, IdentityGate, ReadoutGate,
-                   SingleQubitRotation, TwoQubitGate, VirtualZGate)
+                   SingleQubitRotation, TwoQubitGate, VirtualZGate, RabiGate)
 from predistortion import ExponentialPredistortion, Predistortion
 from pulse import Pulse, PulseShape, PulseType
 from qubits import Qubit, Transmon
@@ -670,6 +670,11 @@ class SequenceToWaveforms:
             else:
                 pulse = copy(self.pulses_1qb_xy[qubit])
                 pulse.width = gate.width
+        elif isinstance(gate, RabiGate):
+            pulse = copy(self.pulses_1qb_xy[qubit])
+            pulse.amplitude = gate.amplitude
+            pulse.plateau = gate.plateau
+            pulse.phase = gate.phase
         elif isinstance(gate, TwoQubitGate):
             pulse = self.pulses_2qb[qubit]
         elif isinstance(gate, ReadoutGate):
@@ -1056,8 +1061,8 @@ class SequenceToWaveforms:
                     pulse.plateau = config.get('Plateau, 2QB' + s)
                 # pulse-specific parameters
                 pulse.amplitude = config.get('Amplitude, 2QB' + s)
-        Gate.CZ.value.new_angles(config.get('QB1 Phi 2QB #12'),
-                                 config.get('QB2 Phi 2QB #12'))
+            Gate.CZ.value.new_angles(config.get('QB1 Phi 2QB #12'),
+                                     config.get('QB2 Phi 2QB #12'))
 
         # predistortion
         self.perform_predistortion = config.get('Predistort waveforms', False)

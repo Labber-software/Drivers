@@ -4,7 +4,8 @@ import logging
 
 import numpy as np
 
-from gates import Gate, IdentityGate, RabiGate
+from gates import Gate, IdentityGate, RabiGate, CustomGate
+from pulse import Pulse
 from sequence import Sequence
 
 log = logging.getLogger('LabberDriver')
@@ -39,7 +40,7 @@ class CPMG(Sequence):
                 self.add_gate_to_all(IdentityGate(width=0), dt=duration)
             else:
                 self.add_gate_to_all(Gate.X2p)
-                dt = duration/(n_pulse+1)
+                dt = duration / (n_pulse + 1)
                 for i in range(n_pulse):
                     self.add_gate_to_all(gate_pi, dt=dt)
                 self.add_gate_to_all(Gate.X2p, dt=dt)
@@ -50,7 +51,8 @@ class CPMG(Sequence):
             else:
                 self.add_gate_to_all(Gate.X2p, t0=0)
                 for i in range(n_pulse):
-                    self.add_gate_to_all(gate_pi, t0=duration/(n_pulse+1)*(i+1))
+                    self.add_gate_to_all(
+                        gate_pi, t0=duration / (n_pulse + 1) * (i + 1))
                 self.add_gate_to_all(Gate.X2p, t0=duration)
 
 
@@ -75,6 +77,7 @@ class PulseTrain(Sequence):
                 gate = Gate.__getattr__(pulse_type)
             self.add_gate_to_all(gate)
 
+
 class SpinLocking(Sequence):
     """ Sequence for spin-locking experiment.
 
@@ -85,42 +88,36 @@ class SpinLocking(Sequence):
 
         pulse_amps = []
         for ii in range(9):
-            pulse_amps.append(float(config['Drive pulse amplitude #' + str(ii+1)]))
-        #pulse_amp = float(config['Drive pulse amplitude #1'])
+            pulse_amps.append(
+                float(config['Drive pulse amplitude #' + str(ii + 1)]))
         pulse_duration = float(config['Drive pulse duration'])
-        pulse_phase = float(config['Drive pulse phase'])/180.0*np.pi # Phase in radians
-        pulse_sequence = config['Pulse sequence'] # -1 = SL-3, 0 = SL-5a, 1 = SL-5b
-        #number_of_qubits = 
+        pulse_phase = float(config['Drive pulse phase']) / 180.0 * np.pi
+        pulse_sequence = config['Pulse sequence']
+
         if pulse_sequence == 'SL-3':
-            #self.add_gates([[Gate.Y2p]])
-           self.add_gate_to_all(Gate.Y2p)
+            self.add_gate_to_all(Gate.Y2p)
         if pulse_sequence == 'SL-5a':
-            #self.add_gates([[Gate.Y2m]])
             self.add_gate_to_all(Gate.Y2m)
         if pulse_sequence == 'SL-5b':
-            #self.add_gates([[Gate.Y2p]])
             self.add_gate_to_all(Gate.Y2p)
-        
+
         if pulse_sequence != 'SL-3':
-            #self.add_gates([[Gate.Xp]])
             self.add_gate_to_all(Gate.Xp)
-        #self.add_gates([[rabi_gate]])
+
+
         rabi_gates = []
-        for ii in range(5):
-            rabi_gates.append(RabiGate(pulse_amps[ii],pulse_duration,pulse_phase))
-        self.add_gate(list(range(5)),rabi_gates)
+        for ii in range(self.n_qubit):
+            rabi_gates.append(
+                RabiGate(pulse_amps[ii], pulse_duration, pulse_phase))
+        self.add_gate(list(range(self.n_qubit)), rabi_gates)
         if pulse_sequence != 'SL-3':
-            #self.add_gates([[Gate.Xp]])
             self.add_gate_to_all(Gate.Xp)
 
         if pulse_sequence == 'SL-3':
-            #self.add_gates([[Gate.Y2p]])
             self.add_gate_to_all(Gate.Y2p)
         if pulse_sequence == 'SL-5a':
-            #self.add_gates([[Gate.Y2m]])
             self.add_gate_to_all(Gate.Y2m)
         if pulse_sequence == 'SL-5b':
-            #self.add_gates([[Gate.Y2p]])
             self.add_gate_to_all(Gate.Y2p)
 
         return
