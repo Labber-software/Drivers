@@ -1048,6 +1048,7 @@ class SequenceToWaveforms:
                 pulse.Offset = config.get('f11-f20 initial, 2QB' + s)
                 pulse.amplitude = config.get('f11-f20 final, 2QB' + s)
                 pulse.dfdV = config.get('df/dV, 2QB' + s)
+                pulse.negative_amplitude = config.get('Negative amplitude' + s)
 
             else:
                 pulse.truncation_range = config.get('Truncation range, 2QB')
@@ -1061,6 +1062,7 @@ class SequenceToWaveforms:
                     pulse.plateau = config.get('Plateau, 2QB' + s)
                 # pulse-specific parameters
                 pulse.amplitude = config.get('Amplitude, 2QB' + s)
+
             Gate.CZ.value.new_angles(config.get('QB1 Phi 2QB #12'),
                                      config.get('QB2 Phi 2QB #12'))
 
