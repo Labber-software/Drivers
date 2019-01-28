@@ -218,10 +218,13 @@ class Driver(LabberDriver):
         self.qubit_states = [[]] * self.MAX_QUBITS
         for n, svm in enumerate(self.svm):
             x = self.getValueArray('Input data, QB%d' % (n + 1))
-            input_data = np.zeros((len(x), 2))
-            input_data[:, 0] = x.real
-            input_data[:, 1] = x.imag
-            output = svm.predict(input_data)
+            if len(x) > 0:
+                input_data = np.zeros((len(x), 2))
+                input_data[:, 0] = x.real
+                input_data[:, 1] = x.imag
+                output = svm.predict(input_data)
+            else:
+                output = np.array([], dtype=int)
             self.qubit_states[n] = output
 
             # update mean value controls
