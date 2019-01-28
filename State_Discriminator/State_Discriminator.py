@@ -38,6 +38,7 @@ class Driver(LabberDriver):
 
         # store training data
         elif (quant.name.startswith('Input data, QB') and
+              self.getValue('Training source') == 'Input traces' and
               self.getValue('Perform training')):
             # before updating values, mark current training as invalid
             self.training_valid = False
@@ -58,6 +59,12 @@ class Driver(LabberDriver):
 
         # if changing to use median, flag that re-training is necessary
         elif quant.name.startswith('Use median value'):
+            self.training_valid = False
+
+        # if changing pointer states, flag need for for re-training
+        elif (quant.name.startswith('Training source') or
+                (self.getValue('Training source') == 'Pointer states' and
+                    quant.name.startswith('Pointer,'))):
             self.training_valid = False
 
         return value
@@ -131,6 +138,11 @@ class Driver(LabberDriver):
         )
         use_median = self.getValue('Use median value')
 
+        # special case if training from pointer states
+        if self.getValue('Training source') == 'Pointer states':
+            self.train_from_pointer_states(kwargs)
+            return
+
         # train for all active qubits
         self.svm = []
         for qubit, data in enumerate(self.training_data):
@@ -148,6 +160,7 @@ class Driver(LabberDriver):
                 # if using median, calculate real and imaginary separately
                 if use_median:
                     x = np.array([np.median(x.real) + 1j * np.median(x.imag)])
+                    self.setValue('Pointer, QB%d-S%d' % (qubit + 1, m), x[0])
 
                 X[k:(k + len(x)), 0] = x.real
                 X[k:(k + len(x)), 1] = x.imag
@@ -171,6 +184,31 @@ class Driver(LabberDriver):
         self.training_valid = True
 
 
+    def train_from_pointer_states(self, kwargs):
+        """Train discriminator based on pointer states"""
+        # train for all active qubits
+        self.svm = []
+        for qubit in range(self.n_qubit):
+            X = np.zeros((self.n_state, 2))
+            y = np.zeros(self.n_state, dtype=int)
+            # collect training data
+            for m in range(self.n_state):
+                # get pointer value
+                x = self.getValue('Pointer, QB%d-S%d' % (qubit + 1, m))
+                X[m, 0] = x.real
+                X[m, 1] = x.imag
+                y[m] = m
+
+            # create SVM and fit data
+            svc = SVC(**kwargs)
+            svc.fit(X, y)
+            # store in list of SVMs
+            self.svm.append(svc)
+
+        # mark training as valid
+        self.training_valid = True
+
+
     def calculate_states(self):
         """Calculate states using training data"""
         # train discriminator, if necessary
@@ -180,10 +218,13 @@ class Driver(LabberDriver):
         self.qubit_states = [[]] * self.MAX_QUBITS
         for n, svm in enumerate(self.svm):
             x = self.getValueArray('Input data, QB%d' % (n + 1))
-            input_data = np.zeros((len(x), 2))
-            input_data[:, 0] = x.real
-            input_data[:, 1] = x.imag
-            output = svm.predict(input_data)
+            if len(x) > 0:
+                input_data = np.zeros((len(x), 2))
+                input_data[:, 0] = x.real
+                input_data[:, 1] = x.imag
+                output = svm.predict(input_data)
+            else:
+                output = np.array([], dtype=int)
             self.qubit_states[n] = output
 
             # update mean value controls
