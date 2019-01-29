@@ -16,7 +16,7 @@ class PulseShape(Enum):
     CZ = 'CZ'
     COSINE = 'Cosine'
 
-# broken
+
 class PulseType(Enum):
     """Define possible qubit pulse types."""
 
