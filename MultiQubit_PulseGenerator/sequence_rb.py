@@ -529,6 +529,7 @@ class TwoQubit_RB(Sequence):
         randomize = config['Randomize']
         interleave = config['Interleave 2-QB Gate']
         multi_seq = config.get('Output multiple sequences', False)
+        write_seq = config.get('Write sequence as txt file', False)
         if interleave is True:
             interleaved_gate = config['Interleaved 2-QB Gate']
         else:
@@ -581,13 +582,23 @@ class TwoQubit_RB(Sequence):
             gate_seq_2.extend(recovery_seq_2)
 
             # test the recovery gate
-            # psi_gnd = np.matrix('1; 0; 0; 0') # ground state |00>
-            # print(gate_seq_1, gate_seq_2)
-            # psi = np.matmul(self.evaluate_sequence(gate_seq_1, gate_seq_2), psi_gnd)
-            # log.info('--- TESTING THE RECOVERY GATE ---')
-            # log.info('The probability amplitude of the final state vector: ' + str(np.matrix(psi).flatten()))
-            # log.info('The population of the ground state after the gate sequence: %.4f'%(np.abs(psi[0,0])**2))
-            # log.info('-------------------------------------------')
+            psi_gnd = np.matrix('1; 0; 0; 0') # ground state |00>
+            if write_seq == True:
+                import os
+                from datetime import datetime
+                directory = os.path.join(path_currentdir,'RBseq')
+                if not os.path.exists(directory):
+                    os.makedirs(directory)
+                filename = datetime.utcnow().strftime('%Y-%m-%d %H-%M-%S-%f')[:-3] + '_N_cliffords=%d_seed=%d.txt'%(N_cliffords,randomize)
+                filepath = os.path.join(directory,filename)
+                with open(filepath, "w") as text_file:
+                    for i in range(len(gate_seq_1)):
+                        print("Seq1 Index: %d, Gate: "%(i) + cliffords.Gate_to_strGate(gate_seq_1[i]) + "\t Seq2 Index: %d, Gate: "%(i) + cliffords.Gate_to_strGate(gate_seq_2[i]), file=text_file)
+            psi = np.matmul(self.evaluate_sequence(gate_seq_1, gate_seq_2), psi_gnd)
+            log.info('--- TESTING THE RECOVERY GATE ---')
+            log.info('The probability amplitude of the final state vector: ' + str(np.matrix(psi).flatten()))
+            log.info('The population of the ground state after the gate sequence: %.4f'%(np.abs(psi[0,0])**2))
+            log.info('-------------------------------------------')
             # Assign two qubit gate sequence to where we want
             if (self.n_qubit > qubits_to_benchmark[0]):
                 for i in range(qubits_to_benchmark[0] - 1):
