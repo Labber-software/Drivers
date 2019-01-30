@@ -49,11 +49,15 @@ class CPMG(Sequence):
                 self.add_gate_to_all(gate_pi, t0=0)
                 self.add_gate_to_all(IdentityGate(width=0), t0=duration)
             else:
-                self.add_gate_to_all(Gate.X2p, t0=0)
+                self.add_gate_to_all(IdentityGate(width=0), t0=0)
+                self.add_gate_to_all(Gate.X2p)
                 for i in range(n_pulse):
                     self.add_gate_to_all(
-                        gate_pi, t0=duration / (n_pulse + 1) * (i + 1))
-                self.add_gate_to_all(Gate.X2p, t0=duration)
+                        IdentityGate(width=0), t0=duration / (n_pulse + 1) * (i + 1))
+                    self.add_gate_to_all(
+                        gate_pi)
+                self.add_gate_to_all(IdentityGate(width=0), t0=duration)
+                self.add_gate_to_all(Gate.X2p)
 
 
 class PulseTrain(Sequence):
