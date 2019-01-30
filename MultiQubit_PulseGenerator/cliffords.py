@@ -29,8 +29,8 @@ dict_m1QBGate = {'I': np.matrix('1,0;0,1'),
     'Y2m': 1/np.sqrt(2)*np.matrix('1,1;-1,1'),
     'Z2p': np.matrix('1,0;0,1j'),
     'Z2m': np.matrix('1,0;0,-1j'),
-    'Xp': np.matrix('0,1j;1j,0'),
-    'Xm': np.matrix('0,-1j;-1j,0'),
+    'Xp': np.matrix('0,-1j;-1j,0'),
+    'Xm': np.matrix('0,1j;1j,0'),
     'Yp': np.matrix('0,-1;1,0'),
     'Ym': np.matrix('0,1;-1,0'),
     'Zp': np.matrix('1,0;0,-1'),
@@ -243,7 +243,6 @@ def generate_2QB_Cliffords(_index):
                     _mGate = np.kron(dict_m1QBGate['Z2p'], _mGate)
                 elif (g == Gate.Z2m):
                     _mGate = np.kron(dict_m1QBGate['Z2m'], _mGate)
-
         m2QBClifford = mul(_mGate, m2QBClifford)
     return (m2QBClifford)
 
@@ -298,7 +297,10 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------
 
     # Start with ground state
-    psi_gnd = np.matrix('1;0;0;0')
+    psi_00 = np.matrix('1;0;0;0')
+    psi_01 = np.matrix('0;1;0;0')
+    psi_10 = np.matrix('0;0;1;0')
+    psi_11 = np.matrix('0;0;0;1')
     
     N_2QBcliffords = 11520
     list_stabilizer = []
@@ -313,16 +315,21 @@ if __name__ == "__main__":
             print('Running... %d %%'%(cnt*100))
             cnt = cnt+0.01
         g = generate_2QB_Cliffords(i)
-        psi = dot(g, psi_gnd)
-        stabilizer = get_stabilizer(psi)  
+
+        final_psi_00 = dot(g, psi_00)
+        final_psi_01 = dot(g, psi_01)
+        final_psi_10 = dot(g, psi_10)
+        final_psi_11 = dot(g, psi_11)
+
+        stabilizer = get_stabilizer(final_psi_00)  
 
         # append only if the state is not in list_stablizier list. 
         if (not (stabilizer in list_stabilizer)):
             list_stabilizer.append(stabilizer)
-            list_psi.append(psi)
+            list_psi.append(final_psi_00)
             # find the cheapest recovery clifford gate.
             print('stabilizer state: '+ str(stabilizer))
-            print('psi: ' + str(psi.flatten()))
+            print('Before recovery, final_psi_00: ' + str(final_psi_00.flatten()))
             print('find the cheapest recovery clifford gate')
             min_N_2QB_gate = np.inf
             min_N_1QB_gate = np.inf
@@ -333,9 +340,21 @@ if __name__ == "__main__":
                 recovery_gate = generate_2QB_Cliffords(j)
                 seq_QB1 = []
                 seq_QB2 = []
-                sequence_rb.add_twoQ_clifford(j, seq_QB1, seq_QB2)
+                # sequence_rb.add_twoQ_clifford(j, seq_QB1, seq_QB2)
+                # print(dot(recovery_gate, final_psi_00))
+                # exit()
+                if ((np.abs(1-np.abs(dot(recovery_gate, final_psi_00)[0,0])) < 1e-6) and
+                    (np.abs(1-np.abs(dot(recovery_gate, final_psi_01)[1,0])) < 1e-6) and
+                    (np.abs(1-np.abs(dot(recovery_gate, final_psi_10)[2,0])) < 1e-6) and
+                    (np.abs(1-np.abs(dot(recovery_gate, final_psi_11)[3,0])) < 1e-6) and
+                    (np.abs(1-dot(recovery_gate, final_psi_01)[1,0]/dot(recovery_gate, final_psi_00)[0,0]) < 1e-6) and
+                    (np.abs(1-dot(recovery_gate, final_psi_10)[2,0]/dot(recovery_gate, final_psi_00)[0,0]) < 1e-6) and
+                    (np.abs(1-dot(recovery_gate, final_psi_11)[3,0]/dot(recovery_gate, final_psi_00)[0,0]) < 1e-6)
+                    ):
 
-                if np.abs(1-np.abs(dot(recovery_gate, psi)[0,0])) < 1e-6: # if the gate is recovery, check if it is the cheapest.
+                    print(dot(recovery_gate, final_psi_00)[0,0],dot(recovery_gate, final_psi_01)[1,0],dot(recovery_gate, final_psi_10)[2,0],dot(recovery_gate, final_psi_11)[3,0])
+                    # if the gate is recovery, check if it is the cheapest.
+
                     # Less 2QB Gates, Less 1QB Gates, and More I Gates = the cheapest gate.
                     # The priority: less 2QB gates > less 1QB gates > more I gates
                     N_2QB_gate, N_1QB_gate, N_I_gate = 0, 0, 0
