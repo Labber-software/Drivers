@@ -614,7 +614,7 @@ class SequenceToWaveforms:
         for step in self.sequences:
             for i, gate in enumerate(step.gates):
                 if gate is None:
-                    step.gates[i] = Gate.I.value
+                    step.gates[i] = IdentityGate(width=0)
 
     def _add_timings(self):
         for step in self.sequences:
@@ -628,6 +628,7 @@ class SequenceToWaveforms:
         for step in self.sequences:
             max_duration = -np.inf
             for q, g in enumerate(step.gates):
+                duration = 0
                 if isinstance(g, IdentityGate) and g.width is not None:
                     duration = g.width
                 else:
@@ -638,6 +639,8 @@ class SequenceToWaveforms:
                     max_duration = duration
             if step.t0 is None:
                 step.t_start = t_start + step.dt
+                if max_duration == 0:
+                    step.t_start -= step.dt
             else:
                 step.t_start = step.t0 - max_duration / 2
             step.t_start = self._round(step.t_start)
@@ -1048,6 +1051,7 @@ class SequenceToWaveforms:
                 pulse.Offset = config.get('f11-f20 initial, 2QB' + s)
                 pulse.amplitude = config.get('f11-f20 final, 2QB' + s)
                 pulse.dfdV = config.get('df/dV, 2QB' + s)
+                pulse.negative_amplitude = config.get('Negative amplitude' + s)
 
             else:
                 pulse.truncation_range = config.get('Truncation range, 2QB')
@@ -1061,6 +1065,7 @@ class SequenceToWaveforms:
                     pulse.plateau = config.get('Plateau, 2QB' + s)
                 # pulse-specific parameters
                 pulse.amplitude = config.get('Amplitude, 2QB' + s)
+
             Gate.CZ.value.new_angles(config.get('QB1 Phi 2QB #12'),
                                      config.get('QB2 Phi 2QB #12'))
 

@@ -84,6 +84,7 @@ class Pulse(object):
         self.Lcoeff = np.array([0.3])
         self.dfdV = 500E6
         self.qubit = None
+        self.negative_amplitude = False
 
         # For IQ mixer corrections
         self.iq_ratio = 1.0
@@ -216,6 +217,9 @@ class Pulse(object):
                 values = df / self.dfdV
             else:
                 values = self.qubit.df_to_dV(df)
+            if self.negative_amplitude is True:
+                # if negative amplitude is needed
+                values = -values
 
         elif self.shape == PulseShape.COSINE:
             tau = self.width
