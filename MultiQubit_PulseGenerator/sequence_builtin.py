@@ -7,7 +7,6 @@ import numpy as np
 from gates import Gate, IdentityGate, RabiGate, CustomGate
 from pulse import Pulse
 from sequence import Sequence
-from sequence import SequenceToWaveforms
 
 log = logging.getLogger('LabberDriver')
 
