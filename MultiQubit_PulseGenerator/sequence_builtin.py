@@ -7,6 +7,7 @@ import numpy as np
 from gates import Gate, IdentityGate, RabiGate, CustomGate
 from pulse import Pulse
 from sequence import Sequence
+from sequence import SequenceToWaveforms
 
 log = logging.getLogger('LabberDriver')
 
@@ -30,24 +31,33 @@ class CPMG(Sequence):
         pi_to_q = config['Add pi pulses to Q']
         duration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
+        width = config['Width']
+        # n_qubits = int(config['Number of qubits'])
 
         # select type of refocusing pi pulse
         gate_pi = Gate.Yp if pi_to_q else Gate.Xp
 
         if edge_to_edge:
+            duration_e2e = duration + 3*width
             if n_pulse < 0:
                 self.add_gate_to_all(gate_pi)
-                self.add_gate_to_all(IdentityGate(width=0), dt=duration)
+                self.add_gate_to_all(IdentityGate(width=0), t0=duration)
             else:
+                self.add_gate_to_all(IdentityGate(width=0), t0=0)
                 self.add_gate_to_all(Gate.X2p)
                 dt = duration / (n_pulse + 1)
                 for i in range(n_pulse):
-                    self.add_gate_to_all(gate_pi, dt=dt)
-                self.add_gate_to_all(Gate.X2p, dt=dt)
+                    self.add_gate_to_all(
+                        IdentityGate(width=0), t0=duration_e2e / (n_pulse + 1) * (i + 1))
+                    self.add_gate_to_all(
+                        gate_pi)
+                self.add_gate_to_all(IdentityGate(width=0), t0=duration_e2e)
+                self.add_gate_to_all(Gate.X2p)
+
         else:
             if n_pulse < 0:
-                self.add_gate_to_all(IdentityGate(width=0), t0=0)
-                self.add_gate_to_all(gate_pi)  # , t0=0)
+                # self.add_gate_to_all(IdentityGate(width=0), t0=0)
+                self.add_gate_to_all(gate_pi)
                 self.add_gate_to_all(IdentityGate(width=0), t0=duration)
             else:
                 self.add_gate_to_all(IdentityGate(width=0), t0=0)
