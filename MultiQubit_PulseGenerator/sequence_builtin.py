@@ -29,7 +29,7 @@ class CPMG(Sequence):
         # get parameters
         n_pulse = int(config['# of pi pulses'])
         pi_to_q = config['Add pi pulses to Q']
-        duration = config['Sequence duration']
+        seqduration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
         width = config['Width']
         plateau = config['Plateau']
@@ -49,15 +49,17 @@ class CPMG(Sequence):
 
         # redefines the sequence duration if edge-to-edge
         if edge_to_edge:
-            duration = duration + width_e2e
+            duration = seqduration + width_e2e
+            T1duration = duration
         else:
-            duration
+            duration = seqduration
+            T1duration = duration + width_e2e/2
 
         # generates the sequence
         if n_pulse < 0:
             self.add_gate_to_all(IdentityGate(width=0), t0=0)
             self.add_gate_to_all(gate_pi)
-            self.add_gate_to_all(IdentityGate(width=0), t0=duration)
+            self.add_gate_to_all(IdentityGate(width=0), t0=T1duration)
         else:
             self.add_gate_to_all(IdentityGate(width=0), t0=0)
             self.add_gate_to_all(Gate.X2p)
