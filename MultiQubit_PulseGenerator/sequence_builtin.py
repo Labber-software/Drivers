@@ -32,14 +32,24 @@ class CPMG(Sequence):
         duration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
         width = config['Width']
-        # n_qubits = int(config['Number of qubits'])
+        plateau = config['Plateau']
+        pulse_shape = config['Pulse type']
+
+        if pulse_shape == 'Gaussian':
+            truncation_val = config['Truncation range']
+            width_e2e = truncation_val*width + plateau
+        elif pulse_shape == 'Ramp':
+            width_e2e = 2 * width + plateau
+        else:
+            width_e2e = width + plateau
 
         # select type of refocusing pi pulse
         gate_pi = Gate.Yp if pi_to_q else Gate.Xp
 
         if edge_to_edge:
-            duration_e2e = duration + 3*width
+            duration_e2e = duration + width_e2e
             if n_pulse < 0:
+                self.add_gate_to_all(IdentityGate(width=0), t0=0)
                 self.add_gate_to_all(gate_pi)
                 self.add_gate_to_all(IdentityGate(width=0), t0=duration)
             else:
@@ -56,7 +66,7 @@ class CPMG(Sequence):
 
         else:
             if n_pulse < 0:
-                # self.add_gate_to_all(IdentityGate(width=0), t0=0)
+                self.add_gate_to_all(IdentityGate(width=0), t0=0)
                 self.add_gate_to_all(gate_pi)
                 self.add_gate_to_all(IdentityGate(width=0), t0=duration)
             else:
