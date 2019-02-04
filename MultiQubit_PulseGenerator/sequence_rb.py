@@ -529,6 +529,7 @@ class TwoQubit_RB(Sequence):
         randomize = config['Randomize']
         interleave = config['Interleave 2-QB Gate']
         multi_seq = config.get('Output multiple sequences', False)
+        write_seq = config.get('Write sequence as txt file', False)
         if interleave is True:
             interleaved_gate = config['Interleaved 2-QB Gate']
         else:
@@ -573,21 +574,48 @@ class TwoQubit_RB(Sequence):
                         gate_seq_1.append(Gate.I)
                         gate_seq_2.append(Gate.I)
 
-
+            cliffordSeq1 = gate_seq_1
+            cliffordSeq2 = gate_seq_2
             # get recovery gate seq
             (recovery_seq_1, recovery_seq_2) = self.get_recovery_gate(
                 gate_seq_1, gate_seq_2, config)
             gate_seq_1.extend(recovery_seq_1)
             gate_seq_2.extend(recovery_seq_2)
 
+
+            # remove redundant Identity gates
+            index_identity = [] # find where Identity gates are
+            for p in range(len(gate_seq_1)):
+                if (gate_seq_1[p] == Gate.I and gate_seq_1[p] == Gate.I):
+                    index_identity.append(p)
+            gate_seq_1 = [m for n, m in enumerate(gate_seq_1) if n not in index_identity]
+            gate_seq_2 = [m for n, m in enumerate(gate_seq_2) if n not in index_identity]
+
             # test the recovery gate
-            # psi_gnd = np.matrix('1; 0; 0; 0') # ground state |00>
-            # print(gate_seq_1, gate_seq_2)
-            # psi = np.matmul(self.evaluate_sequence(gate_seq_1, gate_seq_2), psi_gnd)
-            # log.info('--- TESTING THE RECOVERY GATE ---')
-            # log.info('The probability amplitude of the final state vector: ' + str(np.matrix(psi).flatten()))
-            # log.info('The population of the ground state after the gate sequence: %.4f'%(np.abs(psi[0,0])**2))
-            # log.info('-------------------------------------------')
+            psi_gnd = np.matrix('1; 0; 0; 0') # ground state |00>
+            if write_seq == True:
+                import os
+                from datetime import datetime
+                directory = os.path.join(path_currentdir,'RBseq')
+                if not os.path.exists(directory):
+                    os.makedirs(directory)
+                filename = datetime.now().strftime('%Y-%m-%d %H-%M-%S-f')[:-3] + '_N_cliffords=%d_seed=%d.txt'%(N_cliffords,randomize)
+                # filename = datetime.now().strftime('%Y-%m-%d %H-%M-%S-%f')[:-3] + '_N_cliffords=%d_seed=%d.txt'%(N_cliffords,randomize)
+                filepath = os.path.join(directory,filename)
+                log.info('make file: ' + filepath)
+                with open(filepath, "w") as text_file:
+                    print('New Sequence', file=text_file)
+                    for i in range(len(gate_seq_1)):
+                        print("Index: %d, Gate: ["%(i) + cliffords.Gate_to_strGate(gate_seq_1[i]) + ", " + cliffords.Gate_to_strGate(gate_seq_2[i]) +']', file=text_file)
+                    for i in range(len(cliffordSeq1)):
+                         print("CliffordIndex: %d, Gate: ["%(i) + cliffords.Gate_to_strGate(cliffordSeq1[i]) + ", " + cliffords.Gate_to_strGate(cliffordSeq2[i]) +']', file=text_file)
+                    for i in range(len(recovery_seq_1)):
+                         print("RecoveryIndex: %d, Gate: ["%(i) + cliffords.Gate_to_strGate(recovery_seq_1[i]) + ", " + cliffords.Gate_to_strGate(recovery_seq_2[i]) +']', file=text_file)
+            psi = np.matmul(self.evaluate_sequence(gate_seq_1, gate_seq_2), psi_gnd)
+            log.info('--- TESTING THE RECOVERY GATE ---')
+            log.info('The probability amplitude of the final state vector: ' + str(np.matrix(psi).flatten()))
+            log.info('The population of the ground state after the gate sequence: %.4f'%(np.abs(psi[0,0])**2))
+            log.info('-------------------------------------------')
             # Assign two qubit gate sequence to where we want
             if (self.n_qubit > qubits_to_benchmark[0]):
                 for i in range(qubits_to_benchmark[0] - 1):
