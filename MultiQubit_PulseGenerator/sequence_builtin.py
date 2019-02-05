@@ -28,32 +28,47 @@ class CPMG(Sequence):
         # get parameters
         n_pulse = int(config['# of pi pulses'])
         pi_to_q = config['Add pi pulses to Q']
-        duration = config['Sequence duration']
+        seqduration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
+        width = config['Width']
+        plateau = config['Plateau']
+        pulse_shape = config['Pulse type']
+
+        # defines the actual width of a pulse depending on the pulse shape
+        if pulse_shape == 'Gaussian':
+            truncation_val = config['Truncation range']
+            width_e2e = truncation_val*width + plateau
+        elif pulse_shape == 'Ramp':
+            width_e2e = 2 * width + plateau
+        else:
+            width_e2e = width + plateau
 
         # select type of refocusing pi pulse
         gate_pi = Gate.Yp if pi_to_q else Gate.Xp
 
+        # redefines the sequence duration if edge-to-edge
         if edge_to_edge:
-            if n_pulse < 0:
-                self.add_gate_to_all(gate_pi)
-                self.add_gate_to_all(IdentityGate(width=0), dt=duration)
-            else:
-                self.add_gate_to_all(Gate.X2p)
-                dt = duration / (n_pulse + 1)
-                for i in range(n_pulse):
-                    self.add_gate_to_all(gate_pi, dt=dt)
-                self.add_gate_to_all(Gate.X2p, dt=dt)
+            duration = seqduration + width_e2e
+            T1duration = duration
         else:
-            if n_pulse < 0:
-                self.add_gate_to_all(gate_pi, t0=0)
-                self.add_gate_to_all(IdentityGate(width=0), t0=duration)
-            else:
-                self.add_gate_to_all(Gate.X2p, t0=0)
-                for i in range(n_pulse):
-                    self.add_gate_to_all(
-                        gate_pi, t0=duration / (n_pulse + 1) * (i + 1))
-                self.add_gate_to_all(Gate.X2p, t0=duration)
+            duration = seqduration
+            T1duration = duration + width_e2e/2
+
+        # generates the sequence
+        if n_pulse < 0:
+            self.add_gate_to_all(IdentityGate(width=0), t0=0)
+            self.add_gate_to_all(gate_pi)
+            self.add_gate_to_all(IdentityGate(width=0), t0=T1duration)
+        else:
+            self.add_gate_to_all(IdentityGate(width=0), t0=0)
+            self.add_gate_to_all(Gate.X2p)
+            for i in range(n_pulse):
+                self.add_gate_to_all(
+                    IdentityGate(width=0), t0=duration / (n_pulse + 1) * (i + 1))
+                self.add_gate_to_all(
+                    gate_pi)
+            self.add_gate_to_all(IdentityGate(width=0), t0=duration)
+            self.add_gate_to_all(Gate.X2p)
 
 
 class PulseTrain(Sequence):
