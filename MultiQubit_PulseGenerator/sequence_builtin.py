@@ -30,9 +30,20 @@ class CPMG(Sequence):
         pi_to_q = config['Add pi pulses to Q']
         seqduration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
-        width = config['Width']
-        plateau = config['Plateau']
         pulse_shape = config['Pulse type']
+        uniform = config['Uniform pulse shape']
+
+        if uniform:
+            width = config['Width']
+            plateau = config['Plateau']
+        else:
+            widthlist = []
+            plateaulist = []
+            for i in range(1, 10):
+                widthlist.append(config['Width #' + str(i)])
+                plateaulist.append(config['Plateau #' + str(i)])
+            width = max(widthlist)
+            plateau = max(plateaulist)
 
         # defines the actual width of a pulse depending on the pulse shape
         if pulse_shape == 'Gaussian':
@@ -64,7 +75,7 @@ class CPMG(Sequence):
             self.add_gate_to_all(Gate.X2p)
             for i in range(n_pulse):
                 self.add_gate_to_all(
-                    IdentityGate(width=0), t0=duration / (n_pulse + 1) * (i + 1))
+                    IdentityGate(width=0), t0=duration/(n_pulse+1)*(i+1))
                 self.add_gate_to_all(
                     gate_pi)
             self.add_gate_to_all(IdentityGate(width=0), t0=duration)
