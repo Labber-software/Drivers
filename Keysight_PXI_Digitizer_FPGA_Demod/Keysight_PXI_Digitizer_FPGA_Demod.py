@@ -460,7 +460,7 @@ class Driver(LabberDriver):
 
                 # channel number depens on hardware version
                 data = self.DAQread(self.dig, ch, nPts * nCycle,
-                                    int(1000 + self.timeout_ms / nCall))
+                                    int(3000 + self.timeout_ms / nCall))
                 # stop if no data
                 if data.size == 0:
                     return
@@ -494,7 +494,7 @@ class Driver(LabberDriver):
                     # channel number depens on hardware version
                     ch = self.getHwCh(nCh)
                     data = self.DAQread(self.dig, ch, nPts * nCycle,
-                                        int(1000 + self.timeout_ms / nCall))
+                                        int(3000 + self.timeout_ms / nCall))
                     # stop if no data
                     if data.size == 0:
                         return
@@ -550,7 +550,7 @@ class Driver(LabberDriver):
                         # channel number depens on hardware version
                         ch = self.getHwCh(nCh)
                         data = self.DAQread(self.dig, ch, nPts * nCycle,
-                                            int(1000 + self.timeout_ms / nCall))
+                                            int(3000 + self.timeout_ms / nCall))
                         # stop if no data
                         if data.size == 0:
                             return
