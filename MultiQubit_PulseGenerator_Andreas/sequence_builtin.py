@@ -64,11 +64,9 @@ class CPMG(sequence.Sequence):
 
         # generates the sequence
         if n_pulse < 0:
-            self.add_gate_to_all(gates.IdentityGate(width=0), t0=0)
             self.add_gate_to_all(gate_pi)
             self.add_gate_to_all(gates.IdentityGate(width=0), t0=T1duration)
         else:
-            self.add_gate_to_all(gates.IdentityGate(width=0), t0=0)
             self.add_gate_to_all(gates.X2p)
             for i in range(n_pulse):
                 self.add_gate_to_all(

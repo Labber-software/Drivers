@@ -103,7 +103,6 @@ class Sequence:
         Flag for performing state tomography.
     readout_delay : float
         Delay time between last pulse and readout, in seconds.
-    n_qubit
 
     """
 
@@ -120,7 +119,6 @@ class Sequence:
         self.perform_state_tomography = False
         self._state_tomography = tomography.StateTomography()
 
-        # readout
         self.readout_delay = 0.0
 
     # Public methods
@@ -134,7 +132,7 @@ class Sequence:
 
         """
         # this function should be overloaded by specific sequence
-        pass
+        raise NotImplementedError()
 
     def get_sequence(self, config):
         """Compile sequence and return it.
@@ -539,7 +537,7 @@ class SequenceToWaveforms:
         if not self.simultaneous_pulses:
             new_sequences = []
             for step in self.sequences:
-                if any(isinstance(gate, (ReadoutGate, IdentityGate))
+                if any(isinstance(gate, (gates.ReadoutGate, gates.IdentityGate))
                         for gate in step.gates):
                     # Don't seperate I gates or readouts since we do
                     # multiplexed readout
@@ -564,9 +562,7 @@ class SequenceToWaveforms:
             if step.dt is None and step.t0 is None:
                 # Use global pulse spacing
                 step.dt = self.dt
-        if self.sequences[0].t0 is None:
-            t_start = self.first_delay - self.sequences[0].dt
-
+        t_start = 0
         # Longest pulse in the step needed for correct timing
         for step in self.sequences:
             max_duration = -np.inf
@@ -582,23 +578,20 @@ class SequenceToWaveforms:
                     max_duration = duration
             if step.t0 is None:
                 step.t_start = t_start + step.dt
-                if max_duration == 0:
-                    step.t_start -= step.dt
             else:
                 step.t_start = step.t0 - max_duration / 2
             step.t_start = self._round(step.t_start)
             step.t_end = self._round(step.t_start + max_duration)
             step.t_middle = step.t_start + max_duration / 2
-            t_start = step.t_end
+            t_start = step.t_end # Next step starts where this one ends
 
         # Make sure that the sequence is sorted chronologically.
         self.sequences.sort(key=lambda x: x.t_start)
 
         # Make sure that the sequnce start on first delay
         time_diff = self._round(self.first_delay-self.sequences[0].t_start)
-        if np.abs(time_diff) > 1e-10:
-            for step in self.sequences:
-                step.time_shift(time_diff)
+        for step in self.sequences:
+            step.time_shift(time_diff)
 
     def _get_pulse_for_gate(self, qubit, gate):
         # Virtual Z is special since it has no length
@@ -715,7 +708,8 @@ class SequenceToWaveforms:
                 pulse = self._get_pulse_for_gate(qubit, gate)
                 if pulse is None:
                     continue
-                if isinstance(gate, gates.SingleQubitXYRotation):
+                if isinstance(gate,
+                             (gates.SingleQubitXYRotation, gates.IdentityGate)):
                     waveform = self._wave_xy[qubit]
                 elif isinstance(gate, gates.ReadoutGate):
                     waveform = self.readout_iq

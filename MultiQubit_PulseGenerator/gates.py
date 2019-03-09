@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
-import logging
 from copy import copy
-from enum import Enum
-
 import numpy as np
-
-log = logging.getLogger('LabberDriver')
 
 
 class BaseGate:
@@ -59,42 +54,59 @@ class BaseGate:
             The calculated waveform.
 
         """
+        return self.get_adjusted_pulse(pulse).calculate_waveform(t0, t)
+
+    def get_adjusted_pulse(self, pulse):
         pulse = copy(pulse)
         pulse.phase += self.phase_shift
-        return pulse.calculate_waveform(t0, t)
+        return pulse
 
 
-class SingleQubitRotation(BaseGate):
-    """Single qubit rotations.
+class SingleQubitXYRotation(BaseGate):
+    """Single qubit rotations around the XY axes.
+
+    Angles defined as in https://en.wikipedia.org/wiki/Bloch_sphere.
 
     Parameters
     ----------
-    axis : str {'X', 'Y', 'Z'}
+    phi : float
         Rotation axis.
-    angle : float
+    theta : float
         Roation angle.
 
     """
 
-    def __init__(self, axis, angle):
+    def __init__(self, phi, theta):
         super().__init__()
-        self.axis = axis
-        self.angle = angle
+        self.phi = phi
+        self.theta = theta
 
-    def get_waveform(self, pulse, t0, t):  # noqa D102
+    def get_adjusted_pulse(self, pulse):
         pulse = copy(pulse)
-        if self.axis == 'X':
-            pulse.phase += 0
-        elif self.axis == 'Y':
-            pulse.phase += np.pi / 2
-        elif self.axis == 'Z':
-            # Z pulses are real valued, i.e. no phase
-            pass
-        else:
-            raise ValueError('Axis must be X, Y, or Z.')
+        pulse.phase = self.phi
         # pi pulse correspond to the full amplitude
-        pulse.amplitude *= self.angle / np.pi
-        return super().get_waveform(pulse, t0, t)
+        pulse.amplitude = self.theta / np.pi
+        return pulse
+
+class SingleQubitZRotation(BaseGate):
+    """Single qubit rotation around the Z axis.
+
+    Parameters
+    ----------
+    theta : float
+        Roation angle.
+
+    """
+
+    def __init__(self, theta):
+        super().__init__()
+        self.theta = theta
+
+    def get_adjusted_pulse(self, pulse):
+        pulse = copy(pulse)
+        # pi pulse correspond to the full amplitude
+        pulse.amplitude = self.theta / np.pi
+        return pulse
 
 
 class IdentityGate(BaseGate):
@@ -116,14 +128,14 @@ class IdentityGate(BaseGate):
         super().__init__()
         self.width = width
 
-    def get_waveform(self, pulse, t0, t):  # noqa: D102
+    def get_adjusted_pulse(self, pulse):
         pulse = copy(pulse)
         pulse.amplitude = 0
         pulse.use_drag = False
         if self.width is not None:
             pulse.width = self.width
             pulse.plateau = 0
-        return super().get_waveform(pulse, t0, t)
+        return pulse
 
 
 class VirtualZGate(BaseGate):
@@ -136,20 +148,11 @@ class VirtualZGate(BaseGate):
 
 class TwoQubitGate(BaseGate):
     """Two qubit gate."""
-
     # TODO Make this have two gates. I if nothing on the second waveform
-    def __init__(self):
-        super().__init__()
-
-    def get_waveform(self, pulse, t0, t):  # noqa: D102
-        return super().get_waveform(pulse, t0, t)
 
 
 class ReadoutGate(BaseGate):
     """Readouts the qubit state."""
-
-    def get_waveform(self, pulse, t0, t):  # noqa: D102
-        return super().get_waveform(pulse, t0, t)
 
 
 class CustomGate(BaseGate):
@@ -185,6 +188,13 @@ class RabiGate(BaseGate):
         self.amplitude = amplitude
         self.plateau = plateau
         self.phase = phase
+
+    def get_adjusted_pulse(self, pulse):
+        pulse = copy(pulse)
+        pulse.amplitude = self.amplitude
+        pulse.plateau = self.plateau
+        pulse.phase = self.phase
+        return pulse
 
 
 class CompositeGate:
@@ -264,15 +274,15 @@ class MeasurementGate(CompositeGate):
         if axis == 'Z' and sign == 'P':
             gate = IdentityGate()
         elif axis == 'Z' and sign == 'M':
-            gate = SingleQubitRotation(axis='X', angle=np.pi)
+            gate = SingleQubitXYRotation(phi=0, theta=np.pi)
         elif axis == 'Y' and sign == 'P':
-            gate = SingleQubitRotation(axis='X', angle=np.pi / 2)
+            gate = SingleQubitXYRotation(phi=0, theta=np.pi/2)
         elif axis == 'X' and sign == 'P':
-            gate = SingleQubitRotation(axis='Y', angle=-np.pi / 2)
+            gate = SingleQubitXYRotation(phi=np.pi/2, theta=-np.pi/2)
         elif axis == 'Y' and sign == 'M':
-            gate = SingleQubitRotation(axis='X', angle=-np.pi / 2)
+            gate = SingleQubitXYRotation(phi=0, theta=-np.pi/2)
         elif axis == 'X' and sign == 'M':
-            gate = SingleQubitRotation(axis='Y', angle=np.pi / 2)
+            gate = SingleQubitXYRotation(phi=np.pi/2, theta=np.pi/2)
         else:
             raise ValueError('Axis must be X, Y or Z, and sign P or M.')
 
@@ -311,60 +321,57 @@ class CZ(CompositeGate):
         self.__init__(phi1, phi2)
 
 
-class Gate(Enum):
-    """Define possible qubit gates."""
+I = IdentityGate()
 
-    I = IdentityGate()
+# X gates
+Xp = SingleQubitXYRotation(phi=0, theta=np.pi)
+Xm = SingleQubitXYRotation(phi=0, theta=-np.pi)
+X2p = SingleQubitXYRotation(phi=0, theta=np.pi/2)
+X2m = SingleQubitXYRotation(phi=0, theta=-np.pi/2)
 
-    # X gates
-    Xp = SingleQubitRotation(axis='X', angle=np.pi)
-    Xm = SingleQubitRotation(axis='X', angle=-np.pi)
-    X2p = SingleQubitRotation(axis='X', angle=np.pi / 2)
-    X2m = SingleQubitRotation(axis='X', angle=-np.pi / 2)
+# Y gates
+Yp = SingleQubitXYRotation(phi=np.pi/2, theta=np.pi)
+Ym = SingleQubitXYRotation(phi=np.pi/2, theta=-np.pi)
+Y2m = SingleQubitXYRotation(phi=np.pi/2, theta=-np.pi/2)
+Y2p = SingleQubitXYRotation(phi=np.pi/2, theta=np.pi/2)
 
-    # Y gates
-    Yp = SingleQubitRotation(axis='Y', angle=np.pi)
-    Ym = SingleQubitRotation(axis='Y', angle=-np.pi)
-    Y2m = SingleQubitRotation(axis='Y', angle=-np.pi / 2)
-    Y2p = SingleQubitRotation(axis='Y', angle=np.pi / 2)
+# Z gates
+Zp = SingleQubitZRotation(np.pi)
+Z2p = SingleQubitZRotation(np.pi/2)
+Zm = SingleQubitZRotation(-np.pi)
+Z2m = SingleQubitZRotation(-np.pi/2)
 
-    # Z gates
-    Zp = SingleQubitRotation(axis='Z', angle=np.pi)
-    Z2p = SingleQubitRotation(axis='Z', angle=np.pi / 2)
-    Zm = SingleQubitRotation(axis='Z', angle=-np.pi)
-    Z2m = SingleQubitRotation(axis='Z', angle=-np.pi / 2)
+# Virtual Z gates
+VZp = VirtualZGate(angle=np.pi)
+VZ2p = VirtualZGate(angle=np.pi/2)
+VZm = VirtualZGate(angle=-np.pi)
+VZ2m = VirtualZGate(angle=np.pi/2)
 
-    # Virtual Z gates
-    VZp = VirtualZGate(angle=np.pi)
-    VZ2p = VirtualZGate(angle=np.pi / 2)
-    VZm = VirtualZGate(angle=-np.pi)
-    VZ2m = VirtualZGate(angle=np.pi / 2)
+# two-qubit gates
+CPh = TwoQubitGate()
 
-    # two-qubit gates
-    CPh = TwoQubitGate()
+# Readout
+Mxp = MeasurementGate(axis='X', sign='P')
+Myp = MeasurementGate(axis='Y', sign='P')
+Mzp = MeasurementGate(axis='Z', sign='P')
+Mxm = MeasurementGate(axis='X', sign='M')
+Mym = MeasurementGate(axis='Y', sign='M')
+Mzm = MeasurementGate(axis='Z', sign='M')
 
-    # Readout
-    Mxp = MeasurementGate(axis='X', sign='P')
-    Myp = MeasurementGate(axis='Y', sign='P')
-    Mzp = MeasurementGate(axis='Z', sign='P')
-    Mxm = MeasurementGate(axis='X', sign='M')
-    Mym = MeasurementGate(axis='Y', sign='M')
-    Mzm = MeasurementGate(axis='Z', sign='M')
+# Composite gates
+CZEcho = CompositeGate(n_qubit=2)
+CZEcho.add_gate([X2p, I])
+CZEcho.add_gate([CPh, I])
+CZEcho.add_gate([Xp, Xp])
+CZEcho.add_gate([CPh, I])
+CZEcho.add_gate([X2p, Xp])
 
-    # Composite gates
-    CZEcho = CompositeGate(n_qubit=2)
-    CZEcho.add_gate([X2p, I])
-    CZEcho.add_gate([CPh, I])
-    CZEcho.add_gate([Xp, Xp])
-    CZEcho.add_gate([CPh, I])
-    CZEcho.add_gate([X2p, Xp])
+CNOT = CompositeGate(n_qubit=2)
+CNOT.add_gate([I, Y2m])
+CNOT.add_gate([CPh, I])
+CNOT.add_gate([I, Y2p])
 
-    CNOT = CompositeGate(n_qubit=2)
-    CNOT.add_gate([I, Y2m])
-    CNOT.add_gate([CPh, I])
-    CNOT.add_gate([I, Y2p])
-
-    CZ = CZ(0, 0)  # Start with 0, 0 as the single qubit phase shifts.
+CZ = CZ(0, 0)  # Start with 0, 0 as the single qubit phase shifts.
 
 
 if __name__ == '__main__':

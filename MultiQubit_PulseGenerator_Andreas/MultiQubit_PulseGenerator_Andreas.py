@@ -85,55 +85,10 @@ class Driver(LabberDriver):
                 self.sequence.set_parameters(config)
                 self.sequence_to_waveforms.set_parameters(config)
 
-                # check if calculating multiple sequences, for randomization
-                if config.get('Output multiple sequences', False):
-                    # create multiple randomizations, store in memory
-                    n_call = int(config.get('Number of multiple sequences', 1))
-                    calls = []
-                    for n in range(n_call):
-                        config['Randomize'] += 1
-                        calls.append(
-                            copy.deepcopy(
-                                self.sequence_to_waveforms.get_waveforms(
-                                    self.sequence.get_sequence(config))))
 
-                    # after all calls are done, convert output to matrix form
-                    self.waveforms = dict()
-                    n_qubit = self.sequence.n_qubit
-                    # Align RB waveforms to end
-                    align_RB_to_end = config.get('Align RB waveforms to end', False)
-                    # start with xy and z waveforms, list of data
-                    for key in ['xy', 'z']:
-                        # get size of longest waveform
-                        self.waveforms[key] = []
-                        for n in range(n_qubit):
-                            length = max([len(call[key][n]) for call in calls])
-                            # build matrix
-                            datatype = calls[0][key][n].dtype
-                            data = np.zeros((n_call, length), dtype=datatype)
-                            for m, call in enumerate(calls):
-                                if align_RB_to_end:
-                                    data[m][-len(call[key][n]):] = call[key][n]
-                                else:
-                                    data[m][:len(call[key][n])] = call[key][n]
-                            self.waveforms[key].append(data)
-
-                    # same for readout waveforms
-                    for key in ['readout_trig', 'readout_iq']:
-                        length = max([len(call[key]) for call in calls])
-                        datatype = calls[0][key].dtype
-                        data = np.zeros((n_call, length), dtype=datatype)
-                        for m, call in enumerate(calls):
-                            if align_RB_to_end:
-                                data[m][-len(call[key]):] = call[key]
-                            else:
-                                data[m][:len(call[key])] = call[key]
-                        self.waveforms[key] = data
-
-                else:
-                    # normal operation, calcluate waveforms
-                    self.waveforms = self.sequence_to_waveforms.get_waveforms(
-                        self.sequence.get_sequence(config))
+                # normal operation, calcluate waveforms
+                self.waveforms = self.sequence_to_waveforms.get_waveforms(
+                    self.sequence.get_sequence(config))
             # get correct data from waveforms stored in memory
             value = self.getWaveformFromMemory(quant)
         else:
