@@ -40,7 +40,6 @@ class Driver(LabberDriver):
         # Create HVI object
         self.HVI = keysightSD1.SD_HVI()
 
-
     def performClose(self, bError=False, options={}):
         """Perform the close instrument connection operation"""
         # do not check for error if close was called with an error
@@ -51,7 +50,6 @@ class Driver(LabberDriver):
         except Exception:
             # never return error here
             pass
-
 
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
         """Perform the Set Value instrument operation. This function should
@@ -73,7 +71,6 @@ class Driver(LabberDriver):
             self.configure_hvi()
 
         return value
-
 
     def configure_hvi(self):
         """Configure and start/stop HVI depending on UI settings"""
@@ -153,8 +150,8 @@ class Driver(LabberDriver):
 
             # need to recompile after setting wait time, not sure why
             self.check_keysight_error(self.HVI.compile())
-            # try to load twice, sometimes hangs on first try
-            n_try = 2
+            # try to load a few times, sometimes hangs on first try
+            n_try = 5
             while True:
                 try:
                     self.check_keysight_error(self.HVI.load())
@@ -171,14 +168,12 @@ class Driver(LabberDriver):
         else:
             self.HVI.stop()
 
-
     def check_keysight_error(self, code):
         """Check and raise error"""
         if code >= 0:
             return
         # get error message
         raise Error(keysightSD1.SD_Error.getErrorMessage(code))
-
 
     def auto_detect(self):
         """Auto-detect units"""
@@ -199,15 +194,12 @@ class Driver(LabberDriver):
                 elif model[:5] in self.DIGS:
                     self.setValue('Slot %d' % slot, 'Digitizer')
 
-
     def get_pxi_config_from_ui(self):
         """Get PXI config from user interface"""
         units = []
         for n in range(self.n_slot):
             units.append(self.getValueIndex('Slot %d' % (n + 1)))
         return units
-
-
 
 
 if __name__ == '__main__':
