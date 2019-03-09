@@ -28,58 +28,42 @@ class CPMG(Sequence):
         # get parameters
         n_pulse = int(config['# of pi pulses'])
         pi_to_q = config['Add pi pulses to Q']
-        seqduration = config['Sequence duration']
+        duration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
-        pulse_shape = config['Pulse type']
-        uniform = config['Uniform pulse shape']
-
-        if uniform:
-            width = config['Width']
-            plateau = config['Plateau']
-        else:
-            widthlist = []
-            plateaulist = []
-            for i in range(1, 10):
-                widthlist.append(config['Width #' + str(i)])
-                plateaulist.append(config['Plateau #' + str(i)])
-            width = max(widthlist)
-            plateau = max(plateaulist)
-
-        # defines the actual width of a pulse depending on the pulse shape
-        if pulse_shape == 'Gaussian':
-            truncation_val = config['Truncation range']
-            width_e2e = truncation_val*width + plateau
-        elif pulse_shape == 'Ramp':
-            width_e2e = 2 * width + plateau
-        else:
-            width_e2e = width + plateau
 
         # select type of refocusing pi pulse
         gate_pi = Gate.Yp if pi_to_q else Gate.Xp
 
-        # redefines the sequence duration if edge-to-edge
-        if edge_to_edge:
-            duration = seqduration + width_e2e
-            T1duration = duration
-        else:
-            duration = seqduration
-            T1duration = duration + width_e2e/2
-
-        # generates the sequence
+        # always do T1 same way, regardless if edge-to-edge or center-center
         if n_pulse < 0:
-            self.add_gate_to_all(IdentityGate(width=0), t0=0)
             self.add_gate_to_all(gate_pi)
-            self.add_gate_to_all(IdentityGate(width=0), t0=T1duration)
+            self.add_gate_to_all(IdentityGate(width=duration))
+
+        elif edge_to_edge:
+            # edge-to-edge pulsing, set pulse separations
+            self.add_gate_to_all(Gate.X2p)
+            # for ramsey, just add final pulse
+            if n_pulse == 0:
+                self.add_gate_to_all(Gate.X2p, dt=duration)
+            else:
+                dt = duration / n_pulse
+                # add first pi pulse after half duration
+                self.add_gate_to_all(gate_pi, dt=dt/2)
+                # add rest of pi pulses
+                for i in range(n_pulse - 1):
+                    self.add_gate_to_all(gate_pi, dt=dt)
+                # add final pi/2 pulse
+                self.add_gate_to_all(Gate.X2p, dt=dt/2)
+
         else:
-            self.add_gate_to_all(IdentityGate(width=0), t0=0)
-            self.add_gate_to_all(Gate.X2p)
+            # center-to-center spacing, set absolute pulse positions
+            self.add_gate_to_all(Gate.X2p, t0=0)
+            # add pi pulses at right position
             for i in range(n_pulse):
-                self.add_gate_to_all(
-                    IdentityGate(width=0), t0=duration/(n_pulse+1)*(i+1))
-                self.add_gate_to_all(
-                    gate_pi)
-            self.add_gate_to_all(IdentityGate(width=0), t0=duration)
-            self.add_gate_to_all(Gate.X2p)
+                self.add_gate_to_all(gate_pi,
+                                     t0=(i + 0.5) * (duration / n_pulse))
+            # add final pi/2 pulse
+            self.add_gate_to_all(Gate.X2p, t0=duration)
 
 
 class PulseTrain(Sequence):
@@ -129,7 +113,6 @@ class SpinLocking(Sequence):
 
         if pulse_sequence != 'SL-3':
             self.add_gate_to_all(Gate.Xp)
-
 
         rabi_gates = []
         for ii in range(self.n_qubit):
