@@ -389,12 +389,14 @@ class SingleQubit_RB(Sequence):
                 self.prev_N_cliffords != N_cliffords or
                 self.prev_interleave != interleave or
                 multi_seq or
-                self.prev_interleaved_gate != interleaved_gate):
+                self.prev_interleaved_gate != interleaved_gate or
+                self.prev_n_qubit != self.n_qubit):
 
             self.prev_randomize = randomize
             self.prev_N_cliffords = N_cliffords
             self.prev_interleave = interleave
             self.prev_sequence = sequence
+            self.prev_n_qubit = self.n_qubit
 
             multi_gate_seq = []
             for n in range(self.n_qubit):

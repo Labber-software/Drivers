@@ -28,7 +28,7 @@ class Driver(LabberDriver):
         """Perform the operation of opening the instrument connection."""
         # init variables
         self.sequence = None
-        self.sequence_to_waveforms = SequenceToWaveforms()
+        self.sequence_to_waveforms = SequenceToWaveforms(1)
         self.waveforms = {}
         # always create a sequence at startup
         name = self.getValue('Sequence')
@@ -53,10 +53,10 @@ class Driver(LabberDriver):
                     # the custom sequence class has to be named
                     # 'CustomSequence'
                     if not isinstance(self.sequence, mod.CustomSequence):
-                        self.sequence = mod.CustomSequence()
+                        self.sequence = mod.CustomSequence(1)
                 else:
                     # standard built-in sequence
-                    self.sequence = new_type()
+                    self.sequence = new_type(1)
 
         elif (quant.name == 'Custom Python file' and
               self.getValue('Sequence') == 'Custom'):
@@ -68,7 +68,7 @@ class Driver(LabberDriver):
             mod = importlib.import_module(modName)
             # the custom sequence class has to be named 'CustomSequence'
             if not isinstance(self.sequence, mod.CustomSequence):
-                self.sequence = mod.CustomSequence()
+                self.sequence = mod.CustomSequence(1)
         return value
 
     def performGetValue(self, quant, options={}):

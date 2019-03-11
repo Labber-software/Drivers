@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from copy import copy
 import numpy as np
+import logging
+log = logging.getLogger('LabberDriver')
 
 
 class BaseGate:
@@ -96,6 +98,16 @@ class VirtualZGate(BaseGate):
 class TwoQubitGate(BaseGate):
     """Two qubit gate."""
     # TODO Make this have two gates. I if nothing on the second waveform
+
+
+class CPHASE(TwoQubitGate):
+    def __init__(self, negative_amplitude=False):
+        self.negative_amplitude = negative_amplitude
+
+    def get_adjusted_pulse(self, pulse):
+        pulse = copy(pulse)
+        pulse.negative_amplitude = self.negative_amplitude
+        return pulse
 
 
 class ReadoutGate(BaseGate):
@@ -218,7 +230,7 @@ class CZ(CompositeGate):
 
     def __init__(self, phi1, phi2):
         super().__init__(n_qubit=2)
-        self.add_gate([TwoQubitGate(), IdentityGate()])
+        self.add_gate([CPHASE(), IdentityGate()])
         self.add_gate([VirtualZGate(phi1), VirtualZGate(phi2)])
 
     def new_angles(self, phi1, phi2):
@@ -256,13 +268,13 @@ Zm = SingleQubitZRotation(-np.pi)
 Z2m = SingleQubitZRotation(-np.pi/2)
 
 # Virtual Z gates
-VZp = VirtualZGate(theta=np.pi)
-VZ2p = VirtualZGate(theta=np.pi/2)
-VZm = VirtualZGate(theta=-np.pi)
-VZ2m = VirtualZGate(theta=np.pi/2)
+VZp = VirtualZGate(np.pi)
+VZ2p = VirtualZGate(np.pi/2)
+VZm = VirtualZGate(-np.pi)
+VZ2m = VirtualZGate(np.pi/2)
 
 # two-qubit gates
-CPh = TwoQubitGate()
+CPh = CPHASE()
 
 # Readout
 # TODO Make these with composite gates just
@@ -285,6 +297,10 @@ CNOT = CompositeGate(n_qubit=2)
 CNOT.add_gate([I, Y2m])
 CNOT.add_gate([CPh, I])
 CNOT.add_gate([I, Y2p])
+
+NetZero = CompositeGate(n_qubit=2)
+NetZero.add_gate([CPHASE(), IdentityGate(width=0)])
+NetZero.add_gate([CPHASE(True), IdentityGate(width=0)])
 
 CZ = CZ(0, 0)  # Start with 0, 0 as the single qubit phase shifts.
 

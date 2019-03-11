@@ -1,34 +1,35 @@
 #!/usr/bin/env python3
 import logging
 import numpy as np
+from copy import copy
 
-from crosstalk import Crosstalk
+import crosstalk
 import gates
-from predistortion import ExponentialPredistortion, Predistortion
+import predistortion
 import pulses
 import qubits
-from readout import Readout
-from tomography import ProcessTomography, StateTomography
+import readout
+import tomography
+
 
 # Allow logging to Labber's instrument log
 log = logging.getLogger('LabberDriver')
 
-# Maximal number of qubits controllable by this class
-MAX_QUBIT = 9
-
-# TODO Get rid of simultanous pulses, only for RB?
+# TODO How to define 2 QB properly for different pairs? Also different interactions, CZ, iSWAP etc.
 # TODO Select qubits to benchmark (all sequences?) with check boxes
 # TODO Multiple instances of drivers
 # TODO Should t0 be start or center?
-# TODO Get rid of max_qubit
-# TODO Fix changing of number of qubits
 # TODO Add phase tracking of readout
-# TODO Move all perform checks from the functions
 # TODO Should I gates be in RB?
-# TODO Check VZ
-# TODO Check CZ phases
-# TODO Create lists/dicts of pulses for each gate/qubits. Then have helper functions to modify pulses accordinly
-# TODO Reduce calc of CZ
+# TODO Reduce calc of CZ by finding all unique TwoQubitGates in seq and calc.
+# TODO Extract qubits, crosstalk, demodulation, and predistortion to their own drivers
+# TODO Make I(width=None) have the width of the longest gate in the step
+# TODO Add checks so that not both t0 and dt are given
+# TODO Fix empty custom seq
+# TODO Chaning custom driver path doesnt trigger setValue
+# TODO Error without crashing the driver
+# TODO Combine two cnots to cphase?
+# TODO steps with 0 length should not have 2*dt spacing
 
 
 class Step:
@@ -37,7 +38,7 @@ class Step:
     Parameters
     ----------
     n_qubit : int
-        Number of qubits in the sequece (the default is MAX_QUBIT).
+        Number of qubits in the sequece.
     t0 : float
         Start of the sequence in seconds (the default is None).
     dt : float
@@ -54,7 +55,7 @@ class Step:
 
     """
 
-    def __init__(self, n_qubit=MAX_QUBIT, t0=None, dt=None, align='center'):
+    def __init__(self, n_qubit, t0=None, dt=None, align='center'):
         self.n_qubit = n_qubit
         self.gates = [gates.I for n in range(self.n_qubit)]
         self.align = align
@@ -103,7 +104,7 @@ class Sequence:
     Parameters
     ----------
     n_qubit : type
-        The number of qubits in the sequence (the default is 5).
+        The number of qubits in the sequence.
 
     Attributes
     ----------
@@ -119,18 +120,18 @@ class Sequence:
 
     """
 
-    def __init__(self, n_qubit=5):
+    def __init__(self, n_qubit):
         self.n_qubit = n_qubit
 
         self.sequences = []
 
         # process tomography
         self.perform_process_tomography = False
-        self._process_tomography = ProcessTomography()
+        self._process_tomography = tomography.ProcessTomography()
 
         # state tomography
         self.perform_state_tomography = False
-        self._state_tomography = StateTomography()
+        self._state_tomography = tomography.StateTomography()
 
         # readout
         self.readout_delay = 0.0
@@ -145,8 +146,7 @@ class Sequence:
             Configuration as defined by Labber driver configuration window.
 
         """
-        # this function should be overloaded by specific sequence
-        pass
+        raise NotImplementedError()
 
     def get_sequence(self, config):
         """Compile sequence and return it.
@@ -290,8 +290,8 @@ class Sequence:
     def add_gate_to_all(self, gate, t0=None, dt=None, align='center'):
         """Add a single gate to all qubits.
 
-        Pulses are added at the end
-        of the sequence, with the gate spacing set by the spacing parameter.
+        Pulses are added at the end of the sequence, with the gate spacing set
+        by either the spacing parameter or the aboslut position.
         """
         self.add_gate(list(range((self.n_qubit))),
                       [gate for n in range(self.n_qubit)],
@@ -311,9 +311,9 @@ class Sequence:
         around X to qubit 1, then a negative pi/2-pulse to qubit 2, finally
         simultaneous positive pi-pulses to qubits 1 and 2.
 
-        >>> add_gates([[Gate.Xp,  None    ],
-                       [None,     Gate.Y2m],
-                       [Gate.Xp,  Gate.Xp]])
+        >>> add_gates([[gates.Xp,  None    ],
+                       [None,     gates.Y2m],
+                       [gates.Xp,  gates.Xp]])
 
         Parameters
         ----------
@@ -382,13 +382,13 @@ class Sequence:
                                       align='center'):
         """Add multiple composite gates to the sequence.
 
-        The composite gates need
-        to have the same length. Single qubit gates are also allowed, and will
-        be padded with I gates to have the same length as the composite gate.
+        The composite gates need to have the same length. Single qubit gates
+        are also allowed, and will be padded with I gates to have the same
+        length as the composite gate.
         """
         gate_length = 0
         for i, g in enumerate(gate):
-            if isinstance(g, CompositeGate):
+            if isinstance(g, gates.CompositeGate):
                 if gate_length == 0:
                     gate_length = len(g)
                 elif gate_length != len(g):
@@ -398,9 +398,9 @@ class Sequence:
 
         sequence = []
         for i in range(gate_length):
-            step = [Gate.I for n in range(self.n_qubit)]
+            step = [gates.I for n in range(self.n_qubit)]
             for q, g in zip(qubit, gate):
-                if isinstance(g, CompositeGate):
+                if isinstance(g, gates.CompositeGate):
                     for k, G in enumerate(g.get_gate_at_index(i)):
                         if isinstance(q, int):
                             q = [q]
@@ -422,7 +422,9 @@ class Sequence:
         # sequence parameters
         d = dict(Zero=0, One=1, Two=2, Three=3, Four=4, Five=5, Six=6, Seven=7,
                  Eight=8, Nine=9)
-        self.n_qubit = d[config.get('Number of qubits')]
+        # If the number of qubits changed, we need to re-init
+        if self.n_qubit != d[config.get('Number of qubits')]:
+            self.__init__(d[config.get('Number of qubits')])
 
         # Readout
         self.readout_delay = config.get('Readout delay')
@@ -444,7 +446,7 @@ class SequenceToWaveforms:
     Parameters
     ----------
     n_qubit : type
-        The maximum number of qubits (the default is 5).
+        The maximum number of qubits.
 
     Attributes
     ----------
@@ -477,7 +479,7 @@ class SequenceToWaveforms:
 
     """
 
-    def __init__(self, n_qubit=5):
+    def __init__(self, n_qubit):
         self.n_qubit = n_qubit
         self.dt = 10E-9
         self.local_xy = True
@@ -491,33 +493,34 @@ class SequenceToWaveforms:
         self.align_to_end = False
 
         self.sequences = []
-        self.qubits = [qubits.Qubit() for n in range(MAX_QUBIT)]
+        self.qubits = [qubits.Qubit() for n in range(self.n_qubit)]
 
         # waveforms
         self._wave_xy = [np.zeros(0, dtype=np.complex)
-                         for n in range(MAX_QUBIT)]
-        self._wave_z = [np.zeros(0) for n in range(MAX_QUBIT)]
-        self._wave_gate = [np.zeros(0) for n in range(MAX_QUBIT)]
+                         for n in range(self.n_qubit)]
+        self._wave_z = [np.zeros(0) for n in range(self.n_qubit)]
+        self._wave_gate = [np.zeros(0) for n in range(self.n_qubit)]
 
         # waveform delays
-        self.wave_xy_delays = np.zeros(MAX_QUBIT)
-        self.wave_z_delays = np.zeros(MAX_QUBIT)
+        self.wave_xy_delays = np.zeros(self.n_qubit)
+        self.wave_z_delays = np.zeros(self.n_qubit)
 
         # define pulses
-        self.pulses_1qb_xy = [None for n in range(MAX_QUBIT)]
-        self.pulses_1qb_z = [None for n in range(MAX_QUBIT)]
-        self.pulses_2qb = [None for n in range(MAX_QUBIT - 1)]
-        self.pulses_readout = [None for n in range(MAX_QUBIT)]
+        self.pulses_1qb_xy = [None for n in range(self.n_qubit)]
+        self.pulses_1qb_z = [None for n in range(self.n_qubit)]
+        self.pulses_2qb = [None for n in range(self.n_qubit - 1)]
+        self.pulses_readout = [None for n in range(self.n_qubit)]
 
         # cross-talk
         self.compensate_crosstalk = False
-        self._crosstalk = Crosstalk()
+        self._crosstalk = crosstalk.Crosstalk()
 
         # predistortion
         self.perform_predistortion = False
-        self._predistortions = [Predistortion(n) for n in range(MAX_QUBIT)]
-        self._predistortions_z = [
-            ExponentialPredistortion(n) for n in range(MAX_QUBIT)]
+        self._predistortions = [predistortion.Predistortion(n)
+                                for n in range(self.n_qubit)]
+        self._predistortions_z = [predistortion.ExponentialPredistortion(n)
+                                  for n in range(self.n_qubit)]
 
         # gate switch waveform
         self.generate_gate_switch = False
@@ -530,7 +533,7 @@ class SequenceToWaveforms:
         self.readout_trig_generate = False
 
         # readout wave object and settings
-        self.readout = Readout(max_qubit=MAX_QUBIT)
+        self.readout = readout.Demodulation(self.n_qubit)
         self.readout_trig = np.array([], dtype=float)
         self.readout_iq = np.array([], dtype=np.complex)
 
@@ -549,7 +552,8 @@ class SequenceToWaveforms:
 
         """
         self.sequences = sequences
-        self._seperate_gates()
+        if not self.simultaneous_pulses:
+            self._seperate_gates()
         self._add_timings()
         self._init_waveforms()
 
@@ -570,10 +574,16 @@ class SequenceToWaveforms:
             for n in range(1, self.n_qubit):
                 self._wave_xy[n][:] = 0.0
 
-        self._perform_crosstalk_compensation()
-        self._predistort_waveforms()
-        self._add_readout_trig()
-        self._add_microwave_gate()
+        if self.compensate_crosstalk:
+            self._perform_crosstalk_compensation()
+        if self.perform_predistortion:
+            self._predistort_xy_waveforms()
+        if self.perform_predistortion_z:
+            self._predistort_z_waveforms()
+        if  self.readout_trig_generate:
+            self._add_readout_trig()
+        if self.generate_gate_switch:
+            self._add_microwave_gate()
 
         # Apply offsets
         self.readout_iq += self.readout_i_offset + 1j * self.readout_q_offset
@@ -588,24 +598,23 @@ class SequenceToWaveforms:
         return waveforms
 
     def _seperate_gates(self):
-        if not self.simultaneous_pulses:
-            new_sequences = []
-            for step in self.sequences:
-                if any(isinstance(gate, (gates.ReadoutGate, gates.IdentityGate))
-                    for gate in step.gates):
-                    # Don't seperate I gates or readouts since we do
-                    # multiplexed readout
-                    new_sequences.append(step)
-                    continue
-                for i, gate in enumerate(step.gates):
-                    if gate is not None:
-                        new_step = Step(n_qubit=step.n_qubit,
-                                        t0=step.t_start,
-                                        dt=step.dt,
-                                        align=step.align)
-                        new_step.add_gate(i, gate)
-                        new_sequences.append(new_step)
-            self.sequences = new_sequences
+        new_sequences = []
+        for step in self.sequences:
+            if any(isinstance(gate, (gates.ReadoutGate, gates.IdentityGate))
+                for gate in step.gates):
+                # Don't seperate I gates or readouts since we do
+                # multiplexed readout
+                new_sequences.append(step)
+                continue
+            for i, gate in enumerate(step.gates):
+                if gate is not None:
+                    new_step = Step(n_qubit=step.n_qubit,
+                                    t0=step.t_start,
+                                    dt=step.dt,
+                                    align=step.align)
+                    new_step.add_gate(i, gate)
+                    new_sequences.append(new_step)
+        self.sequences = new_sequences
 
     def _add_timings(self):
         for step in self.sequences:
@@ -664,25 +673,22 @@ class SequenceToWaveforms:
 
         return pulse
 
-    def _predistort_waveforms(self):
+    def _predistort_xy_waveforms(self):
         """Pre-distort the waveforms."""
-        if self.perform_predistortion:
-            # go through and predistort all waveforms
-            n_wave = self.n_qubit if self.local_xy else 1
-            for n in range(n_wave):
-                self._wave_xy[n] = self._predistortions[n].predistort(
-                    self._wave_xy[n])
+        # go through and predistort all xy waveforms
+        n_wave = self.n_qubit if self.local_xy else 1
+        for n in range(n_wave):
+            self._wave_xy[n] = self._predistortions[n].predistort(
+                self._wave_xy[n])
 
-        if self.perform_predistortion_z:
-            # go through and predistort all waveforms
-            for n in range(self.n_qubit):
-                self._wave_z[n] = self._predistortions_z[n].predistort(
-                    self._wave_z[n])
+    def _predistort_z_waveforms(self):
+        # go through and predistort all waveforms
+        for n in range(self.n_qubit):
+            self._wave_z[n] = self._predistortions_z[n].predistort(
+                self._wave_z[n])
 
     def _perform_crosstalk_compensation(self):
         """Compensate for Z-control crosstalk."""
-        if not self.compensate_crosstalk:
-            return
         self._wave_z = self._crosstalk.compensate(self._wave_z)
 
     def _perform_virtual_z(self):
@@ -695,12 +701,11 @@ class SequenceToWaveforms:
                     phase += gate.theta
                     continue
                 if isinstance(gate, gates.SingleQubitXYRotation):
+                    step.gates[qubit] = copy(step.gates[qubit])
                     step.gates[qubit].phi += phase
 
     def _add_microwave_gate(self):
         """Create waveform for gating microwave switch."""
-        if not self.generate_gate_switch:
-            return
         n_wave = self.n_qubit if self.local_xy else 1
         # go through all waveforms
         for n, wave in enumerate(self._wave_xy[:n_wave]):
@@ -774,8 +779,6 @@ class SequenceToWaveforms:
 
     def _add_readout_trig(self):
         """Create waveform for readout trigger."""
-        if not self.readout_trig_generate:
-            return
         trig = np.zeros_like(self.readout_iq)
         start = (np.abs(self.readout_iq) > 0.0).nonzero()[0][0]
         end = int(np.min((start +
@@ -898,13 +901,18 @@ class SequenceToWaveforms:
         # sequence parameters
         d = dict(Zero=0, One=1, Two=2, Three=3, Four=4, Five=5, Six=6, Seven=7,
                  Eight=8, Nine=9)
-        self.n_qubit = d[config.get('Number of qubits')]
+
+        # If the number of qubits changed, we need to re-init to update pulses etc
+        if self.n_qubit != d[config.get('Number of qubits')]:
+            self.__init__(d[config.get('Number of qubits')])
+
         self.dt = config.get('Pulse spacing')
         self.local_xy = config.get('Local XY control')
-        self.simultaneous_pulses = config.get('Simultaneous pulses')
-        # TODO: temporary fix for CP/CPMG, disable non-simultanous pulses
-        if config.get('Sequence', '') == 'CP/CPMG':
-            self.simultaneous_pulses = True
+
+        # Simultaneous pulses only relevant for 2 qb RB. Otherwise we want True.
+        self.simultaneous_pulses = True
+        if config.get('Sequence', '') == '2-QB Randomized Benchmarking':
+            self.simultaneous_pulses = config.get('Simultaneous pulses')
 
 
         # waveform parameters
@@ -1039,8 +1047,8 @@ class SequenceToWaveforms:
                 # pulse-specific parameters
                 pulse.amplitude = config.get('Amplitude, 2QB' + s)
 
-            # Gate.CZ.value.new_angles(config.get('QB1 Phi 2QB #12'),
-            #                          config.get('QB2 Phi 2QB #12'))
+            gates.CZ.new_angles(config.get('QB1 Phi 2QB #12'),
+                                     config.get('QB2 Phi 2QB #12'))
 
             self.pulses_2qb[n] = pulse
 

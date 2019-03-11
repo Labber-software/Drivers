@@ -212,7 +212,6 @@ class Cosine(Pulse):
         return self.width + self.plateau
 
     def calculate_envelope(self, t0, t):
-        log.log(msg="amp: {}".format(self.amplitude), level=30)
         tau = self.width
         if self.plateau == 0:
             values = (self.amplitude / 2 *
@@ -307,8 +306,9 @@ class CZ(Pulse):
         tau = np.linspace(0, 1, n_points)
         self.theta_tau = np.zeros(n_points)
         for i in range(n_points):
-            self.theta_tau[i] = np.sum(
-                (Lcoeff * (1 - np.cos(2 * np.pi * n * tau[i]))) + self.theta_i)
+            self.theta_tau[i] = (np.sum(
+                (Lcoeff * (1 - np.cos(2 * np.pi * n * tau[i])))) +
+                self.theta_i)
         t_tau = np.trapz(np.sin(self.theta_tau), x=tau)
         Width_tau = self.width / t_tau
 
@@ -316,8 +316,8 @@ class CZ(Pulse):
         tau = np.linspace(0, Width_tau, n_points)
         self.t_tau = np.zeros(n_points)
         for i in range(n_points):
-            self.theta_tau[i] = np.sum(
-                (Lcoeff * (1 - np.cos(2 * np.pi * n * tau[i] / Width_tau))) +
+            self.theta_tau[i] = (np.sum(
+                (Lcoeff * (1 - np.cos(2 * np.pi * n * tau[i] / Width_tau)))) +
                 self.theta_i)
             if i > 0:
                 self.t_tau[i] = np.trapz(

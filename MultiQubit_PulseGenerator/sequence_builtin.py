@@ -78,10 +78,21 @@ class PulseTrain(Sequence):
             self.add_gate_to_all(gates.I)
         for n in range(n_pulse):
             pulse_type = config['Pulse']
-            if alternate and (n % 2) == 1:
-                pulse_type = pulse_type.replace('p', 'm')
-            gate = getattr(gates, pulse_type)
-            self.add_gate_to_all(gate)
+            if pulse_type == 'CPh':
+                if alternate and (n % 2) == 1:
+                    gate = [gates.CPHASE(True), gates.I]
+                else:
+                    gate = [gates.CPHASE(), gates.I]
+                for i in range(self.n_qubit-1):
+                    self.add_gate([i, i+1], gate)
+            elif pulse_type == 'NetZero':
+                for i in range(self.n_qubit-1):
+                    self.add_gate([i, i+1], gates.NetZero)
+            else:
+                if alternate and (n % 2) == 1:
+                    pulse_type = pulse_type.replace('p', 'm')
+                gate = getattr(gates, pulse_type)
+                self.add_gate_to_all(gate)
 
 
 class SpinLocking(Sequence):
@@ -113,7 +124,7 @@ class SpinLocking(Sequence):
         rabi_gates = []
         for ii in range(self.n_qubit):
             rabi_gates.append(
-                RabiGate(pulse_amps[ii], pulse_duration, pulse_phase))
+                gates.RabiGate(pulse_amps[ii], pulse_duration, pulse_phase))
         self.add_gate(list(range(self.n_qubit)), rabi_gates)
         if pulse_sequence != 'SL-3':
             self.add_gate_to_all(gates.Xp)
