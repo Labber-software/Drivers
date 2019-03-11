@@ -6,59 +6,10 @@ import numpy as np
 class BaseGate:
     """Base class for a qubit gate.
 
-    Attributes
-    ----------
-    phase_shift : float
-        The phase shift applied when compiling into pulsesself.
-        For example used for virutal Z gates.
-
     """
-
-    def __init__(self):
-        self.phase_shift = 0
-
-    def add_phase(self, shift):
-        """Return a new instance of the gate, but with a phase shift applied.
-
-        Parameters
-        ----------
-        shift : float
-            The angle in radians.
-
-        Returns
-        -------
-        :obj: BaseGate
-            The new instance of the gate.
-
-        """
-        new_gate = copy(self)
-        new_gate.phase_shift += shift
-        return new_gate
-
-    def get_waveform(self, pulse, t0, t):
-        """
-        Return the waveform corresponding to the gate.
-
-        Parameters
-        ----------
-        pulse : Pulse object
-            The pulse object to use for the gate.
-        t0 : float
-            The time of the pulse center.
-        t : numpy array
-            The time vector to use for the waveform.
-
-        Returns
-        ----------
-        waveform : numpy array
-            The calculated waveform.
-
-        """
-        return self.get_adjusted_pulse(pulse).calculate_waveform(t0, t)
 
     def get_adjusted_pulse(self, pulse):
         pulse = copy(pulse)
-        pulse.phase += self.phase_shift
         return pulse
 
 
@@ -77,7 +28,6 @@ class SingleQubitXYRotation(BaseGate):
     """
 
     def __init__(self, phi, theta):
-        super().__init__()
         self.phi = phi
         self.theta = theta
 
@@ -85,7 +35,7 @@ class SingleQubitXYRotation(BaseGate):
         pulse = copy(pulse)
         pulse.phase = self.phi
         # pi pulse correspond to the full amplitude
-        pulse.amplitude = self.theta / np.pi
+        pulse.amplitude *= self.theta / np.pi
         return pulse
 
 class SingleQubitZRotation(BaseGate):
@@ -99,13 +49,12 @@ class SingleQubitZRotation(BaseGate):
     """
 
     def __init__(self, theta):
-        super().__init__()
         self.theta = theta
 
     def get_adjusted_pulse(self, pulse):
         pulse = copy(pulse)
         # pi pulse correspond to the full amplitude
-        pulse.amplitude = self.theta / np.pi
+        pulse.amplitude *= self.theta / np.pi
         return pulse
 
 
@@ -125,13 +74,12 @@ class IdentityGate(BaseGate):
     """
 
     def __init__(self, width=None):
-        super().__init__()
         self.width = width
 
     def get_adjusted_pulse(self, pulse):
         pulse = copy(pulse)
         pulse.amplitude = 0
-        pulse.use_drag = False
+        pulse.use_drag = False # Avoids bug
         if self.width is not None:
             pulse.width = self.width
             pulse.plateau = 0
@@ -141,9 +89,8 @@ class IdentityGate(BaseGate):
 class VirtualZGate(BaseGate):
     """Virtual Z Gate."""
 
-    def __init__(self, angle):
-        super().__init__()
-        self.angle = angle
+    def __init__(self, theta):
+        self.theta = theta
 
 
 class TwoQubitGate(BaseGate):
@@ -166,11 +113,7 @@ class CustomGate(BaseGate):
     """
 
     def __init__(self, pulse):
-        super().__init__()
         self.pulse = pulse
-
-    def get_waveform(self, pulse, t0, t):  # noqa: D102
-        return super().get_waveform(self.pulse, t0, t)
 
 
 class RabiGate(BaseGate):
@@ -184,7 +127,6 @@ class RabiGate(BaseGate):
     """
 
     def __init__(self, amplitude, plateau, phase):
-        super().__init__()
         self.amplitude = amplitude
         self.plateau = plateau
         self.phase = phase
@@ -262,34 +204,6 @@ class CompositeGate:
         return len(self.sequence)
 
 
-class MeasurementGate(CompositeGate):
-    """Measures the qubit along the specified axis.
-
-    Axis should be X, Y, or Z. The sign is either positive (P) or negative (M).
-    """
-
-    def __init__(self, axis='Z', sign='P'):
-        super().__init__(n_qubit=1)
-
-        if axis == 'Z' and sign == 'P':
-            gate = IdentityGate()
-        elif axis == 'Z' and sign == 'M':
-            gate = SingleQubitXYRotation(phi=0, theta=np.pi)
-        elif axis == 'Y' and sign == 'P':
-            gate = SingleQubitXYRotation(phi=0, theta=np.pi/2)
-        elif axis == 'X' and sign == 'P':
-            gate = SingleQubitXYRotation(phi=np.pi/2, theta=-np.pi/2)
-        elif axis == 'Y' and sign == 'M':
-            gate = SingleQubitXYRotation(phi=0, theta=-np.pi/2)
-        elif axis == 'X' and sign == 'M':
-            gate = SingleQubitXYRotation(phi=np.pi/2, theta=np.pi/2)
-        else:
-            raise ValueError('Axis must be X, Y or Z, and sign P or M.')
-
-        self.add_gate(gate)
-        self.add_gate(ReadoutGate())
-
-
 class CZ(CompositeGate):
     """CPHASE gate followed by single qubit Z rotations.
 
@@ -342,21 +256,22 @@ Zm = SingleQubitZRotation(-np.pi)
 Z2m = SingleQubitZRotation(-np.pi/2)
 
 # Virtual Z gates
-VZp = VirtualZGate(angle=np.pi)
-VZ2p = VirtualZGate(angle=np.pi/2)
-VZm = VirtualZGate(angle=-np.pi)
-VZ2m = VirtualZGate(angle=np.pi/2)
+VZp = VirtualZGate(theta=np.pi)
+VZ2p = VirtualZGate(theta=np.pi/2)
+VZm = VirtualZGate(theta=-np.pi)
+VZ2m = VirtualZGate(theta=np.pi/2)
 
 # two-qubit gates
 CPh = TwoQubitGate()
 
 # Readout
-Mxp = MeasurementGate(axis='X', sign='P')
-Myp = MeasurementGate(axis='Y', sign='P')
-Mzp = MeasurementGate(axis='Z', sign='P')
-Mxm = MeasurementGate(axis='X', sign='M')
-Mym = MeasurementGate(axis='Y', sign='M')
-Mzm = MeasurementGate(axis='Z', sign='M')
+# TODO Make these with composite gates just
+# Mxp = MeasurementGate(axis='X', sign='P')
+# Myp = MeasurementGate(axis='Y', sign='P')
+# Mzp = MeasurementGate(axis='Z', sign='P')
+# Mxm = MeasurementGate(axis='X', sign='M')
+# Mym = MeasurementGate(axis='Y', sign='M')
+# Mzm = MeasurementGate(axis='Z', sign='M')
 
 # Composite gates
 CZEcho = CompositeGate(n_qubit=2)

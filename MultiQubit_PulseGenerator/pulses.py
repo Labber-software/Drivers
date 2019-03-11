@@ -3,6 +3,7 @@ import numpy as np
 import logging
 log = logging.getLogger('LabberDriver')
 
+# TODO Private methods and variables
 
 class Pulse:
     """Represents physical pulses played by an AWG.
@@ -10,7 +11,8 @@ class Pulse:
     Parameters
     ----------
     complex : bool
-        If True, pulse has both I and Q, otherwise it's a real valued.
+        If True, pulse has both I and Q, otherwise it's real valued.
+        Phase, frequency and drag only applies for complex waveforms.
 
     Attributes
     ----------
@@ -30,9 +32,6 @@ class Pulse:
         Drag coefficient.
     drag_detuning : float
         Applies a frequnecy detuning for DRAG pulses.
-    truncation_range : float
-        The truncation range of Gaussian pulses,
-        in units of standard deviations.
     start_at_zero : bool
         If True, forces the pulse to start in 0.
 
@@ -49,7 +48,6 @@ class Pulse:
         self.use_drag = False
         self.drag_coefficient = 0.0
         self.drag_detuning = 0.0
-        self.truncation_range = 5.0
         self.start_at_zero = False
         self.complex = complex
 
@@ -126,8 +124,11 @@ class Pulse:
             y = data_i + 1j * data_q
         return y
 
-
 class Gaussian(Pulse):
+    def __init__(self, complex):
+        super().__init__(complex)
+        self.truncation_range = 5
+
     def total_duration(self):
         return self.truncation_range * self.width + self.plateau
 
@@ -136,12 +137,11 @@ class Gaussian(Pulse):
         # std = self.width/2;
         # alternate; std is set to give total pulse area same as a square
         std = self.width / np.sqrt(2 * np.pi)
+        values = np.zeros_like(t)
         if self.plateau == 0:
             # pure gaussian, no plateau
             if std > 0:
                 values = np.exp(-(t - t0)**2 / (2 * std**2))
-            else:
-                values = np.zeros_like(t)
         else:
             # add plateau
             values = np.array(((t >= (t0 - self.plateau / 2)) &
@@ -160,6 +160,7 @@ class Gaussian(Pulse):
                             (2 * std**2))
                 )
 
+        # TODO  Fix this
         if self.start_at_zero:
             values = values - values.min()
             values = values / values.max()
@@ -211,6 +212,7 @@ class Cosine(Pulse):
         return self.width + self.plateau
 
     def calculate_envelope(self, t0, t):
+        log.log(msg="amp: {}".format(self.amplitude), level=30)
         tau = self.width
         if self.plateau == 0:
             values = (self.amplitude / 2 *

@@ -35,30 +35,15 @@ class CPMG(Sequence):
 
         # always do T1 same way, regardless if edge-to-edge or center-center
         if n_pulse < 0:
-<<<<<<< HEAD
-            self.add_gate_to_all(gates.IdentityGate(width=0), t0=0)
-            self.add_gate_to_all(gate_pi)
-            self.add_gate_to_all(gates.IdentityGate(width=0), t0=T1duration)
-        else:
-            self.add_gate_to_all(gates.IdentityGate(width=0), t0=0)
-            self.add_gate_to_all(gates.X2p)
-            for i in range(n_pulse):
-                self.add_gate_to_all(
-                    gates.IdentityGate(width=0), t0=duration/(n_pulse+1)*(i+1))
-                self.add_gate_to_all(
-                    gate_pi)
-            self.add_gate_to_all(gates.IdentityGate(width=0), t0=duration)
-            self.add_gate_to_all(gates.X2p)
-=======
             self.add_gate_to_all(gate_pi)
             self.add_gate_to_all(IdentityGate(width=duration))
 
         elif edge_to_edge:
             # edge-to-edge pulsing, set pulse separations
-            self.add_gate_to_all(Gate.X2p)
+            self.add_gate_to_all(gates.X2p)
             # for ramsey, just add final pulse
             if n_pulse == 0:
-                self.add_gate_to_all(Gate.X2p, dt=duration)
+                self.add_gate_to_all(gates.X2p, dt=duration)
             else:
                 dt = duration / n_pulse
                 # add first pi pulse after half duration
@@ -67,18 +52,17 @@ class CPMG(Sequence):
                 for i in range(n_pulse - 1):
                     self.add_gate_to_all(gate_pi, dt=dt)
                 # add final pi/2 pulse
-                self.add_gate_to_all(Gate.X2p, dt=dt/2)
+                self.add_gate_to_all(gates.X2p, dt=dt/2)
 
         else:
             # center-to-center spacing, set absolute pulse positions
-            self.add_gate_to_all(Gate.X2p, t0=0)
+            self.add_gate_to_all(gates.X2p, t0=0)
             # add pi pulses at right position
             for i in range(n_pulse):
                 self.add_gate_to_all(gate_pi,
                                      t0=(i + 0.5) * (duration / n_pulse))
             # add final pi/2 pulse
-            self.add_gate_to_all(Gate.X2p, t0=duration)
->>>>>>> e884bd5923fccc8a0e6db136a158067ac7434c1a
+            self.add_gate_to_all(gates.X2p, t0=duration)
 
 
 class PulseTrain(Sequence):

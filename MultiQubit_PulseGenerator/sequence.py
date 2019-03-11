@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 import logging
-from copy import copy
-
 import numpy as np
 
 from crosstalk import Crosstalk
 import gates
 from predistortion import ExponentialPredistortion, Predistortion
 import pulses
-from qubits import Qubit, Transmon
+import qubits
 from readout import Readout
 from tomography import ProcessTomography, StateTomography
 
@@ -17,6 +15,20 @@ log = logging.getLogger('LabberDriver')
 
 # Maximal number of qubits controllable by this class
 MAX_QUBIT = 9
+
+# TODO Get rid of simultanous pulses, only for RB?
+# TODO Select qubits to benchmark (all sequences?) with check boxes
+# TODO Multiple instances of drivers
+# TODO Should t0 be start or center?
+# TODO Get rid of max_qubit
+# TODO Fix changing of number of qubits
+# TODO Add phase tracking of readout
+# TODO Move all perform checks from the functions
+# TODO Should I gates be in RB?
+# TODO Check VZ
+# TODO Check CZ phases
+# TODO Create lists/dicts of pulses for each gate/qubits. Then have helper functions to modify pulses accordinly
+# TODO Reduce calc of CZ
 
 
 class Step:
@@ -29,7 +41,8 @@ class Step:
     t0 : float
         Start of the sequence in seconds (the default is None).
     dt : float
-        End of the sequence in seconds (the default is None).
+        Spacing to previous pulse in seconds (the default is None). Use only
+        either t0 or dt.
     align : str {'left', 'center', 'right'}
         The alignment of pulses if they have different lengths,
         (the default is 'center').
@@ -38,20 +51,16 @@ class Step:
     ----------
     gates : list of :obj:`BaseGate`
         The different gates in the step.
-    t_middle : float
-        Center of the sequence in seconds.
 
     """
 
     def __init__(self, n_qubit=MAX_QUBIT, t0=None, dt=None, align='center'):
         self.n_qubit = n_qubit
-        self.gates = [None for n in range(self.n_qubit)]
+        self.gates = [gates.I for n in range(self.n_qubit)]
         self.align = align
-        self.t0 = t0
         self.dt = dt
-        self.t_start = None
+        self.t_start = t0
         self.t_end = None
-        self.t_middle = None
 
     def add_gate(self, qubit, gate):
         """Add the given gate(s) to the specified qubit(s).
@@ -85,7 +94,6 @@ class Step:
 
         """
         self.t_start += shift
-        self.t_middle += shift
         self.t_end += shift
 
 
@@ -199,7 +207,7 @@ class Sequence:
             If True, aligns the pulse to the left. Defaults to False.
 
         """
-        gate = CustomGate(pulse)
+        gate = gates.CustomGate(pulse)
         if align_left is True:
             self.add_gate(qubit, gate, t0, dt, 'left')
         else:
@@ -285,8 +293,10 @@ class Sequence:
         Pulses are added at the end
         of the sequence, with the gate spacing set by the spacing parameter.
         """
-        self.add_gate([n for n in range(self.n_qubit)],
-                      [gate for n in range(self.n_qubit)], t0=t0, dt=dt,
+        self.add_gate(list(range((self.n_qubit))),
+                      [gate for n in range(self.n_qubit)],
+                      t0=t0,
+                      dt=dt,
                       align=align)
 
     def add_gates(self, gates):
@@ -322,7 +332,7 @@ class Sequence:
         # add gates sequence to waveforms
         for gates_qubits in gates:
             # add gate to specific qubit waveform
-            self.add_gate([n for n in range(len(gates_qubits))], gates_qubits)
+            self.add_gate(list(range(len(gates_qubits))), gates_qubits)
 
     # Internal methods for adding pulses and gates to the sequence.
     def _add_step(self, qubit, gate, t0=None, dt=None, align='center'):
@@ -481,7 +491,7 @@ class SequenceToWaveforms:
         self.align_to_end = False
 
         self.sequences = []
-        self.qubits = [Qubit() for n in range(MAX_QUBIT)]
+        self.qubits = [qubits.Qubit() for n in range(MAX_QUBIT)]
 
         # waveforms
         self._wave_xy = [np.zeros(0, dtype=np.complex)
@@ -540,7 +550,6 @@ class SequenceToWaveforms:
         """
         self.sequences = sequences
         self._seperate_gates()
-
         self._add_timings()
         self._init_waveforms()
 
@@ -552,6 +561,7 @@ class SequenceToWaveforms:
 
         self._perform_virtual_z()
         self._generate_waveforms()
+
         # collapse all xy pulses to one waveform if no local XY control
         if not self.local_xy:
             # sum all waveforms to first one
@@ -581,7 +591,7 @@ class SequenceToWaveforms:
         if not self.simultaneous_pulses:
             new_sequences = []
             for step in self.sequences:
-                if any(isinstance(gate, (ReadoutGate, IdentityGate))
+                if any(isinstance(gate, (gates.ReadoutGate, gates.IdentityGate))
                     for gate in step.gates):
                     # Don't seperate I gates or readouts since we do
                     # multiplexed readout
@@ -589,21 +599,17 @@ class SequenceToWaveforms:
                     continue
                 for i, gate in enumerate(step.gates):
                     if gate is not None:
-                        new_step = Step(n_qubit=step.n_qubit, t0=step.t0,
-                                        dt=step.dt, align=step.align)
+                        new_step = Step(n_qubit=step.n_qubit,
+                                        t0=step.t_start,
+                                        dt=step.dt,
+                                        align=step.align)
                         new_step.add_gate(i, gate)
                         new_sequences.append(new_step)
             self.sequences = new_sequences
 
-        # Replace any missing gates with I
-        for step in self.sequences:
-            for i, gate in enumerate(step.gates):
-                if gate is None:
-                    step.gates[i] = IdentityGate(width=0)
-
     def _add_timings(self):
         for step in self.sequences:
-            if step.dt is None and step.t0 is None:
+            if step.dt is None and step.t_start is None:
                 # Use global pulse spacing
                 step.dt = self.dt
         t_start = 0
@@ -620,13 +626,10 @@ class SequenceToWaveforms:
                         duration = pulse.total_duration()
                 if duration > max_duration:
                     max_duration = duration
-            if step.t0 is None:
-                step.t_start = t_start + step.dt
-            else:
-                step.t_start = step.t0 - max_duration / 2
-            step.t_start = self._round(step.t_start)
+            if step.t_start is None:
+                step.t_start = self._round(t_start + step.dt)
+
             step.t_end = self._round(step.t_start + max_duration)
-            step.t_middle = step.t_start + max_duration / 2
             t_start = step.t_end # Next step starts where this one ends
 
         # Make sure that the sequence is sorted chronologically.
@@ -689,10 +692,10 @@ class SequenceToWaveforms:
             for m, step in enumerate(self.sequences):
                 gate = step.gates[qubit]
                 if isinstance(gate, gates.VirtualZGate):
-                    phase += gate.angle
+                    phase += gate.theta
                     continue
-                if not isinstance(gate, gates.ReadoutGate):
-                    step.gates[qubit] = gate.add_phase(phase)
+                if isinstance(gate, gates.SingleQubitXYRotation):
+                    step.gates[qubit].phi += phase
 
     def _add_microwave_gate(self):
         """Create waveform for gating microwave switch."""
@@ -836,9 +839,10 @@ class SequenceToWaveforms:
         """Generate the waveforms corresponding to the sequence."""
         for step in self.sequences:
             for qubit, gate in enumerate(step.gates):
-                pulse = self._get_pulse_for_gate(qubit, gate)
-                if pulse is None:
+                if isinstance(gate, (gates.IdentityGate, gates.VirtualZGate)):
                     continue
+
+                pulse = self._get_pulse_for_gate(qubit, gate)
                 if isinstance(gate, (gates.SingleQubitZRotation, gates.TwoQubitGate)):
                     waveform = self._wave_z[qubit]
                     delay = self.wave_z_delays[qubit]
@@ -854,11 +858,9 @@ class SequenceToWaveforms:
                         self.readout_match_main_size):
                     # special case for readout if not matching main wave size
                     start = 0.0
-                    middle = self._round(step.t_middle - step.t_start)
                     end = self._round(step.t_end - step.t_start)
                 else:
                     start = self._round(step.t_start + delay)
-                    middle = self._round(step.t_middle + delay)
                     end = self._round(step.t_end + delay)
 
                 indices = np.arange(
@@ -874,6 +876,7 @@ class SequenceToWaveforms:
                 # calculate time values for the pulse indices
                 t = indices / self.sample_rate
                 max_duration = end - start
+                middle = end - max_duration/2
                 if step.align == 'center':
                     t0 = middle
                 elif step.align == 'left':
@@ -881,7 +884,7 @@ class SequenceToWaveforms:
                 elif step.align == 'right':
                     t0 = middle + (max_duration - pulse.total_duration()) / 2
                 # calculate the pulse waveform for the selected indices
-                waveform[indices] += gate.get_waveform(pulse, t0, t)
+                waveform[indices] += pulse.calculate_waveform(t0, t)
 
     def set_parameters(self, config={}):
         """Set base parameters using config from from Labber driver.
@@ -915,7 +918,7 @@ class SequenceToWaveforms:
         # qubit spectra
         for n in range(self.n_qubit):
             m = n + 1  # pulses are indexed from 1 in Labber
-            qubit = Transmon(config.get('f01 max #{}'.format(m)),
+            qubit = qubits.Transmon(config.get('f01 max #{}'.format(m)),
                              config.get('f01 min #{}'.format(m)),
                              config.get('Ec #{}'.format(m)),
                              config.get('Vperiod #{}'.format(m)),
