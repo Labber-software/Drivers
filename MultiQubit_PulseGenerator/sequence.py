@@ -903,12 +903,8 @@ class SequenceToWaveforms:
 
         self.dt = config.get('Pulse spacing')
         self.local_xy = config.get('Local XY control')
-
-        # Simultaneous pulses only relevant for 2 qb RB. Otherwise we want True.
-        self.simultaneous_pulses = True
-        if config.get('Sequence', '') == '2-QB Randomized Benchmarking':
-            self.simultaneous_pulses = config.get('Simultaneous pulses')
-
+        # default for simultaneous pulses is true, only option for benchmarking
+        self.simultaneous_pulses = config.get('Simultaneous pulses', True)
 
         # waveform parameters
         self.sample_rate = config.get('Sample rate')
