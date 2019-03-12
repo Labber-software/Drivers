@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import logging
 import numpy as np
-from copy import copy
+import copy
 
 import crosstalk
 import gates
@@ -11,25 +11,18 @@ import qubits
 import readout
 import tomography
 
-
 # Allow logging to Labber's instrument log
 log = logging.getLogger('LabberDriver')
 
-# TODO How to define 2 QB properly for different pairs? Also different interactions, CZ, iSWAP etc.
 # TODO Select qubits to benchmark (all sequences?) with check boxes
-# TODO Multiple instances of drivers
-# TODO Should t0 be start or center?
+# TODO Should t0 be start or center? Center
 # TODO Add phase tracking of readout
-# TODO Should I gates be in RB?
 # TODO Reduce calc of CZ by finding all unique TwoQubitGates in seq and calc.
 # TODO Extract qubits, crosstalk, demodulation, and predistortion to their own drivers
 # TODO Make I(width=None) have the width of the longest gate in the step
 # TODO Add checks so that not both t0 and dt are given
-# TODO Fix empty custom seq
-# TODO Chaning custom driver path doesnt trigger setValue
-# TODO Error without crashing the driver
-# TODO Combine two cnots to cphase?
-# TODO steps with 0 length should not have 2*dt spacing
+# TODO test demod with some data
+# TODO composite gates
 
 
 class Step:
@@ -640,6 +633,8 @@ class SequenceToWaveforms:
 
             step.t_end = self._round(step.t_start + max_duration)
             t_start = step.t_end # Next step starts where this one ends
+            if max_duration == 0: # Avoid double spacing for steps with 0 duration
+                t_start = t_start-step.dt
 
         # Make sure that the sequence is sorted chronologically.
         self.sequences.sort(key=lambda x: x.t_start)
@@ -701,7 +696,7 @@ class SequenceToWaveforms:
                     phase += gate.theta
                     continue
                 if isinstance(gate, gates.SingleQubitXYRotation):
-                    step.gates[qubit] = copy(step.gates[qubit])
+                    step.gates[qubit] = copy.copy(step.gates[qubit])
                     step.gates[qubit].phi += phase
 
     def _add_microwave_gate(self):

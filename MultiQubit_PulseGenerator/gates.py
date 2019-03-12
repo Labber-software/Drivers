@@ -247,7 +247,8 @@ class CZ(CompositeGate):
         self.__init__(phi1, phi2)
 
 
-I = IdentityGate()
+I = IdentityGate(width=None)
+I0 = IdentityGate(width=0)
 
 # X gates
 Xp = SingleQubitXYRotation(phi=0, theta=np.pi)
