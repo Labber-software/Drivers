@@ -15,14 +15,15 @@ import tomography
 log = logging.getLogger('LabberDriver')
 
 # TODO Select qubits to benchmark (all sequences?) with check boxes
-# TODO Should t0 be start or center? Center
 # TODO Add phase tracking of readout
 # TODO Reduce calc of CZ by finding all unique TwoQubitGates in seq and calc.
-# TODO Extract qubits, crosstalk, demodulation, and predistortion to their own drivers
 # TODO Make I(width=None) have the width of the longest gate in the step
 # TODO Add checks so that not both t0 and dt are given
 # TODO test demod with some data
-# TODO composite gates
+# TODO Two composite gates should be able to be parallell
+# TODO should never have to specify I0
+# TODO implement eq test for gates
+# TODO check so that same qubit is not named twice in one step
 
 
 class Step:
@@ -33,7 +34,7 @@ class Step:
     n_qubit : int
         Number of qubits in the sequece.
     t0 : float
-        Start of the sequence in seconds (the default is None).
+        Center of the sequence in seconds (the default is None).
     dt : float
         Spacing to previous pulse in seconds (the default is None). Use only
         either t0 or dt.
@@ -43,21 +44,22 @@ class Step:
 
     Attributes
     ----------
-    gates : list of :obj:`BaseGate`
+    gates : list of :dict:
         The different gates in the step.
 
     """
 
     def __init__(self, n_qubit, t0=None, dt=None, align='center'):
         self.n_qubit = n_qubit
-        self.gates = [gates.I for n in range(self.n_qubit)]
+        self.gates = []
         self.align = align
+        self.t0 = t0
         self.dt = dt
-        self.t_start = t0
+        self.t_start = None
         self.t_end = None
 
     def add_gate(self, qubit, gate):
-        """Add the given gate(s) to the specified qubit(s).
+        """Add the given gate to the specified qubit(s).
 
         The number of gates must equal the number of qubits.
 
@@ -67,16 +69,22 @@ class Step:
         ----------
         qubit : int or list of int
             The qubit indices.
-        gate : :obj:`BaseGate` or list of :obj:`BaseGate`
+        gate : :obj:`BaseGate`
             The gate(s).
 
         """
-        if not isinstance(qubit, list):
-            qubit = [qubit]
-        if not isinstance(gate, list):
-            gate = [gate]
-        for i in range(len(gate)):
-            self.gates[qubit[i]] = gate[i]
+        if gate.number_of_qubits() > 1 and not isinstance(qubit, list):
+            raise ValueError("Please provide a list of qubits for gates with more than one qubit")
+
+
+        if gate.number_of_qubits() > 1 and not gate.number_of_qubits() == len(qubit):
+            raise ValueError("Number of qubits in the gate must be equal to the number of qubit indices given")
+
+        if gate.number_of_qubits() == 1 and not isinstance(qubit, int):
+            raise ValueError("Please provide qubit as int for gates with one qubit")
+
+        self.gates.append({'gate': gate, 'qubit': qubit})
+
 
     def time_shift(self, shift):
         """Shift the timings of the step.
@@ -88,7 +96,15 @@ class Step:
 
         """
         self.t_start += shift
+        self.t0 += shift
         self.t_end += shift
+
+    def __str__(self):
+        return str(self.gates)
+
+    def __repr__(self):
+        return str(self.gates)
+
 
 
 class Sequence:
@@ -116,7 +132,7 @@ class Sequence:
     def __init__(self, n_qubit):
         self.n_qubit = n_qubit
 
-        self.sequences = []
+        self.sequence_list = []
 
         # process tomography
         self.perform_process_tomography = False
@@ -155,7 +171,7 @@ class Sequence:
             The compiled qubit sequence.
 
         """
-        self.sequences = []
+        self.sequence_list = []
 
         if self.perform_process_tomography:
             self._process_tomography.add_pulses(self)
@@ -170,7 +186,7 @@ class Sequence:
             self.add_gate_to_all(delay, dt=0)
         self.add_gate_to_all(gates.ReadoutGate(), dt=0, align='left')
 
-        return self.sequences
+        return self
 
     # Public methods for adding pulses and gates to the sequence.
     def add_single_pulse(self, qubit, pulse, t0=None, dt=None,
@@ -238,7 +254,7 @@ class Sequence:
         else:
             self.add_gate(qubit, gate, t0, dt, 'center')
 
-    def add_gate(self, qubit, gate, t0=None, dt=None, align='center'):
+    def add_gate(self, qubit, gate, t0=None, dt=None, align='center', index=None):
         """Add a set of gates to the given qubit sequences.
 
         For the qubits with no specificied gate, an IdentityGate will be given.
@@ -260,25 +276,37 @@ class Sequence:
             specifies how those pulses should be aligned. 'Left' aligns the
             start, 'center' aligns the centers, and 'right' aligns the end,
             (the default is 'center').
+        index : int, optional
+            Where in the sequence to insert the new gate. Default is at the end.
 
         """
-        if isinstance(gate, gates.CompositeGate):
-            self._add_composite_gate(qubit, gate, t0, dt, align)
-            return
-        if not isinstance(qubit, list):
-            qubit = [qubit]
-        if not isinstance(gate, list):
-            gate = [gate]
-        if len(gate) != len(qubit):
-            raise ValueError('Length of qubit and gate list must be equal.')
+        step = Step(self.n_qubit, t0=t0, dt=dt, align=align)
+        if isinstance(gate, list):
+            if len(gate) == 1:
+                raise ValueError("For single gates, don't provide gate as a list.")
+            if not isinstance(qubit, list):
+                raise ValueError("Please provide qubit indices as a list when adding more thab one gate.")
+            if len(gate) != len(qubit):
+                log.log(30, "gate: {}, qubit: {}".format(gate, qubit))
+                raise ValueError("Length of gate list must be equal to length of qubit list.")
 
-        # If any of the gates is a composite gate, special care is needed
-        for g in gate:
-            if isinstance(g, gates.CompositeGate):
-                self._add_multiple_composite_gates(qubit, gate, t0, dt, align)
-                return
+            for q, g in zip(qubit, gate):
+                step.add_gate(q, g)
 
-        self._add_step(qubit, gate, t0, dt, align)
+
+        else:
+            if gate.number_of_qubits() > 1:
+                if not isinstance(qubit, list):
+                    raise ValueError("Please provide qubit list for gates with more than one qubit.")
+            else:
+                if not isinstance(qubit, int):
+                    raise ValueError("For single gates, give qubit as int (not list).")
+            step.add_gate(qubit, gate)
+
+        if index is None:
+            self.sequence_list.append(step)
+        else:
+            self.sequence_list.insert(index+1, step)
 
     def add_gate_to_all(self, gate, t0=None, dt=None, align='center'):
         """Add a single gate to all qubits.
@@ -326,82 +354,6 @@ class Sequence:
         for gates_qubits in gates:
             # add gate to specific qubit waveform
             self.add_gate(list(range(len(gates_qubits))), gates_qubits)
-
-    # Internal methods for adding pulses and gates to the sequence.
-    def _add_step(self, qubit, gate, t0=None, dt=None, align='center'):
-        """Turn the given gates into a step and append to sequence.
-
-        Parameters
-        ----------
-        qubit : int or list of int
-            The target qubits.
-        gate : :obj:`BaseGate` or list of :obj:`BaseGate`
-            Gates to be added to sequence.
-        t0 : float, optional
-            If specified, the time position of the gates (the default is None).
-        dt : float, optional
-            If specified, overwrites the global spacing between the previous
-            pulse and the new (the default is None).
-        align : str, optional
-            If two or more qubits have differnt pulse lengths, `align`
-            specifies how those pulses should be aligned. 'Left' aligns the
-            start, 'center' aligns the centers, and 'right' aligns the end,
-            (the default is 'center').
-
-        """
-        if not isinstance(qubit, list):
-            qubit = [qubit]
-        if not isinstance(gate, list):
-            gate = [gate]
-
-        step = Step(self.n_qubit, t0=t0, dt=dt, align=align)
-        step.add_gate(qubit, gate)
-
-        self.sequences.append(step)
-
-    def _add_composite_gate(self, qubit, gate, t0=None, dt=None,
-                            align='center'):
-        """Add a composite gate to the sequence."""
-        if isinstance(qubit, int):
-            qubit = [qubit]
-        if len(qubit) != gate.n_qubit:
-            raise ValueError('For composite gates the length of the qubit \
-            list must match the number of qubits in the composite gate.')
-
-        for i in range(len(gate)):
-            self.add_gate(qubit, gate.get_gate_at_index(i))
-
-    def _add_multiple_composite_gates(self, qubit, gate, t0=None, dt=None,
-                                      align='center'):
-        """Add multiple composite gates to the sequence.
-
-        The composite gates need to have the same length. Single qubit gates
-        are also allowed, and will be padded with I gates to have the same
-        length as the composite gate.
-        """
-        gate_length = 0
-        for i, g in enumerate(gate):
-            if isinstance(g, gates.CompositeGate):
-                if gate_length == 0:
-                    gate_length = len(g)
-                elif gate_length != len(g):
-                    raise ValueError(
-                        'For now, composite gates added at the same time needs'
-                        ' to have the same length')
-
-        sequence = []
-        for i in range(gate_length):
-            step = [gates.I for n in range(self.n_qubit)]
-            for q, g in zip(qubit, gate):
-                if isinstance(g, gates.CompositeGate):
-                    for k, G in enumerate(g.get_gate_at_index(i)):
-                        if isinstance(q, int):
-                            q = [q]
-                        step[q[k]] = G
-                else:
-                    step[q] = g
-            sequence.append(step)
-        self.add_gates(sequence)
 
     def set_parameters(self, config={}):
         """Set base parameters using config from from Labber driver.
@@ -485,7 +437,7 @@ class SequenceToWaveforms:
         self.trim_to_sequence = True
         self.align_to_end = False
 
-        self.sequences = []
+        self.sequence_list = []
         self.qubits = [qubits.Qubit() for n in range(self.n_qubit)]
 
         # waveforms
@@ -530,7 +482,7 @@ class SequenceToWaveforms:
         self.readout_trig = np.array([], dtype=float)
         self.readout_iq = np.array([], dtype=np.complex)
 
-    def get_waveforms(self, sequences):
+    def get_waveforms(self, sequence):
         """Compile the given sequence into waveforms.
 
         Parameters
@@ -544,16 +496,19 @@ class SequenceToWaveforms:
             Description of returned object.
 
         """
-        self.sequences = sequences
+        self.sequence = sequence
+        self.sequence_list = sequence.sequence_list
         if not self.simultaneous_pulses:
             self._seperate_gates()
+        self._explode_composite_gates()
         self._add_timings()
+
         self._init_waveforms()
 
         if self.align_to_end:
             shift = self._round((self.n_pts - 2) / self.sample_rate -
-                                self.sequences[-1].t_end)
-            for step in self.sequences:
+                                self.sequence_list[-1].t_end)
+            for step in self.sequence_list:
                 step.time_shift(shift)
 
         self._perform_virtual_z()
@@ -592,7 +547,7 @@ class SequenceToWaveforms:
 
     def _seperate_gates(self):
         new_sequences = []
-        for step in self.sequences:
+        for step in self.sequence_list:
             if any(isinstance(gate, (gates.ReadoutGate, gates.IdentityGate))
                 for gate in step.gates):
                 # Don't seperate I gates or readouts since we do
@@ -607,44 +562,41 @@ class SequenceToWaveforms:
                                     align=step.align)
                     new_step.add_gate(i, gate)
                     new_sequences.append(new_step)
-        self.sequences = new_sequences
+        self.sequence_list = new_sequences
 
     def _add_timings(self):
-        for step in self.sequences:
+        t_start = 0
+        for step in self.sequence_list:
             if step.dt is None and step.t_start is None:
                 # Use global pulse spacing
                 step.dt = self.dt
-        t_start = 0
-        # Longest pulse in the step needed for correct timing
-        for step in self.sequences:
+            # Find longest pulse in sequence
             max_duration = -np.inf
-            for q, g in enumerate(step.gates):
-                duration = 0
-                if isinstance(g, gates.IdentityGate) and g.width is not None:
-                    duration = g.width
-                else:
-                    pulse = self._get_pulse_for_gate(q, g)
-                    if pulse is not None:
-                        duration = pulse.total_duration()
+            for gate in step.gates:
+                duration = self._get_duration_of_gate(gate)
                 if duration > max_duration:
                     max_duration = duration
-            if step.t_start is None:
+            if step.t0 is None:
                 step.t_start = self._round(t_start + step.dt)
-
+                step.t0 = self._round(step.t_start + max_duration/2)
+            else:
+                step.t_start = self._round(step.t0 - max_duration/2)
             step.t_end = self._round(step.t_start + max_duration)
             t_start = step.t_end # Next step starts where this one ends
             if max_duration == 0: # Avoid double spacing for steps with 0 duration
                 t_start = t_start-step.dt
 
         # Make sure that the sequence is sorted chronologically.
-        self.sequences.sort(key=lambda x: x.t_start)
+        # self.sequence_list.sort(key=lambda x: x.t_start) # TODO Fix this
 
         # Make sure that the sequnce start on first delay
-        time_diff = self._round(self.first_delay-self.sequences[0].t_start)
-        for step in self.sequences:
+        time_diff = self._round(self.first_delay-self.sequence_list[0].t_start)
+        for step in self.sequence_list:
             step.time_shift(time_diff)
 
-    def _get_pulse_for_gate(self, qubit, gate):
+    def _get_pulse_for_gate(self, gate):
+        qubit = gate['qubit']
+        gate = gate['gate']
         # Virtual Z is special since it has no length
         if isinstance(gate, gates.VirtualZGate):
             pulse = None
@@ -658,7 +610,7 @@ class SequenceToWaveforms:
         elif isinstance(gate, gates.RabiGate):
             pulse = gate.get_adjusted_pulse(self.pulses_1qb_xy[qubit])
         elif isinstance(gate, gates.TwoQubitGate):
-            pulse = gate.get_adjusted_pulse(self.pulses_2qb[qubit])
+            pulse = gate.get_adjusted_pulse(self.pulses_2qb[qubit[0]])
         elif isinstance(gate, gates.ReadoutGate):
             pulse = gate.get_adjusted_pulse(self.pulses_readout[qubit])
         elif isinstance(gate, gates.CustomGate):
@@ -667,6 +619,17 @@ class SequenceToWaveforms:
             raise ValueError('Please provide a pulse for {}'.format(gate))
 
         return pulse
+
+    def _get_duration_of_gate(self, gate):
+        duration = 0
+        gate_obj = gate['gate']
+        if isinstance(gate_obj, gates.IdentityGate) and gate_obj.width is not None:
+            duration = gate_obj.width
+        else:
+            pulse = self._get_pulse_for_gate(gate)
+            if pulse is not None:
+                duration = pulse.total_duration()
+        return duration
 
     def _predistort_xy_waveforms(self):
         """Pre-distort the waveforms."""
@@ -686,18 +649,71 @@ class SequenceToWaveforms:
         """Compensate for Z-control crosstalk."""
         self._wave_z = self._crosstalk.compensate(self._wave_z)
 
+    def _explode_composite_gates(self):
+        # Keep looping through the sequence until all CompositeGates are removed
+        # Note that there could be nested CompositeGates
+        n = 0
+        while n < len(self.sequence_list):
+            step = self.sequence_list[n]
+            i = 0
+            while i < len(step.gates):
+                gate = step.gates[i]
+                if isinstance(gate['gate'], gates.CompositeGate):
+                    for m, g in enumerate(gate['gate'].sequence):
+                        new_gate = [x['gate'] for x in g.gates]
+                        # Single gates shouldn't be lists
+                        if len(new_gate) == 1:
+                            new_gate = new_gate[0]
+
+                        # Need to translate composite qubit number to device qubit number
+                        new_qubit = [x['qubit'] for x in g.gates]
+                        for j, q in enumerate(new_qubit):
+                            if isinstance(q, int):
+                                if isinstance(gate['qubit'], int):
+                                    new_qubit[j] = gate['qubit']
+                                    continue
+                                new_qubit[j] = gate['qubit'][q]
+                            else:
+                                new_qubit[j] = []
+                                for k in q:
+                                    new_qubit[j].append(gate['qubit'][k])
+
+                        # Single qubit shouldn't be lists
+                        if len(new_qubit) == 1:
+                            new_qubit = new_qubit[0]
+
+
+                        self.sequence.add_gate(new_qubit, new_gate, index=n+m)
+
+                    del step.gates[i]
+                    continue
+                i = i + 1
+            n = n + 1
+
+        # Remove any empty steps where the composite gates were
+        i = 0
+        while i < len(self.sequence_list):
+            step = self.sequence_list[i]
+            if len(step.gates) == 0:
+                del self.sequence_list[i]
+                continue
+            i = i +1
+
     def _perform_virtual_z(self):
         """Shifts the phase of pulses subsequent to virutal z gates."""
         for qubit in range(self.n_qubit):
             phase = 0
-            for m, step in enumerate(self.sequences):
-                gate = step.gates[qubit]
-                if isinstance(gate, gates.VirtualZGate):
-                    phase += gate.theta
+            for m, step in enumerate(self.sequence_list):
+                gate_obj = None
+                for gate in step.gates:
+                    if qubit == gate['qubit']: # TODO Allow for 2 qb
+                        gate_obj = gate['gate']
+                if isinstance(gate_obj, gates.VirtualZGate):
+                    phase += gate_obj.theta
                     continue
-                if isinstance(gate, gates.SingleQubitXYRotation):
-                    step.gates[qubit] = copy.copy(step.gates[qubit])
-                    step.gates[qubit].phi += phase
+                if isinstance(gate_obj, gates.SingleQubitXYRotation):
+                    gate['gate'] = copy.copy(gate_obj)
+                    gate['gate'].phi += phase
 
     def _add_microwave_gate(self):
         """Create waveform for gating microwave switch."""
@@ -799,9 +815,9 @@ class SequenceToWaveforms:
         # find the end of the sequence
         # only include readout in size estimate if all waveforms have same size
         if self.readout_match_main_size:
-            end = np.max([s.t_end for s in self.sequences]) + max_delay
+            end = np.max([s.t_end for s in self.sequence_list]) + max_delay
         else:
-            end = np.max([s.t_end for s in self.sequences[0:-1]]) + max_delay
+            end = np.max([s.t_end for s in self.sequence_list[0:-1]]) + max_delay
 
         # create empty waveforms of the correct size
         if self.trim_to_sequence:
@@ -825,7 +841,7 @@ class SequenceToWaveforms:
             # different number of points for readout and main waveform
             self.n_pts_readout = 1 + int(
                 np.ceil(self.sample_rate *
-                (self.sequences[-1].t_end - self.sequences[-1].t_start)))
+                (self.sequence_list[-1].t_end - self.sequence_list[-1].t_start)))
             if self.n_pts_readout % 2 == 1:
                 # Odd n_pts give spectral leakage in FFT
                 self.n_pts_readout += 1
@@ -835,24 +851,28 @@ class SequenceToWaveforms:
 
     def _generate_waveforms(self):
         """Generate the waveforms corresponding to the sequence."""
-        for step in self.sequences:
-            for qubit, gate in enumerate(step.gates):
-                if isinstance(gate, (gates.IdentityGate, gates.VirtualZGate)):
+        for step in self.sequence_list:
+            for gate in step.gates:
+                qubit = gate['qubit']
+                if isinstance(qubit, list):
+                    qubit = qubit[0]
+                gate_obj = gate['gate']
+                if isinstance(gate_obj, (gates.IdentityGate, gates.VirtualZGate)):
                     continue
 
-                pulse = self._get_pulse_for_gate(qubit, gate)
-                if isinstance(gate, (gates.SingleQubitZRotation, gates.TwoQubitGate)):
+                pulse = self._get_pulse_for_gate(gate)
+                if isinstance(gate_obj, (gates.SingleQubitZRotation, gates.TwoQubitGate)):
                     waveform = self._wave_z[qubit]
                     delay = self.wave_z_delays[qubit]
-                elif isinstance(gate, (gates.SingleQubitXYRotation, gates.IdentityGate)):
+                elif isinstance(gate_obj, (gates.SingleQubitXYRotation, gates.IdentityGate)):
                     waveform = self._wave_xy[qubit]
                     delay = self.wave_xy_delays[qubit]
-                elif isinstance(gate, gates.ReadoutGate):
+                elif isinstance(gate_obj, gates.ReadoutGate):
                     waveform = self.readout_iq
                     delay = 0
 
                 # get the range of indices in use
-                if (isinstance(gate, gates.ReadoutGate) and not
+                if (isinstance(gate_obj, gates.ReadoutGate) and not
                         self.readout_match_main_size):
                     # special case for readout if not matching main wave size
                     start = 0.0

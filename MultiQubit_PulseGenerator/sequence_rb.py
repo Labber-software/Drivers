@@ -617,10 +617,10 @@ class TwoQubit_RB(Sequence):
                         cliffordSeq2.append(gates.CZ)
                     elif interleaved_gate == 'CZEcho':
                         # CZEcho is a composite gate, so get each gate
-                        gate = gates.CZEcho.value
-                        for g in gates.sequence:
-                            cliffordSeq1.append(g[0])
-                            cliffordSeq2.append(g[1])
+                        gate = gates.CZEcho
+                        for g in gate.sequence:
+                            cliffordSeq1.append(g[1])
+                            cliffordSeq2.append(g[0])
                     elif interleaved_gate == 'I':
                         # TBA: adjust the duration of I gates?
                         # log.info('Qubits to benchmark: ' + str(qubits_to_benchmark))
@@ -697,7 +697,7 @@ class TwoQubit_RB(Sequence):
                 multi_gate_seq.append([None] * len(gateSeq1))
 
             # transpose list of lists
-            multi_gate_seq = list(map(list, itertools.zip_longest(*multi_gate_seq, fillvalue=gates.I))) # Not to chop
+            multi_gate_seq = list(map(list, itertools.zip_longest(*multi_gate_seq, fillvalue=gates.I0))) # Not to chop
 
             # self.add_gates(multi_gate_seq)
             for gate_seq in multi_gate_seq:
