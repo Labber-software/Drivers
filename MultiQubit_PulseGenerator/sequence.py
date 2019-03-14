@@ -21,9 +21,9 @@ log = logging.getLogger('LabberDriver')
 # TODO Add checks so that not both t0 and dt are given
 # TODO test demod with some data
 # TODO Two composite gates should be able to be parallell
-# TODO should never have to specify I0
 # TODO implement eq test for gates
 # TODO check so that same qubit is not named twice in one step
+# TODO check number of qubits in seq and in gate added to seq
 
 
 class Step:
@@ -292,8 +292,6 @@ class Sequence:
 
             for q, g in zip(qubit, gate):
                 step.add_gate(q, g)
-
-
         else:
             if gate.number_of_qubits() > 1:
                 if not isinstance(qubit, list):
@@ -301,6 +299,7 @@ class Sequence:
             else:
                 if not isinstance(qubit, int):
                     raise ValueError("For single gates, give qubit as int (not list).")
+            log.log(30, "adding {} to qubits {}".format(gate, qubit))
             step.add_gate(qubit, gate)
 
         if index is None:
@@ -314,8 +313,20 @@ class Sequence:
         Pulses are added at the end of the sequence, with the gate spacing set
         by either the spacing parameter or the aboslut position.
         """
-        self.add_gate(list(range((self.n_qubit))),
-                      [gate for n in range(self.n_qubit)],
+        if isinstance(gate, list):
+            raise ValueError("Only single gates allowed.")
+        if isinstance(gate, (gates.BaseGate, gates.CompositeGate)):
+            if gate.number_of_qubits() > 1:
+                raise ValueError("Not clear how to add multi-qubit gates to all qubits.")
+
+        qubit = list(range((self.n_qubit)))
+        gate = [gate for n in range(self.n_qubit)]
+        # Single qubit gates shouldn't be lists
+        if len(qubit) == 1:
+            qubit = qubit[0]
+            gate = gate[0]
+        self.add_gate(qubit,
+                      gate,
                       t0=t0,
                       dt=dt,
                       align=align)
@@ -351,9 +362,14 @@ class Sequence:
         if not isinstance(gates[0], (list, tuple)):
             raise Exception('The input must be a list of list with gates')
         # add gates sequence to waveforms
-        for gates_qubits in gates:
+        for gate in gates:
             # add gate to specific qubit waveform
-            self.add_gate(list(range(len(gates_qubits))), gates_qubits)
+            qubit = list(range(len(gate)))
+            # Single qubit gates shouldn't be lists
+            if len(qubit) == 1:
+                qubit = qubit[0]
+                gate = gate[0]
+            self.add_gate(qubit, gate)
 
     def set_parameters(self, config={}):
         """Set base parameters using config from from Labber driver.
@@ -498,10 +514,14 @@ class SequenceToWaveforms:
         """
         self.sequence = sequence
         self.sequence_list = sequence.sequence_list
+        log.log(30, "seq begin {}".format(self.sequence_list))
         if not self.simultaneous_pulses:
             self._seperate_gates()
+        log.log(30, "seq after sep {}".format(self.sequence_list))
         self._explode_composite_gates()
+        log.log(30, "seq after explode {}".format(self.sequence_list))
         self._add_timings()
+        log.log(30, "seq after timing {}".format(self.sequence_list))
 
         self._init_waveforms()
 
@@ -512,6 +532,7 @@ class SequenceToWaveforms:
                 step.time_shift(shift)
 
         self._perform_virtual_z()
+        log.log(30, "seq after vz {}".format(self.sequence_list))
         self._generate_waveforms()
 
         # collapse all xy pulses to one waveform if no local XY control
@@ -554,13 +575,13 @@ class SequenceToWaveforms:
                 # multiplexed readout
                 new_sequences.append(step)
                 continue
-            for i, gate in enumerate(step.gates):
-                if gate is not None:
+            for gate in step.gates:
+                if gate['gate'] is not None:
                     new_step = Step(n_qubit=step.n_qubit,
                                     t0=step.t_start,
                                     dt=step.dt,
                                     align=step.align)
-                    new_step.add_gate(i, gate)
+                    new_step.add_gate(gate['qubit'], gate['gate'])
                     new_sequences.append(new_step)
         self.sequence_list = new_sequences
 
@@ -700,20 +721,21 @@ class SequenceToWaveforms:
             i = i +1
 
     def _perform_virtual_z(self):
-        """Shifts the phase of pulses subsequent to virutal z gates."""
+        """Shifts the phase of pulses subsequent to virtual z gates."""
         for qubit in range(self.n_qubit):
             phase = 0
-            for m, step in enumerate(self.sequence_list):
-                gate_obj = None
+            for step in self.sequence_list:
                 for gate in step.gates:
+                    gate_obj = None
                     if qubit == gate['qubit']: # TODO Allow for 2 qb
                         gate_obj = gate['gate']
-                if isinstance(gate_obj, gates.VirtualZGate):
-                    phase += gate_obj.theta
-                    continue
-                if isinstance(gate_obj, gates.SingleQubitXYRotation):
-                    gate['gate'] = copy.copy(gate_obj)
-                    gate['gate'].phi += phase
+                    if isinstance(gate_obj, gates.VirtualZGate):
+                        phase += gate_obj.theta
+                        continue
+                    if isinstance(gate_obj, gates.SingleQubitXYRotation):
+                        log.log(30, "Copying {} over {} for qubit {}".format(gate_obj, gate['gate'], qubit))
+                        gate['gate'] = copy.copy(gate_obj)
+                        gate['gate'].phi += phase
 
     def _add_microwave_gate(self):
         """Create waveform for gating microwave switch."""
@@ -857,6 +879,7 @@ class SequenceToWaveforms:
                 if isinstance(qubit, list):
                     qubit = qubit[0]
                 gate_obj = gate['gate']
+                log.log(30, "generate {} on qubit {}".format(gate_obj, qubit))
                 if isinstance(gate_obj, (gates.IdentityGate, gates.VirtualZGate)):
                     continue
 

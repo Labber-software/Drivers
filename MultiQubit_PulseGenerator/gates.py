@@ -51,6 +51,12 @@ class SingleQubitXYRotation(BaseGate, OneQubitGate):
         pulse.amplitude *= self.theta / np.pi
         return pulse
 
+    def __str__(self):
+        return "Phi: {}, theta: {}".format(self.phi, self.theta)
+
+    def __repr__(self):
+        return self.__str__()
+
 class SingleQubitZRotation(BaseGate, OneQubitGate):
     """Single qubit rotation around the Z axis.
 

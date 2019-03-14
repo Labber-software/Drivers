@@ -411,8 +411,7 @@ class SingleQubit_RB(Sequence):
                     # If interleave gate,
                     if interleave is True:
                         self.prev_interleaved_gate = interleaved_gate
-                        single_gate_seq.append(
-                            gates.__getattr__(interleaved_gate))
+                        single_gate_seq.append(getattr(gates, interleaved_gate))
 
                 recovery_gate = self.get_recovery_gate(single_gate_seq)
 
@@ -697,7 +696,7 @@ class TwoQubit_RB(Sequence):
                 multi_gate_seq.append([None] * len(gateSeq1))
 
             # transpose list of lists
-            multi_gate_seq = list(map(list, itertools.zip_longest(*multi_gate_seq, fillvalue=gates.I0))) # Not to chop
+            multi_gate_seq = list(map(list, itertools.zip_longest(*multi_gate_seq, fillvalue=gates.I))) # Not to chop
 
             # self.add_gates(multi_gate_seq)
             for gate_seq in multi_gate_seq:
