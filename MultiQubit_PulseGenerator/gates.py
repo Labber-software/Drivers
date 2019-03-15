@@ -5,6 +5,7 @@ import logging
 from sequence import Step
 log = logging.getLogger('LabberDriver')
 
+# TODO remove Step dep from CompositeGate
 
 class BaseGate:
     """Base class for a qubit gate.
@@ -202,7 +203,7 @@ class CompositeGate:
             else:
                 qubit = [n for n in range(self.n_qubit)]
 
-        step = Step(self.n_qubit)
+        step = Step()
         if isinstance(gate, list):
             if len(gate) == 1:
                 raise ValueError("For single gates, don't provide gate as a list.")
