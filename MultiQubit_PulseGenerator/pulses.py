@@ -5,6 +5,7 @@ log = logging.getLogger('LabberDriver')
 
 # TODO Private methods and variables
 
+
 class Pulse:
     """Represents physical pulses played by an AWG.
 
@@ -116,13 +117,12 @@ class Pulse:
             omega = 2 * np.pi * self.frequency
             # apply SSBM transform
             data_i = (y.real * np.cos(omega * t - phase) +
-                      - y.imag * np.cos(omega * t - phase +
-                      + np.pi / 2))
+                      -y.imag * np.cos(omega * t - phase + +np.pi / 2))
             data_q = (y.real * np.sin(omega * t - phase) +
-                      - y.imag * np.sin(omega * t - phase +
-                      + np.pi / 2))
+                      -y.imag * np.sin(omega * t - phase + +np.pi / 2))
             y = data_i + 1j * data_q
         return y
+
 
 class Gaussian(Pulse):
     def __init__(self, complex):
@@ -144,21 +144,17 @@ class Gaussian(Pulse):
                 values = np.exp(-(t - t0)**2 / (2 * std**2))
         else:
             # add plateau
-            values = np.array(((t >= (t0 - self.plateau / 2)) &
-                               (t < (t0 + self.plateau / 2))), dtype=float)
+            values = np.array(
+                ((t >= (t0 - self.plateau / 2)) & (t <
+                                                   (t0 + self.plateau / 2))),
+                dtype=float)
             if std > 0:
                 # before plateau
-                values += (
-                    (t < (t0 - self.plateau / 2)) *
-                    np.exp(-(t - (t0 - self.plateau / 2))**2 /
-                            (2 * std**2))
-                )
+                values += ((t < (t0 - self.plateau / 2)) * np.exp(
+                    -(t - (t0 - self.plateau / 2))**2 / (2 * std**2)))
                 # after plateau
-                values += (
-                    (t >= (t0 + self.plateau / 2)) *
-                    np.exp(-(t - (t0 + self.plateau / 2))**2 /
-                            (2 * std**2))
-                )
+                values += ((t >= (t0 + self.plateau / 2)) * np.exp(
+                    -(t - (t0 + self.plateau / 2))**2 / (2 * std**2)))
 
         # TODO  Fix this
         if self.start_at_zero:
@@ -175,12 +171,10 @@ class Ramp(Pulse):
 
     def calculate_envelope(self, t0, t):
         # rising and falling slopes
-        vRise = ((t - (t0 - self.plateau / 2 - self.width)) /
-                 self.width)
+        vRise = ((t - (t0 - self.plateau / 2 - self.width)) / self.width)
         vRise[vRise < 0.0] = 0.0
         vRise[vRise > 1.0] = 1.0
-        vFall = (((t0 + self.plateau / 2 + self.width) - t) /
-                 self.width)
+        vFall = (((t0 + self.plateau / 2 + self.width) - t) / self.width)
         vFall[vFall < 0.0] = 0.0
         vFall[vFall > 1.0] = 1.0
         values = vRise * vFall
@@ -261,18 +255,17 @@ class CZ(Pulse):
             if 0 < (t[i] - t0 + self.plateau / 2) < self.plateau:
                 theta_t[i] = self.theta_f
             elif (0 < (t[i] - t0 + self.width / 2 + self.plateau / 2) <
-                    (self.width + self.plateau) / 2):
+                  (self.width + self.plateau) / 2):
                 theta_t[i] = np.interp(
-                    t[i] - t0 + self.width / 2 + self.plateau / 2,
-                    self.t_tau, self.theta_tau)
+                    t[i] - t0 + self.width / 2 + self.plateau / 2, self.t_tau,
+                    self.theta_tau)
             elif (0 < (t[i] - t0 + self.width / 2 + self.plateau / 2) <
                   (self.width + self.plateau)):
                 theta_t[i] = np.interp(
-                    t[i] - t0 + self.width / 2 - self.plateau / 2,
-                    self.t_tau, self.theta_tau)
+                    t[i] - t0 + self.width / 2 - self.plateau / 2, self.t_tau,
+                    self.theta_tau)
 
-        df = self.Coupling * (
-            1 / np.tan(theta_t) - 1 / np.tan(self.theta_i))
+        df = self.Coupling * (1 / np.tan(theta_t) - 1 / np.tan(self.theta_i))
         if self.qubit is None:
             # Use linear dependence if no qubit was given
             values = df / self.dfdV
@@ -308,7 +301,7 @@ class CZ(Pulse):
         for i in range(n_points):
             self.theta_tau[i] = (np.sum(
                 (Lcoeff * (1 - np.cos(2 * np.pi * n * tau[i])))) +
-                self.theta_i)
+                                 self.theta_i)
         t_tau = np.trapz(np.sin(self.theta_tau), x=tau)
         Width_tau = self.width / t_tau
 
@@ -318,7 +311,7 @@ class CZ(Pulse):
         for i in range(n_points):
             self.theta_tau[i] = (np.sum(
                 (Lcoeff * (1 - np.cos(2 * np.pi * n * tau[i] / Width_tau)))) +
-                self.theta_i)
+                                 self.theta_i)
             if i > 0:
                 self.t_tau[i] = np.trapz(
                     np.sin(self.theta_tau[0:i]), x=tau[0:i])

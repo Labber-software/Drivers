@@ -7,6 +7,7 @@ log = logging.getLogger('LabberDriver')
 
 # TODO remove Step dep from CompositeGate
 
+
 class BaseGate:
     """Base class for a qubit gate.
 
@@ -58,6 +59,7 @@ class SingleQubitXYRotation(BaseGate, OneQubitGate):
     def __repr__(self):
         return self.__str__()
 
+
 class SingleQubitZRotation(BaseGate, OneQubitGate):
     """Single qubit rotation around the Z axis.
 
@@ -99,7 +101,7 @@ class IdentityGate(BaseGate, OneQubitGate):
     def get_adjusted_pulse(self, pulse):
         pulse = copy(pulse)
         pulse.amplitude = 0
-        pulse.use_drag = False # Avoids bug
+        pulse.use_drag = False  # Avoids bug
         if self.width is not None:
             pulse.width = self.width
             pulse.plateau = 0
@@ -111,7 +113,6 @@ class VirtualZGate(BaseGate, OneQubitGate):
 
     def __init__(self, theta):
         self.theta = theta
-
 
 
 class CPHASE(BaseGate, TwoQubitGate):
@@ -206,11 +207,17 @@ class CompositeGate:
         step = Step()
         if isinstance(gate, list):
             if len(gate) == 1:
-                raise ValueError("For single gates, don't provide gate as a list.")
+                raise ValueError(
+                    "For single gates, don't provide gate as a list.")
             if not isinstance(qubit, list):
-                raise ValueError("Please provide qubit indices as a list when adding more thab one gate.")
+                raise ValueError(
+                    """Please provide qubit indices as a list when adding more
+                    than one gate."""
+                )
             if len(gate) != len(qubit):
-                raise ValueError("Length of gate list must be equal to length of qubit list.")
+                raise ValueError(
+                    "Length of gate list must equal length of qubit list."
+                )
 
             for q, g in zip(qubit, gate):
                 step.add_gate(q, g)
@@ -218,10 +225,14 @@ class CompositeGate:
         else:
             if gate.number_of_qubits() > 1:
                 if not isinstance(qubit, list):
-                    raise ValueError("Please provide qubit list for gates with more than one qubit.")
+                    raise ValueError(
+                        """Please provide qubit list for gates with more than
+                        one qubit."""
+                    )
             else:
                 if not isinstance(qubit, int):
-                    raise ValueError("For single gates, give qubit as int (not list).")
+                    raise ValueError(
+                        "For single gates, give qubit as int (not list).")
             step.add_gate(qubit, gate)
 
         self.sequence.append(step)
@@ -270,26 +281,26 @@ I0 = IdentityGate(width=0)
 # X gates
 Xp = SingleQubitXYRotation(phi=0, theta=np.pi)
 Xm = SingleQubitXYRotation(phi=0, theta=-np.pi)
-X2p = SingleQubitXYRotation(phi=0, theta=np.pi/2)
-X2m = SingleQubitXYRotation(phi=0, theta=-np.pi/2)
+X2p = SingleQubitXYRotation(phi=0, theta=np.pi / 2)
+X2m = SingleQubitXYRotation(phi=0, theta=-np.pi / 2)
 
 # Y gates
-Yp = SingleQubitXYRotation(phi=np.pi/2, theta=np.pi)
-Ym = SingleQubitXYRotation(phi=np.pi/2, theta=-np.pi)
-Y2m = SingleQubitXYRotation(phi=np.pi/2, theta=-np.pi/2)
-Y2p = SingleQubitXYRotation(phi=np.pi/2, theta=np.pi/2)
+Yp = SingleQubitXYRotation(phi=np.pi / 2, theta=np.pi)
+Ym = SingleQubitXYRotation(phi=np.pi / 2, theta=-np.pi)
+Y2m = SingleQubitXYRotation(phi=np.pi / 2, theta=-np.pi / 2)
+Y2p = SingleQubitXYRotation(phi=np.pi / 2, theta=np.pi / 2)
 
 # Z gates
 Zp = SingleQubitZRotation(np.pi)
-Z2p = SingleQubitZRotation(np.pi/2)
+Z2p = SingleQubitZRotation(np.pi / 2)
 Zm = SingleQubitZRotation(-np.pi)
-Z2m = SingleQubitZRotation(-np.pi/2)
+Z2m = SingleQubitZRotation(-np.pi / 2)
 
 # Virtual Z gates
 VZp = VirtualZGate(np.pi)
-VZ2p = VirtualZGate(np.pi/2)
+VZ2p = VirtualZGate(np.pi / 2)
 VZm = VirtualZGate(-np.pi)
-VZ2m = VirtualZGate(np.pi/2)
+VZ2m = VirtualZGate(np.pi / 2)
 
 # two-qubit gates
 CPh = CPHASE()
@@ -319,15 +330,13 @@ H = CompositeGate(n_qubit=1)
 H.add_gate(VZp)
 H.add_gate(Y2p)
 
-CZ = CHASE_with_1qb_phases(0, 0)  # Start with 0, 0 as the single qubit phase shifts.
+CZ = CHASE_with_1qb_phases(
+    0, 0)  # Start with 0, 0 as the single qubit phase shifts.
 
 CNOT = CompositeGate(n_qubit=2)
 CNOT.add_gate(H, 1)
 CNOT.add_gate(CZ, [0, 1])
 CNOT.add_gate(H, 1)
-
-
-
 
 if __name__ == '__main__':
     pass
