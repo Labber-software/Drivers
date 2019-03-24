@@ -103,8 +103,8 @@ class IdentityGate(BaseGate, OneQubitGate):
         pulse.amplitude = 0
         pulse.use_drag = False  # Avoids bug
         if self.width is not None:
-            pulse.width = self.width
-            pulse.plateau = 0
+            pulse.width = 0
+            pulse.plateau = self.width
         return pulse
 
 
@@ -212,12 +212,10 @@ class CompositeGate:
             if not isinstance(qubit, list):
                 raise ValueError(
                     """Please provide qubit indices as a list when adding more
-                    than one gate."""
-                )
+                    than one gate.""")
             if len(gate) != len(qubit):
                 raise ValueError(
-                    "Length of gate list must equal length of qubit list."
-                )
+                    "Length of gate list must equal length of qubit list.")
 
             for q, g in zip(qubit, gate):
                 step.add_gate(q, g)
@@ -227,8 +225,7 @@ class CompositeGate:
                 if not isinstance(qubit, list):
                     raise ValueError(
                         """Please provide qubit list for gates with more than
-                        one qubit."""
-                    )
+                        one qubit.""")
             else:
                 if not isinstance(qubit, int):
                     raise ValueError(
@@ -244,7 +241,7 @@ class CompositeGate:
         return len(self.sequence)
 
 
-class CHASE_with_1qb_phases(CompositeGate):
+class CPHASE_with_1qb_phases(CompositeGate):
     """CPHASE gate followed by single qubit Z rotations.
 
     Parameters
@@ -305,15 +302,6 @@ VZ2m = VirtualZGate(np.pi / 2)
 # two-qubit gates
 CPh = CPHASE()
 
-# Readout
-# TODO Make these with composite gates just
-# Mxp = MeasurementGate(axis='X', sign='P')
-# Myp = MeasurementGate(axis='Y', sign='P')
-# Mzp = MeasurementGate(axis='Z', sign='P')
-# Mxm = MeasurementGate(axis='X', sign='M')
-# Mym = MeasurementGate(axis='Y', sign='M')
-# Mzm = MeasurementGate(axis='Z', sign='M')
-
 # Composite gates
 CZEcho = CompositeGate(n_qubit=2)
 CZEcho.add_gate([X2p, I])
@@ -330,7 +318,7 @@ H = CompositeGate(n_qubit=1)
 H.add_gate(VZp)
 H.add_gate(Y2p)
 
-CZ = CHASE_with_1qb_phases(
+CZ = CPHASE_with_1qb_phases(
     0, 0)  # Start with 0, 0 as the single qubit phase shifts.
 
 CNOT = CompositeGate(n_qubit=2)
