@@ -14,14 +14,11 @@ import tomography
 # Allow logging to Labber's instrument log
 log = logging.getLogger('LabberDriver')
 
-# TODO Select qubits to benchmark (all sequences?) with check boxes
-# TODO Add phase tracking of readout
 # TODO Reduce calc of CZ by finding all unique TwoQubitGates in seq and calc.
 # TODO Make I(width=None) have the width of the longest gate in the step
 # TODO Add checks so that not both t0 and dt are given
 # TODO test demod with some data
 # TODO Two composite gates should be able to be parallell
-# TODO implement eq test for gates
 # TODO check number of qubits in seq and in gate added to seq
 
 

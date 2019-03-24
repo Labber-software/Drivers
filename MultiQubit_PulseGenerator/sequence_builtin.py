@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # add logger, to allow logging to Labber's instrument log
 import logging
-
 import numpy as np
 
 import gates
@@ -36,7 +35,7 @@ class CPMG(Sequence):
         # always do T1 same way, regardless if edge-to-edge or center-center
         if n_pulse < 0:
             self.add_gate_to_all(gate_pi)
-            self.add_gate_to_all(IdentityGate(width=duration))
+            self.add_gate_to_all(gates.IdentityGate(width=duration))
 
         elif edge_to_edge:
             # edge-to-edge pulsing, set pulse separations
