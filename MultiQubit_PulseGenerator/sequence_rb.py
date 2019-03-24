@@ -570,8 +570,8 @@ class TwoQubit_RB(Sequence):
         # get parameters
 
         sequence = config['Sequence']
-        qubits_to_benchmark = np.fromstring(
-            config['Qubits to Benchmark'], dtype=int, sep='-')
+        qubits_to_benchmark = [int(config['Qubits to Benchmark'][0]) - 1,
+                               int(config['Qubits to Benchmark'][2]) - 1]
         # Number of Cliffords to generate
         N_cliffords = int(config['Number of Cliffords'])
         randomize = config['Randomize']
@@ -688,12 +688,12 @@ class TwoQubit_RB(Sequence):
             log.info('-------------------------------------------')
 
             # Assign two qubit gate sequence to where we want
-            for i in range(qubits_to_benchmark[0] - 1):
-                multi_gate_seq.append([None] * len(gateSeq1))
+            # for i in range(qubits_to_benchmark[0] - 1):
+            #     multi_gate_seq.append([None] * len(gateSeq1))
             multi_gate_seq.append(gateSeq2)
             multi_gate_seq.append(gateSeq1)
-            for i in range(self.n_qubit - qubits_to_benchmark[1]):
-                multi_gate_seq.append([None] * len(gateSeq1))
+            # for i in range(self.n_qubit - qubits_to_benchmark[1]):
+            #     multi_gate_seq.append([None] * len(gateSeq1))
 
             # transpose list of lists
             multi_gate_seq = list(map(list, itertools.zip_longest(*multi_gate_seq, fillvalue=gates.I))) # Not to chop
@@ -701,16 +701,16 @@ class TwoQubit_RB(Sequence):
             # self.add_gates(multi_gate_seq)
             for gate_seq in multi_gate_seq:
                 if gate_seq[0] == gates.CZ:
-                    self.add_gate(qubit=[0, 1], gate=gate_seq[0])
+                    self.add_gate(qubit=qubits_to_benchmark, gate=gate_seq[0])
                 else:
-                    self.add_gate(qubit=[0, 1], gate=gate_seq)
+                    self.add_gate(qubit=qubits_to_benchmark, gate=gate_seq)
             self.prev_gate_seq = multi_gate_seq
         else:
             for gate_seq in self.prev_gate_seq:
                 if gate_seq[0] == gates.CZ:
-                    self.add_gate(qubit=[0, 1], gate=gate_seq[0])
+                    self.add_gate(qubit=qubits_to_benchmark, gate=gate_seq[0])
                 else:
-                    self.add_gate(qubit=[0, 1], gate=gate_seq)
+                    self.add_gate(qubit=qubits_to_benchmark, gate=gate_seq)
 
     def evaluate_sequence(self, gate_seq_1, gate_seq_2):
         """
