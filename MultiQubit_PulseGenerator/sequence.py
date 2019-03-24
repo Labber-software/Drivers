@@ -20,6 +20,7 @@ log = logging.getLogger('LabberDriver')
 # TODO test demod with some data
 # TODO Two composite gates should be able to be parallell
 # TODO check number of qubits in seq and in gate added to seq
+# TODO Remove pulse from I gates
 
 
 class GateOnQubit:
@@ -954,7 +955,8 @@ class SequenceToWaveforms:
                 elif isinstance(gate_obj, gates.TwoQubitGate):
                     waveform = self._wave_z[qubit]
                     delay = self.wave_z_delays[qubit]
-                elif isinstance(gate_obj, gates.SingleQubitXYRotation):
+                elif isinstance(gate_obj, (gates.SingleQubitXYRotation,
+                                           gates.RabiGate)):
                     waveform = self._wave_xy[qubit]
                     delay = self.wave_xy_delays[qubit]
                 elif isinstance(gate_obj, gates.ReadoutGate):
