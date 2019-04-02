@@ -938,7 +938,8 @@ class SequenceToWaveforms:
         self.n_qubit = d[config.get('Number of qubits')]
         self.dt = config.get('Pulse spacing')
         self.local_xy = config.get('Local XY control')
-        self.simultaneous_pulses = config.get('Simultaneous pulses')
+        # default for simultaneous pulses is true, only option for benchmarking
+        self.simultaneous_pulses = config.get('Simultaneous pulses', True)
 
         # waveform parameters
         self.sample_rate = config.get('Sample rate')

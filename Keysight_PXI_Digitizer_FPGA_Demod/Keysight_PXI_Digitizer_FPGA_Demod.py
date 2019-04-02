@@ -463,12 +463,15 @@ class Driver(LabberDriver):
                                     int(1000 + self.timeout_ms / nCall))
                 # stop if no data
                 if data.size == 0:
+                    if self.fpga_config != 'Only signals':
+                        self.demod_output_ssb = self.demod_output_ssb.reshape(
+                            (self.num_of_demods, nAv, nSeg))
                     return
                 # store data in long vector, convert later
                 self.demod_buffer[count:(count + data.size)] = data
                 count += data.size
                 # report progress, only report integer percent
-                if nCall >= 1:
+                if nCall > 10:
                     new_percent = int(100 * n / nCall)
                     if new_percent > old_percent:
                         old_percent = new_percent
@@ -497,6 +500,10 @@ class Driver(LabberDriver):
                                         int(1000 + self.timeout_ms / nCall))
                     # stop if no data
                     if data.size == 0:
+                        if self.fpga_config != 'Only signals':
+                            self.demod_output_ssb = (
+                                self.demod_output_ssb.reshape(
+                                    (self.num_of_demods, nAv, nSeg)))
                         return
 
                     # different operation for signals vs demod data
@@ -513,7 +520,7 @@ class Driver(LabberDriver):
                         self.getDemodValues(data, nPts, nSeg, nCycle)
 
                 # report progress, only report integer percent
-                if nCall >= 1:
+                if nCall > 10:
                     new_percent = int(100 * n / nCall)
                     if new_percent > old_percent:
                         old_percent = new_percent
@@ -553,6 +560,10 @@ class Driver(LabberDriver):
                                             int(1000 + self.timeout_ms / nCall))
                         # stop if no data
                         if data.size == 0:
+                            if self.fpga_config != 'Only signals':
+                                self.demod_output_ssb = (
+                                    self.demod_output_ssb.reshape(
+                                        (self.num_of_demods, nAv, nSeg)))
                             return
 
                         # different operation for signals vs demod data
@@ -570,7 +581,7 @@ class Driver(LabberDriver):
                     self.getDemodValues(self.demod_buffer, nPts, nSeg, nSeg)
 
                 # report progress, only report integer percent
-                if nAv >= 1:
+                if nAv > 1:
                     new_percent = int(100 * n / nAv)
                     if new_percent > old_percent:
                         old_percent = new_percent
@@ -584,7 +595,7 @@ class Driver(LabberDriver):
                 if self.isStopped():
                     break
 
-        # at the end, convert binary data to I/Q values
+        # at the end, reshape output arrays
         if self.fpga_config != 'Only signals':
             self.demod_output_ssb = self.demod_output_ssb.reshape(
                 (self.num_of_demods, nAv, nSeg))
