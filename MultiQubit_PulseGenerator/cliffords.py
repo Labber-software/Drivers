@@ -8,22 +8,22 @@ import pickle
 
 import itertools
 import sequence_rb
-from gates import Gate
+import gates
 
 
 # list of Paulis in string representation
-list_sSign = ['+','-'] # 
+list_sSign = ['+','-'] #
 list_sPauli = ['I','X','Y','Z']
 list_s2QBPauli = list(itertools.product(list_sSign,list_sPauli, list_sPauli))
 
 # list of Paulis, 1QB-gates, and 2QB-gates in np.matrix representation
-dict_mPauli = {'I': np.matrix('1,0;0,1'), 
+dict_mPauli = {'I': np.matrix('1,0;0,1'),
     'X': np.matrix('0,1;1,0'),
     'Y': np.matrix('0,-1j;1j,0'),
     'Z': np.matrix('1,0;0,-1')}
 
 dict_m1QBGate = {'I': np.matrix('1,0;0,1'),
-    'X2p': 1/np.sqrt(2)*np.matrix('1,-1j;-1j,1'), 
+    'X2p': 1/np.sqrt(2)*np.matrix('1,-1j;-1j,1'),
     'X2m': 1/np.sqrt(2)*np.matrix('1,1j;1j,1'),
     'Y2p': 1/np.sqrt(2)*np.matrix('1,-1;1,1'),
     'Y2m': 1/np.sqrt(2)*np.matrix('1,1;-1,1'),
@@ -44,15 +44,15 @@ dict_m2QBGate = {'SWAP': np.matrix('1,0,0,0; 0,0,1,0; 0,1,0,0; 0,0,0,1'),
 
 def expect(_psi, _op):
     """
-    Get the expectation value of the operator, given the quantum state 
-    
+    Get the expectation value of the operator, given the quantum state
+
     Parameters
     ----------
-    _psi: np.matrix 
+    _psi: np.matrix
         the state vector of a quantum state
     _op: np.matrix
-        a quantum operator 
-    
+        a quantum operator
+
     Returns
     -------
     e_val: expectation value
@@ -61,15 +61,15 @@ def expect(_psi, _op):
 
 def sPauli_to_mPauli(_sPaulis):
     """
-    Convert from string-type Paulis to matrix-type Paulis 
-    
+    Convert from string-type Paulis to matrix-type Paulis
+
     Parameters
     ----------
     _sPaulis: string
         string representation of a quantum state
     _op: np.matrix
-        quantum operator 
-    
+        quantum operator
+
     Returns
     -------
     e_val: expectation value
@@ -95,44 +95,44 @@ def sPauli_to_mPauli(_sPaulis):
 def Gate_to_strGate(_Gate):
     """
     represent Gate (defined in "gates.py") object in string-format.
-    
+
     Parameters
     ----------
     Gate: gates.Gate
         Gate object
-    
+
     Returns
     -------
     str_Gate: string
         string representation of the Gate
     """
-    if (_Gate == Gate.I):
+    if (_Gate == gates.I):
         str_Gate = 'I'
-    elif (_Gate == Gate.Xp):
+    elif (_Gate == gates.Xp):
         str_Gate = 'Xp'
-    elif (_Gate == Gate.Xm):
+    elif (_Gate == gates.Xm):
         str_Gate = 'Xm'
-    elif (_Gate == Gate.X2p):
+    elif (_Gate == gates.X2p):
         str_Gate = 'X2p'
-    elif (_Gate == Gate.X2m):
+    elif (_Gate == gates.X2m):
         str_Gate = 'X2m'
-    elif (_Gate == Gate.Yp):
+    elif (_Gate == gates.Yp):
         str_Gate = 'Yp'
-    elif (_Gate == Gate.Ym):
+    elif (_Gate == gates.Ym):
         str_Gate = 'Ym'
-    elif (_Gate == Gate.Y2p):
+    elif (_Gate == gates.Y2p):
         str_Gate = 'Y2p'
-    elif (_Gate == Gate.Y2m):
+    elif (_Gate == gates.Y2m):
         str_Gate = 'Y2m'
-    elif (_Gate == Gate.Zp):
+    elif (_Gate == gates.Zp):
         str_Gate = 'Zp'
-    elif (_Gate == Gate.Zm):
+    elif (_Gate == gates.Zm):
         str_Gate = 'Zm'
-    elif (_Gate == Gate.Z2p):
+    elif (_Gate == gates.Z2p):
         str_Gate = 'Z2p'
-    elif (_Gate == Gate.Z2m):
+    elif (_Gate == gates.Z2m):
         str_Gate = 'Z2m'
-    elif (_Gate == Gate.CZ):
+    elif (_Gate == gates.CZ):
         str_Gate = 'CZ'
 
     return str_Gate
@@ -140,60 +140,60 @@ def Gate_to_strGate(_Gate):
 
 def strGate_to_Gate(_strGate):
     """
-    Convert from string-type Gates to Gate (defined in "gates.py") object 
-    
+    Convert from string-type Gates to Gate (defined in "gates.py") object
+
     Parameters
     ----------
     str_Gate: string
         string representation of the Gate
-    
+
     Returns
     -------
     Gate: gates.Gate
         Gate object
     """
     if (_strGate == 'I'):
-        g = Gate.I
+        g = gates.I
     elif (_strGate == 'Xp'):
-        g = Gate.Xp
+        g = gates.Xp
     elif (_strGate == 'Xm'):
-        g = Gate.Xm
+        g = gates.Xm
     elif (_strGate == 'X2p'):
-        g = Gate.X2p
+        g = gates.X2p
     elif (_strGate == 'X2m'):
-        g = Gate.X2m
+        g = gates.X2m
     elif (_strGate == 'Yp'):
-        g = Gate.Yp
+        g = gates.Yp
     elif (_strGate == 'Ym'):
-        g = Gate.Ym
+        g = gates.Ym
     elif (_strGate == 'Y2p'):
-        g = Gate.Y2p
+        g = gates.Y2p
     elif (_strGate == 'Y2m'):
-        g = Gate.Y2m
+        g = gates.Y2m
     elif (_strGate == 'Zp'):
-        g = Gate.Zp
+        g = gates.Zp
     elif (_strGate == 'Zm'):
-        g = Gate.Zm
+        g = gates.Zm
     elif (_strGate == 'Z2p'):
-        g = Gate.Z2p
+        g = gates.Z2p
     elif (_strGate == 'Z2m'):
-        g = Gate.Z2m
+        g = gates.Z2m
     elif (_strGate == 'CZ'):
-        g = Gate.CZ
+        g = gates.CZ
 
     return g
 
 def get_stabilizer(_psi):
     """
     Get the stabilizer group corresponding the qubit_state
-    
+
     Parameters
     ----------
     _psi: np.matrix
         The state vector of the qubit.
     Returns
     -------
-    stabilizer: list 
+    stabilizer: list
         The stabilizer group
     """
     stabilizer = []
@@ -213,35 +213,35 @@ def generate_2QB_Cliffords(_index):
     m2QBClifford = np.identity(4, dtype = complex)
     for i in range(len(seq_QB1)):
         _mGate = np.matrix([1])
-        if (seq_QB1[i] == Gate.CZ or seq_QB2[i] == Gate.CZ ): # two qubit gates
+        if (seq_QB1[i] == gates.CZ or seq_QB2[i] == gates.CZ ): # two qubit gates
             _mGate = np.kron(dict_m2QBGate['CZ'], _mGate)
         else: # 1QB gates
             for g in [seq_QB2[i], seq_QB1[i]]:
-                if (g == Gate.I):
+                if (g == gates.I):
                     _mGate = np.kron(dict_m1QBGate['I'], _mGate)
-                elif (g == Gate.Xp):
+                elif (g == gates.Xp):
                     _mGate = np.kron(dict_m1QBGate['Xp'], _mGate)
-                elif (g == Gate.Xm):
+                elif (g == gates.Xm):
                     _mGate = np.kron(dict_m1QBGate['Xm'], _mGate)
-                elif (g == Gate.X2p):
+                elif (g == gates.X2p):
                     _mGate = np.kron(dict_m1QBGate['X2p'], _mGate)
-                elif (g == Gate.X2m):
+                elif (g == gates.X2m):
                     _mGate = np.kron(dict_m1QBGate['X2m'], _mGate)
-                elif (g == Gate.Yp):
+                elif (g == gates.Yp):
                     _mGate = np.kron(dict_m1QBGate['Yp'], _mGate)
-                elif (g == Gate.Ym):
+                elif (g == gates.Ym):
                     _mGate = np.kron(dict_m1QBGate['Ym'], _mGate)
-                elif (g == Gate.Y2p):
+                elif (g == gates.Y2p):
                     _mGate = np.kron(dict_m1QBGate['Y2p'], _mGate)
-                elif (g == Gate.Y2m):
+                elif (g == gates.Y2m):
                     _mGate = np.kron(dict_m1QBGate['Y2m'], _mGate)
-                elif (g == Gate.Zp):
+                elif (g == gates.Zp):
                     _mGate = np.kron(dict_m1QBGate['Zp'], _mGate)
-                elif (g == Gate.Zm):
+                elif (g == gates.Zm):
                     _mGate = np.kron(dict_m1QBGate['Zm'], _mGate)
-                elif (g == Gate.Z2p):
+                elif (g == gates.Z2p):
                     _mGate = np.kron(dict_m1QBGate['Z2p'], _mGate)
-                elif (g == Gate.Z2m):
+                elif (g == gates.Z2m):
                     _mGate = np.kron(dict_m1QBGate['Z2m'], _mGate)
         m2QBClifford = mul(_mGate, m2QBClifford)
     return (m2QBClifford)
@@ -250,10 +250,10 @@ def saveData(file_path, data):
 
     """
     Create a log file. (Use the built-in pickle module)
-    
+
     Parameters
     ----------
-    file_path: str 
+    file_path: str
         path of the log file
 
     - data: arbitrary object
@@ -272,10 +272,10 @@ def loadData(file_path):
 
     """
     Load a log file. (Use the built-in pickle module)
-    
+
     Parameters
     ----------
-    file_path: str 
+    file_path: str
         path of the log file
 
 
@@ -301,7 +301,7 @@ if __name__ == "__main__":
     psi_01 = np.matrix('0;1;0;0')
     psi_10 = np.matrix('0;0;1;0')
     psi_11 = np.matrix('0;0;0;1')
-    
+
     N_2QBcliffords = 11520
     list_stabilizer = []
     list_psi = []
@@ -311,7 +311,7 @@ if __name__ == "__main__":
 
     # Apply 11520 different 2QB cliffords and get the corresponding stabilizer states
     for i in range(N_2QBcliffords):
-        if (i/N_2QBcliffords > cnt):    
+        if (i/N_2QBcliffords > cnt):
             print('Running... %d %%'%(cnt*100))
             cnt = cnt+0.01
         g = generate_2QB_Cliffords(i)
@@ -321,13 +321,13 @@ if __name__ == "__main__":
         final_psi_10 = dot(g, psi_10)
         final_psi_11 = dot(g, psi_11)
 
-        stabilizer = get_stabilizer(final_psi_00)  
+        stabilizer = get_stabilizer(final_psi_00)
 
-        # append only if the state is not in list_stablizier list. 
+        # append only if the state is not in list_stablizier list.
         if (not (stabilizer in list_stabilizer)):
             list_stabilizer.append(stabilizer)
             list_psi.append(final_psi_00)
-            # find the cheapest recovery clifford gate.
+            # find the cheapest recovery clifford gates.
             print('stabilizer state: '+ str(stabilizer))
             print('Before recovery, final_psi_00: ' + str(final_psi_00.flatten()))
             print('find the cheapest recovery clifford gate')
@@ -355,37 +355,37 @@ if __name__ == "__main__":
                     print(dot(recovery_gate, final_psi_00)[0,0],dot(recovery_gate, final_psi_01)[1,0],dot(recovery_gate, final_psi_10)[2,0],dot(recovery_gate, final_psi_11)[3,0])
                     # if the gate is recovery, check if it is the cheapest.
 
-                    # Less 2QB Gates, Less 1QB Gates, and More I Gates = the cheapest gate.
+                    # Less 2QB Gates, Less 1QB Gates, and More I Gates = the cheapest gates.
                     # The priority: less 2QB gates > less 1QB gates > more I gates
                     N_2QB_gate, N_1QB_gate, N_I_gate = 0, 0, 0
 
                     # count the numbers of the gates
                     for k in range(len(seq_QB1)):
-                        if (seq_QB1[k] == Gate.CZ or seq_QB2[k] == Gate.CZ):
+                        if (seq_QB1[k] == gates.CZ or seq_QB2[k] == gates.CZ):
                             N_2QB_gate += 1
                         else:
                             N_1QB_gate += 2
-                        if (seq_QB1[k] == Gate.I):
+                        if (seq_QB1[k] == gates.I):
                             N_I_gate += 1
-                        if (seq_QB2[k] == Gate.I):
+                        if (seq_QB2[k] == gates.I):
                             N_I_gate += 1
 
                     # check whether it is the cheapest
                     # if it has less 2QB gates, always update it.
-                    if (N_2QB_gate < min_N_2QB_gate): 
+                    if (N_2QB_gate < min_N_2QB_gate):
                         min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
                         print('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
                     else:
                         # if it has equal # of 2QB gates and less 1QB gates, update it.
-                        if (N_2QB_gate == min_N_2QB_gate and 
+                        if (N_2QB_gate == min_N_2QB_gate and
                             N_1QB_gate < min_N_1QB_gate):
                             min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
                             print('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
                         else:
                             # if it has equal # of 2QB & 1QB gates, and more 1QB gates, update it.
-                            if (N_2QB_gate == min_N_2QB_gate and 
-                                N_1QB_gate == min_N_1QB_gate and 
-                                N_I_gate >= max_N_I_gate): 
+                            if (N_2QB_gate == min_N_2QB_gate and
+                                N_1QB_gate == min_N_1QB_gate and
+                                N_I_gate >= max_N_I_gate):
                                 min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
                                 print('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
 
@@ -398,7 +398,7 @@ if __name__ == "__main__":
             # remove redundant Identity gates
             index_identity = [] # find where Identity gates are
             for p in range(len(seq_recovery_QB1)):
-                if (seq_recovery_QB1[p] == Gate.I and seq_recovery_QB2[p] == Gate.I):
+                if (seq_recovery_QB1[p] == gates.I and seq_recovery_QB2[p] == gates.I):
                     index_identity.append(p)
             seq_recovery_QB1 = [m for n, m in enumerate(seq_recovery_QB1) if n not in index_identity]
             seq_recovery_QB2 = [m for n, m in enumerate(seq_recovery_QB2) if n not in index_identity]
@@ -420,7 +420,7 @@ if __name__ == "__main__":
     dict_result['recovery_gates_QB1'] = list_recovery_gates_QB1
     dict_result['recovery_gates_QB2'] = list_recovery_gates_QB2
     saveData('recovery_rb_table.pickle', dict_result)
-    
+
     # load the results.
     # dict_result =loadData('recovery_rb_table.dill')
     # print(dict_result['psi_stabilizer'])
