@@ -116,12 +116,13 @@ class VirtualZGate(BaseGate, OneQubitGate):
 
 
 class CPHASE(BaseGate, TwoQubitGate):
-    def __init__(self, negative_amplitude=False):
+    def __init__(self, negative_amplitude=None):
         self.negative_amplitude = negative_amplitude
 
     def get_adjusted_pulse(self, pulse):
         pulse = copy(pulse)
-        pulse.negative_amplitude = self.negative_amplitude
+        if self.negative_amplitude is not None:
+            pulse.negative_amplitude = self.negative_amplitude
         return pulse
 
 

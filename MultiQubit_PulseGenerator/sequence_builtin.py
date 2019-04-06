@@ -78,12 +78,8 @@ class PulseTrain(Sequence):
         for n in range(n_pulse):
             pulse_type = config['Pulse']
             if pulse_type == 'CPh':
-                if alternate and (n % 2) == 1:
-                    gate = gates.CPHASE(negative_amplitude=True)
-                else:
-                    gate = gates.CPHASE(negative_amplitude=False)
                 for i in range(self.n_qubit-1):
-                    self.add_gate([i, i+1], gate)
+                    self.add_gate([i, i+1], gates.CPh)
             elif pulse_type == 'NetZero':
                 for i in range(self.n_qubit-1):
                     self.add_gate([i, i+1], gates.NetZero)
