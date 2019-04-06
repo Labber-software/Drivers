@@ -1149,7 +1149,7 @@ class SequenceToWaveforms:
             pulse = (getattr(pulses,
                              config.get('Pulse type, 2QB'))(complex=False))
 
-            if config.get('Pulse type, 2QB') == 'CZ':
+            if config.get('Pulse type, 2QB') in ['CZ', 'NetZero']:
                 pulse.F_Terms = d[config.get('Fourier terms, 2QB')]
                 if config.get('Uniform 2QB pulses'):
                     pulse.width = config.get('Width, 2QB')

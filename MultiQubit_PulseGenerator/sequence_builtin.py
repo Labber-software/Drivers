@@ -80,9 +80,6 @@ class PulseTrain(Sequence):
             if pulse_type == 'CPh':
                 for i in range(self.n_qubit-1):
                     self.add_gate([i, i+1], gates.CPh)
-            elif pulse_type == 'NetZero':
-                for i in range(self.n_qubit-1):
-                    self.add_gate([i, i+1], gates.NetZero)
             else:
                 if alternate and (n % 2) == 1:
                     pulse_type = pulse_type.replace('p', 'm')
