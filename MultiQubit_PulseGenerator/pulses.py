@@ -239,7 +239,7 @@ class CZ(Pulse):
         self.t_tau = None
 
     def total_duration(self):
-        return self.width
+        return self.width+self.plateau
 
     def calculate_envelope(self, t0, t):
         # notation and calculations are based on
@@ -315,6 +315,15 @@ class CZ(Pulse):
             if i > 0:
                 self.t_tau[i] = np.trapz(
                     np.sin(self.theta_tau[0:i]), x=tau[0:i])
+
+
+class NetZero(CZ):
+    def total_duration(self):
+        return 2*super().total_duration()
+
+    def calculate_envelope(self, t0, t):
+        return (super().calculate_envelope(t0-self.total_duration()/4, t) -
+                super().calculate_envelope(t0+self.total_duration()/4, t))
 
 
 if __name__ == '__main__':

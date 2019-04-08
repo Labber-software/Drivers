@@ -116,13 +116,7 @@ class VirtualZGate(BaseGate, OneQubitGate):
 
 
 class CPHASE(BaseGate, TwoQubitGate):
-    def __init__(self, negative_amplitude=False):
-        self.negative_amplitude = negative_amplitude
-
-    def get_adjusted_pulse(self, pulse):
-        pulse = copy(pulse)
-        pulse.negative_amplitude = self.negative_amplitude
-        return pulse
+    """ CPHASE gate. """
 
 
 class ReadoutGate(BaseGate, OneQubitGate):
@@ -309,10 +303,6 @@ CZEcho.add_gate(CPh)
 CZEcho.add_gate([Xp, Xp])
 CZEcho.add_gate(CPh)
 CZEcho.add_gate([X2p, Xp])
-
-NetZero = CompositeGate(n_qubit=2)
-NetZero.add_gate(CPHASE(negative_amplitude=False))
-NetZero.add_gate(CPHASE(negative_amplitude=True))
 
 H = CompositeGate(n_qubit=1)
 H.add_gate(VZp)
