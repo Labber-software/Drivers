@@ -71,7 +71,7 @@ class ProcessTomography(object):
         """
         if self.tomography_scheme == 'Single qubit':
             qubitID1 = self.qubit1ID - 1
-            gate = [None]
+            gate = None
 
             whichGate = self.prepulse_index[0]
             gate = self.gate_from_index(whichGate)
@@ -101,16 +101,16 @@ class ProcessTomography(object):
 
         """
         indices = list(whichGate)
-        gate = []
+        gate = None
         for index in indices:
             if index == '0':
-                gate.append(gates.I)
+                gate = gates.I
             elif index == '1':
-                gate.append(gates.Xp)
+                gate = gates.Xp
             elif index == 'X':
-                gate.append(gates.Y2p)
+                gate = gates.Y2p
             elif index == 'Y':
-                gate.append(gates.X2m)
+                gate = gates.X2m
             else:
                 raise ValueError("Gate should be in ['0', '1', 'X', or 'Y']")
 
