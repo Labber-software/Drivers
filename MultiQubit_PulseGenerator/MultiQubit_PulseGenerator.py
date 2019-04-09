@@ -17,7 +17,7 @@ SEQUENCES = {'Rabi': Rabi,
              'Pulse train': PulseTrain,
              '1-QB Randomized Benchmarking': SingleQubit_RB,
              '2-QB Randomized Benchmarking': TwoQubit_RB,
-             'Spin-locking' : SpinLocking,
+             'Spin-locking': SpinLocking,
              'Custom': type(None)}
 
 
@@ -130,7 +130,8 @@ class Driver(LabberDriver):
                     self.waveforms = dict()
                     n_qubit = self.sequence.n_qubit
                     # Align RB waveforms to end
-                    align_RB_to_end = config.get('Align RB waveforms to end', False)
+                    align_RB_to_end = config.get('Align RB waveforms to end',
+                                                 False)
                     # start with xy, z and gate waveforms, list of data
                     for key in ['xy', 'z', 'gate']:
                         # get size of longest waveform
@@ -192,16 +193,29 @@ class Driver(LabberDriver):
                 value = self.waveforms['z'][n]
             elif name == 'Trace - G':
                 value = self.waveforms['gate'][n]
+            dt = 1 / self.sequence_to_waveforms.sample_rate
 
         elif quant.name == 'Trace - Readout trig':
             value = self.waveforms['readout_trig']
+            dt = 1 / self.sequence_to_waveforms.sample_rate
         elif quant.name == 'Trace - Readout I':
             value = self.waveforms['readout_iq'].real
+            xp = np.arange(len(value))/self.sequence_to_waveforms.sample_rate
+            x = (np.arange(int(np.ceil(xp[-1]
+                 * self.sequence_to_waveforms.sample_rate_readout)))
+                 / self.sequence_to_waveforms.sample_rate_readout)
+            value = np.interp(x, xp, value)
+            dt = 1 / self.sequence_to_waveforms.sample_rate_readout
         elif quant.name == 'Trace - Readout Q':
             value = self.waveforms['readout_iq'].imag
+            xp = np.arange(len(value))/self.sequence_to_waveforms.sample_rate
+            x = (np.arange(int(np.ceil(xp[-1]
+                 * self.sequence_to_waveforms.sample_rate_readout)))
+                 / self.sequence_to_waveforms.sample_rate_readout)
+            value = np.interp(x, xp, value)
+            dt = 1 / self.sequence_to_waveforms.sample_rate_readout
 
         # return data as dict with sampling information
-        dt = 1 / self.sequence_to_waveforms.sample_rate
         value = quant.getTraceDict(value, dt=dt)
         return value
 

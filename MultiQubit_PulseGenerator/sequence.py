@@ -17,7 +17,6 @@ log = logging.getLogger('LabberDriver')
 # TODO Reduce calc of CZ by finding all unique TwoQubitGates in seq and calc.
 # TODO Make I(width=None) have the width of the longest gate in the step
 # TODO Add checks so that not both t0 and dt are given
-# TODO test demod with some data
 # TODO Two composite gates should be able to be parallell
 # TODO check number of qubits in seq and in gate added to seq
 # TODO Remove pulse from I gates
@@ -124,6 +123,7 @@ class Step:
         self.t_end += shift
 
     def _qubit_in_step(self, qubit):
+        """Returns whatever the given qubit is in the step or not. """
         if not isinstance(qubit, int):
             raise ValueError("Qubit index should be int.")
 
@@ -508,6 +508,7 @@ class SequenceToWaveforms:
 
         # waveform parameter
         self.sample_rate = 1.2E9
+        self.sample_rate_readout = 1.2E9
         self.n_pts = 240E3
         self.first_delay = 100E-9
         self.trim_to_sequence = True
@@ -1012,7 +1013,8 @@ class SequenceToWaveforms:
                         scaling_factor = float(crosstalk[q, 0])
                         if q != qubit:
                             scaling_factor = -scaling_factor
-                        waveform[indices] += (scaling_factor
+                        waveform[indices] += (
+                            scaling_factor
                             * gate.pulse.calculate_waveform(t0, t))
                 else:
                     # calculate the pulse waveform for the selected indices
@@ -1070,6 +1072,8 @@ class SequenceToWaveforms:
 
         # waveform parameters
         self.sample_rate = config.get('Sample rate')
+        self.sample_rate_readout = config.get('Sample rate - Readout',
+                                              self.sample_rate)
         self.n_pts = int(config.get('Number of points', 0))
         self.first_delay = config.get('First pulse delay')
         self.trim_to_sequence = config.get('Trim waveform to sequence')
