@@ -331,9 +331,6 @@ class Sequence:
         """
         step = Step(t0=t0, dt=dt, align=align)
         if isinstance(gate, list):
-            if len(gate) == 1:
-                raise ValueError(
-                    "For single gates, don't provide gate as a list.")
             if not isinstance(qubit, list):
                 raise ValueError(
                     """Provide qubit indices as a list when adding more than
@@ -376,10 +373,6 @@ class Sequence:
 
         qubit = list(range((self.n_qubit)))
         gate = [gate for n in range(self.n_qubit)]
-        # Single qubit gates shouldn't be lists
-        if len(qubit) == 1:
-            qubit = qubit[0]
-            gate = gate[0]
         self.add_gate(qubit, gate, t0=t0, dt=dt, align=align)
 
     def add_gates(self, gates):
@@ -416,10 +409,6 @@ class Sequence:
         for gate in gates:
             # add gate to specific qubit waveform
             qubit = list(range(len(gate)))
-            # Single qubit gates shouldn't be lists
-            if len(qubit) == 1:
-                qubit = qubit[0]
-                gate = gate[0]
             self.add_gate(qubit, gate)
 
     def set_parameters(self, config={}):
@@ -696,8 +685,6 @@ class SequenceToWaveforms:
             pulse = gate.get_adjusted_pulse(self.pulses_1qb_z[qubit])
         elif isinstance(gate, gates.IdentityGate):
             pulse = gate.get_adjusted_pulse(self.pulses_1qb_xy[qubit])
-        elif isinstance(gate, gates.RabiGate):
-            pulse = gate.get_adjusted_pulse(self.pulses_1qb_xy[qubit])
         elif isinstance(gate, gates.TwoQubitGate):
             pulse = gate.get_adjusted_pulse(self.pulses_2qb[qubit[0]])
         elif isinstance(gate, gates.ReadoutGate):
@@ -957,8 +944,7 @@ class SequenceToWaveforms:
                     if self.compensate_crosstalk:
                         crosstalk = self._crosstalk.compensation_matrix[:,
                                                                         qubit]
-                elif isinstance(gate_obj,
-                                (gates.SingleQubitXYRotation, gates.RabiGate)):
+                elif isinstance(gate_obj, gates.SingleQubitXYRotation):
                     waveform = self._wave_xy[qubit]
                     delay = self.wave_xy_delays[qubit]
                 elif isinstance(gate_obj, gates.ReadoutGate):

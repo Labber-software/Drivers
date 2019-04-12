@@ -137,7 +137,7 @@ class CustomGate(BaseGate):
         self.pulse = pulse
 
 
-class RabiGate(OneQubitGate):
+class RabiGate(SingleQubitXYRotation):
     """Creates the Rabi gate used in the spin-locking sequence.
 
     Parameters
