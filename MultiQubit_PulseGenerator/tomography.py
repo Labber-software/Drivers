@@ -76,6 +76,7 @@ class ProcessTomography(object):
             whichGate = self.prepulse_index[0]
             gate = self.gate_from_index(whichGate)
 
+            log.info('Gate is: {}'.format(gate))
             sequence.add_gate(qubitID1, gate)
 
         elif self.tomography_scheme in ['Two qubit (9 pulse set)',
