@@ -193,28 +193,14 @@ class Driver(LabberDriver):
                 value = self.waveforms['z'][n]
             elif name == 'Trace - G':
                 value = self.waveforms['gate'][n]
-            dt = 1 / self.sequence_to_waveforms.sample_rate
-
         elif quant.name == 'Trace - Readout trig':
             value = self.waveforms['readout_trig']
-            dt = 1 / self.sequence_to_waveforms.sample_rate
         elif quant.name == 'Trace - Readout I':
             value = self.waveforms['readout_iq'].real
-            xp = np.arange(len(value))/self.sequence_to_waveforms.sample_rate
-            x = (np.arange(int(np.ceil(xp[-1]
-                 * self.sequence_to_waveforms.sample_rate_readout)))
-                 / self.sequence_to_waveforms.sample_rate_readout)
-            value = np.interp(x, xp, value)
-            dt = 1 / self.sequence_to_waveforms.sample_rate_readout
         elif quant.name == 'Trace - Readout Q':
-            value = self.waveforms['readout_iq'].imag
-            xp = np.arange(len(value))/self.sequence_to_waveforms.sample_rate
-            x = (np.arange(int(np.ceil(xp[-1]
-                 * self.sequence_to_waveforms.sample_rate_readout)))
-                 / self.sequence_to_waveforms.sample_rate_readout)
-            value = np.interp(x, xp, value)
-            dt = 1 / self.sequence_to_waveforms.sample_rate_readout
+            value = self.waveforms['readout_iq'].imag,
 
+        dt = 1 / self.sequence_to_waveforms.sample_rate
         # return data as dict with sampling information
         value = quant.getTraceDict(value, dt=dt)
         return value

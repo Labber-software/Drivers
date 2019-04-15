@@ -497,7 +497,6 @@ class SequenceToWaveforms:
 
         # waveform parameter
         self.sample_rate = 1.2E9
-        self.sample_rate_readout = 1.2E9
         self.n_pts = 240E3
         self.first_delay = 100E-9
         self.trim_to_sequence = True
@@ -1058,8 +1057,6 @@ class SequenceToWaveforms:
 
         # waveform parameters
         self.sample_rate = config.get('Sample rate')
-        self.sample_rate_readout = config.get('Sample rate - Readout',
-                                              self.sample_rate)
         self.n_pts = int(config.get('Number of points', 0))
         self.first_delay = config.get('First pulse delay')
         self.trim_to_sequence = config.get('Trim waveform to sequence')
