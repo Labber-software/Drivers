@@ -71,20 +71,18 @@ class ProcessTomography(object):
         """
         if self.tomography_scheme == 'Single qubit':
             qubitID1 = self.qubit1ID - 1
-            gate = None
 
             whichGate = self.prepulse_index[0]
             gate = self.gate_from_index(whichGate)
 
             log.info('Gate is: {}'.format(gate))
-            sequence.add_gate(qubitID1, gate)
+            sequence.add_gate(qubitID1, gate[0])
 
         elif self.tomography_scheme in ['Two qubit (9 pulse set)',
                                         'Two qubit (30 pulse set)',
                                         'Two qubit (36 pulse set)']:
             qubitID1 = self.qubit1ID - 1
             qubitID2 = self.qubit2ID - 1
-            gate = [None, None]
 
             whichGate = self.prepulse_index[:2]
             gate = self.gate_from_index(whichGate)
@@ -92,30 +90,28 @@ class ProcessTomography(object):
             sequence.add_gate([qubitID1, qubitID2], gate)
 
     def gate_from_index(self, whichGate):
-        """Help function to translate prepulse index into gates.
-
+        """Help function to translate prepulse index into gate.
         Parameters
         ----------
         whichGate: str
             Elements of list should be in ['0', '1', 'X', 'Y'],
             indicating which state to prepare
-
         """
         indices = list(whichGate)
-        gate = None
+        gate_list = []
         for index in indices:
             if index == '0':
-                gate = gates.I
+                gate_list.append(gates.I)
             elif index == '1':
-                gate = gates.Xp
+                gate_list.append(gates.Xp)
             elif index == 'X':
-                gate = gates.Y2p
+                gate_list.append(gates.Y2p)
             elif index == 'Y':
-                gate = gates.X2m
+                gate_list.append(gates.X2m)
             else:
                 raise ValueError("Gate should be in ['0', '1', 'X', or 'Y']")
 
-        return gate
+        return gate_list
 
 
 class StateTomography(object):
