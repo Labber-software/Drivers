@@ -199,7 +199,7 @@ class Driver(LabberDriver):
         elif quant.name == 'Trace - Readout I':
             value = self.waveforms['readout_iq'].real
         elif quant.name == 'Trace - Readout Q':
-            value = self.waveforms['readout_iq'].imag,
+            value = self.waveforms['readout_iq'].imag
 
         # return data as dict with sampling information
         dt = 1 / self.sequence_to_waveforms.sample_rate
