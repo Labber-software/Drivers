@@ -17,7 +17,7 @@ SEQUENCES = {'Rabi': Rabi,
              'Pulse train': PulseTrain,
              '1-QB Randomized Benchmarking': SingleQubit_RB,
              '2-QB Randomized Benchmarking': TwoQubit_RB,
-             'Spin-locking' : SpinLocking,
+             'Spin-locking': SpinLocking,
              'Custom': type(None)}
 
 
@@ -130,7 +130,8 @@ class Driver(LabberDriver):
                     self.waveforms = dict()
                     n_qubit = self.sequence.n_qubit
                     # Align RB waveforms to end
-                    align_RB_to_end = config.get('Align RB waveforms to end', False)
+                    align_RB_to_end = config.get('Align RB waveforms to end',
+                                                 False)
                     # start with xy, z and gate waveforms, list of data
                     for key in ['xy', 'z', 'gate']:
                         # get size of longest waveform

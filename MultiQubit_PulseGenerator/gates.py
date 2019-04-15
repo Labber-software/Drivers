@@ -18,17 +18,17 @@ class BaseGate:
         return pulse
 
 
-class OneQubitGate():
+class OneQubitGate(BaseGate):
     def number_of_qubits(self):
         return 1
 
 
-class TwoQubitGate():
+class TwoQubitGate(BaseGate):
     def number_of_qubits(self):
         return 2
 
 
-class SingleQubitXYRotation(BaseGate, OneQubitGate):
+class SingleQubitXYRotation(OneQubitGate):
     """Single qubit rotations around the XY axes.
 
     Angles defined as in https://en.wikipedia.org/wiki/Bloch_sphere.
@@ -60,7 +60,7 @@ class SingleQubitXYRotation(BaseGate, OneQubitGate):
         return self.__str__()
 
 
-class SingleQubitZRotation(BaseGate, OneQubitGate):
+class SingleQubitZRotation(OneQubitGate):
     """Single qubit rotation around the Z axis.
 
     Parameters
@@ -80,7 +80,7 @@ class SingleQubitZRotation(BaseGate, OneQubitGate):
         return pulse
 
 
-class IdentityGate(BaseGate, OneQubitGate):
+class IdentityGate(OneQubitGate):
     """Identity gate.
 
     Does nothing to the qubit. The width can be specififed to
@@ -108,18 +108,18 @@ class IdentityGate(BaseGate, OneQubitGate):
         return pulse
 
 
-class VirtualZGate(BaseGate, OneQubitGate):
+class VirtualZGate(OneQubitGate):
     """Virtual Z Gate."""
 
     def __init__(self, theta):
         self.theta = theta
 
 
-class CPHASE(BaseGate, TwoQubitGate):
+class CPHASE(TwoQubitGate):
     """ CPHASE gate. """
 
 
-class ReadoutGate(BaseGate, OneQubitGate):
+class ReadoutGate(OneQubitGate):
     """Readouts the qubit state."""
 
 
@@ -137,7 +137,7 @@ class CustomGate(BaseGate):
         self.pulse = pulse
 
 
-class RabiGate(BaseGate, OneQubitGate):
+class RabiGate(SingleQubitXYRotation):
     """Creates the Rabi gate used in the spin-locking sequence.
 
     Parameters

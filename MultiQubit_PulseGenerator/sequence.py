@@ -17,7 +17,6 @@ log = logging.getLogger('LabberDriver')
 # TODO Reduce calc of CZ by finding all unique TwoQubitGates in seq and calc.
 # TODO Make I(width=None) have the width of the longest gate in the step
 # TODO Add checks so that not both t0 and dt are given
-# TODO test demod with some data
 # TODO Two composite gates should be able to be parallell
 # TODO check number of qubits in seq and in gate added to seq
 # TODO Remove pulse from I gates
@@ -124,6 +123,7 @@ class Step:
         self.t_end += shift
 
     def _qubit_in_step(self, qubit):
+        """Returns whatever the given qubit is in the step or not. """
         if not isinstance(qubit, int):
             raise ValueError("Qubit index should be int.")
 
@@ -331,9 +331,6 @@ class Sequence:
         """
         step = Step(t0=t0, dt=dt, align=align)
         if isinstance(gate, list):
-            if len(gate) == 1:
-                raise ValueError(
-                    "For single gates, don't provide gate as a list.")
             if not isinstance(qubit, list):
                 raise ValueError(
                     """Provide qubit indices as a list when adding more than
@@ -376,10 +373,6 @@ class Sequence:
 
         qubit = list(range((self.n_qubit)))
         gate = [gate for n in range(self.n_qubit)]
-        # Single qubit gates shouldn't be lists
-        if len(qubit) == 1:
-            qubit = qubit[0]
-            gate = gate[0]
         self.add_gate(qubit, gate, t0=t0, dt=dt, align=align)
 
     def add_gates(self, gates):
@@ -416,10 +409,6 @@ class Sequence:
         for gate in gates:
             # add gate to specific qubit waveform
             qubit = list(range(len(gate)))
-            # Single qubit gates shouldn't be lists
-            if len(qubit) == 1:
-                qubit = qubit[0]
-                gate = gate[0]
             self.add_gate(qubit, gate)
 
     def set_parameters(self, config={}):
@@ -695,8 +684,6 @@ class SequenceToWaveforms:
             pulse = gate.get_adjusted_pulse(self.pulses_1qb_z[qubit])
         elif isinstance(gate, gates.IdentityGate):
             pulse = gate.get_adjusted_pulse(self.pulses_1qb_xy[qubit])
-        elif isinstance(gate, gates.RabiGate):
-            pulse = gate.get_adjusted_pulse(self.pulses_1qb_xy[qubit])
         elif isinstance(gate, gates.TwoQubitGate):
             pulse = gate.get_adjusted_pulse(self.pulses_2qb[qubit[0]])
         elif isinstance(gate, gates.ReadoutGate):
@@ -956,8 +943,7 @@ class SequenceToWaveforms:
                     if self.compensate_crosstalk:
                         crosstalk = self._crosstalk.compensation_matrix[:,
                                                                         qubit]
-                elif isinstance(gate_obj,
-                                (gates.SingleQubitXYRotation, gates.RabiGate)):
+                elif isinstance(gate_obj, gates.SingleQubitXYRotation):
                     waveform = self._wave_xy[qubit]
                     delay = self.wave_xy_delays[qubit]
                 elif isinstance(gate_obj, gates.ReadoutGate):
@@ -1012,7 +998,8 @@ class SequenceToWaveforms:
                         scaling_factor = float(crosstalk[q, 0])
                         if q != qubit:
                             scaling_factor = -scaling_factor
-                        waveform[indices] += (scaling_factor
+                        waveform[indices] += (
+                            scaling_factor
                             * gate.pulse.calculate_waveform(t0, t))
                 else:
                     # calculate the pulse waveform for the selected indices

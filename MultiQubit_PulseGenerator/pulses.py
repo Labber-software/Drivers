@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
 import logging
+import copy
 log = logging.getLogger('LabberDriver')
 
 # TODO Private methods and variables
@@ -318,12 +319,23 @@ class CZ(Pulse):
 
 
 class NetZero(CZ):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self.slepian = None
+
     def total_duration(self):
-        return 2*super().total_duration()
+        return 2*self.slepian.total_duration()
+
+    def calculate_cz_waveform(self):
+        self.slepian = CZ()
+        self.slepian.__dict__ = copy.copy(self.__dict__)
+        self.slepian.width /= 2
+        self.slepian.plateau /= 2
+        self.slepian.calculate_cz_waveform()
 
     def calculate_envelope(self, t0, t):
-        return (super().calculate_envelope(t0-self.total_duration()/4, t) -
-                super().calculate_envelope(t0+self.total_duration()/4, t))
+        return (self.slepian.calculate_envelope(t0-self.total_duration()/4, t) -
+                self.slepian.calculate_envelope(t0+self.total_duration()/4, t))
 
 
 if __name__ == '__main__':
