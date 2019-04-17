@@ -266,7 +266,8 @@ class CZ(Pulse):
                     t[i] - t0 + self.width / 2 - self.plateau / 2, self.t_tau,
                     self.theta_tau)
 
-        df = self.Coupling * (1 / np.tan(theta_t) - 1 / np.tan(self.theta_i))
+        df = 2*self.Coupling * (1 / np.tan(theta_t) - 1 / np.tan(self.theta_i))
+        # df = 2*self.Coupling * (1 / np.tan(theta_t))
         if self.qubit is None:
             # Use linear dependence if no qubit was given
             values = df / self.dfdV
@@ -283,14 +284,15 @@ class CZ(Pulse):
         # "Fast adiabatic qubit gates using only sigma_z control"
         # PRA 90, 022307 (2014)
         # Initial and final angles on the |11>-|02> bloch sphere
-        self.theta_i = np.arctan(self.Coupling / self.Offset)
-        self.theta_f = np.arctan(self.Coupling / self.amplitude)
+        self.theta_i = np.arctan(2*self.Coupling / self.Offset)
+        self.theta_f = np.arctan(2*self.Coupling / self.amplitude)
         log.log(msg="calc", level=30)
 
-        # Normalize fouriere coefficients to initial and final angles
-        Lcoeff = self.Lcoeff * (
-            (self.theta_f - self.theta_i) /
-            (2 * np.sum(self.Lcoeff[range(0, self.F_Terms, 2)])))
+        # Renormalize fourier coefficients to initial and final angles
+        # Consistent with both Martinis & Geller and DiCarlo 1903.02492
+        Lcoeff = self.Lcoeff
+        Lcoeff[0] =  ((self.theta_f - self.theta_i) / 2) \
+                        - np.sum(self.Lcoeff[range(2, self.F_Terms, 2)])
 
         # defining helper variabels
         n = np.arange(1, self.F_Terms + 1, 1)
@@ -299,14 +301,18 @@ class CZ(Pulse):
         # Calculate pulse width in tau variable - See paper for details
         tau = np.linspace(0, 1, n_points)
         self.theta_tau = np.zeros(n_points)
+        # This corresponds to the sum in Eq. (15) in Martinis & Geller
         for i in range(n_points):
             self.theta_tau[i] = (np.sum(
                 (Lcoeff * (1 - np.cos(2 * np.pi * n * tau[i])))) +
                                  self.theta_i)
+        # Now calculate t_tau according to Eq. (20)
         t_tau = np.trapz(np.sin(self.theta_tau), x=tau)
+        # Find the width in units of tau:
         Width_tau = self.width / t_tau
 
         # Calculating angle and time as functions of tau
+        # we normalize to width_tau (calculated above)
         tau = np.linspace(0, Width_tau, n_points)
         self.t_tau = np.zeros(n_points)
         for i in range(n_points):
