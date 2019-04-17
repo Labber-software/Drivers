@@ -112,7 +112,7 @@ class ProcessTomography(object):
             else:
                 raise ValueError("Gate should be in ['0', '1', 'X', or 'Y']")
 
-        return gate_list
+        return gate
 
 
 class StateTomography(object):
