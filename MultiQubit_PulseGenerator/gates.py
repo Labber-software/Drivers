@@ -17,6 +17,9 @@ class BaseGate:
         pulse = copy(pulse)
         return pulse
 
+    def __repr__(self):
+        return self.__str__()
+
 
 class OneQubitGate(BaseGate):
     def number_of_qubits(self):
@@ -42,9 +45,10 @@ class SingleQubitXYRotation(OneQubitGate):
 
     """
 
-    def __init__(self, phi, theta):
+    def __init__(self, phi, theta, name=None):
         self.phi = phi
         self.theta = theta
+        self.name = name
 
     def get_adjusted_pulse(self, pulse):
         pulse = copy(pulse)
@@ -54,10 +58,20 @@ class SingleQubitXYRotation(OneQubitGate):
         return pulse
 
     def __str__(self):
-        return "Phi: {}, theta: {}".format(self.phi, self.theta)
+        if self.name is None:
+            return "XY Phi={:+.2f} theta={:+.2f}".format(self.phi, self.theta)
+        else:
+            return self.name
 
-    def __repr__(self):
-        return self.__str__()
+    def __eq__(self, other):
+        threshold = 1e-10
+        if not isinstance(other, SingleQubitXYRotation):
+            return False
+        if np.abs(self.phi - other.phi) > threshold:
+            return False
+        if np.abs(self.theta - other.theta) > threshold:
+            return False
+        return True
 
 
 class SingleQubitZRotation(OneQubitGate):
@@ -70,14 +84,29 @@ class SingleQubitZRotation(OneQubitGate):
 
     """
 
-    def __init__(self, theta):
+    def __init__(self, theta, name=None):
         self.theta = theta
+        self.name = name
 
     def get_adjusted_pulse(self, pulse):
         pulse = copy(pulse)
         # pi pulse correspond to the full amplitude
         pulse.amplitude *= self.theta / np.pi
         return pulse
+
+    def __str__(self):
+        if self.name is None:
+            return "Z theta={:+.2f}".format(self.theta)
+        else:
+            return self.name
+
+    def __eq__(self, other):
+        threshold = 1e-10
+        if not isinstance(other, SingleQubitZRotation):
+            return False
+        if np.abs(self.theta - other.theta) > threshold:
+            return False
+        return True
 
 
 class IdentityGate(OneQubitGate):
@@ -107,12 +136,30 @@ class IdentityGate(OneQubitGate):
             pulse.plateau = self.width
         return pulse
 
+    def __str__(self):
+        return "I"
+
 
 class VirtualZGate(OneQubitGate):
     """Virtual Z Gate."""
 
-    def __init__(self, theta):
+    def __init__(self, theta, name=None):
         self.theta = theta
+        self.name = name
+
+    def __eq__(self, other):
+        threshold = 1e-10
+        if not isinstance(other, VirtualZGate):
+            return False
+        if np.abs(self.theta - other.theta) > threshold:
+            return False
+        return True
+
+    def __str__(self):
+        if self.name is None:
+            return "VZ theta={:+.2f}".format(self.theta)
+        else:
+            return self.name
 
 
 class CPHASE(TwoQubitGate):
@@ -175,9 +222,10 @@ class CompositeGate:
 
     """
 
-    def __init__(self, n_qubit):
+    def __init__(self, n_qubit, name=None):
         self.n_qubit = n_qubit
         self.sequence = []
+        self.name = name
 
     def add_gate(self, gate, qubit=None):
         """Add a set of gates to the given qubit.
@@ -234,6 +282,15 @@ class CompositeGate:
     def __len__(self):
         return len(self.sequence)
 
+    def __str__(self):
+        if self.name is not None:
+            return self.name
+        else:
+            super().__str__()
+
+    def __repr__(self):
+        return self.__str__()
+
 
 class CPHASE_with_1qb_phases(CompositeGate):
     """CPHASE gate followed by single qubit Z rotations.
@@ -265,33 +322,36 @@ class CPHASE_with_1qb_phases(CompositeGate):
         """
         self.__init__(phi1, phi2)
 
+    def __str__(self):
+        return "CZ"
+
 
 I = IdentityGate(width=None)
 I0 = IdentityGate(width=0)
 
 # X gates
-Xp = SingleQubitXYRotation(phi=0, theta=np.pi)
-Xm = SingleQubitXYRotation(phi=0, theta=-np.pi)
-X2p = SingleQubitXYRotation(phi=0, theta=np.pi / 2)
-X2m = SingleQubitXYRotation(phi=0, theta=-np.pi / 2)
+Xp = SingleQubitXYRotation(phi=0, theta=np.pi, name='Xp')
+Xm = SingleQubitXYRotation(phi=0, theta=-np.pi, name='Xm')
+X2p = SingleQubitXYRotation(phi=0, theta=np.pi / 2, name='X2p')
+X2m = SingleQubitXYRotation(phi=0, theta=-np.pi / 2, name='X2m')
 
 # Y gates
-Yp = SingleQubitXYRotation(phi=np.pi / 2, theta=np.pi)
-Ym = SingleQubitXYRotation(phi=np.pi / 2, theta=-np.pi)
-Y2m = SingleQubitXYRotation(phi=np.pi / 2, theta=-np.pi / 2)
-Y2p = SingleQubitXYRotation(phi=np.pi / 2, theta=np.pi / 2)
+Yp = SingleQubitXYRotation(phi=np.pi / 2, theta=np.pi, name='Yp')
+Ym = SingleQubitXYRotation(phi=np.pi / 2, theta=-np.pi, name='Ym')
+Y2m = SingleQubitXYRotation(phi=np.pi / 2, theta=-np.pi / 2, name='Y2m')
+Y2p = SingleQubitXYRotation(phi=np.pi / 2, theta=np.pi / 2, name='Y2p')
 
 # Z gates
-Zp = SingleQubitZRotation(np.pi)
-Z2p = SingleQubitZRotation(np.pi / 2)
-Zm = SingleQubitZRotation(-np.pi)
-Z2m = SingleQubitZRotation(-np.pi / 2)
+Zp = SingleQubitZRotation(np.pi, name='Zp')
+Z2p = SingleQubitZRotation(np.pi / 2, name='Z2p')
+Zm = SingleQubitZRotation(-np.pi, name='Zm')
+Z2m = SingleQubitZRotation(-np.pi / 2, name='Z2m')
 
 # Virtual Z gates
-VZp = VirtualZGate(np.pi)
-VZ2p = VirtualZGate(np.pi / 2)
-VZm = VirtualZGate(-np.pi)
-VZ2m = VirtualZGate(np.pi / 2)
+VZp = VirtualZGate(np.pi, name='VZp')
+VZ2p = VirtualZGate(np.pi / 2, name='VZ2p')
+VZm = VirtualZGate(-np.pi, name='VZm')
+VZ2m = VirtualZGate(np.pi / 2, name='VZ2m')
 
 # two-qubit gates
 CPh = CPHASE()
@@ -304,14 +364,14 @@ CZEcho.add_gate([Xp, Xp])
 CZEcho.add_gate(CPh)
 CZEcho.add_gate([X2p, Xp])
 
-H = CompositeGate(n_qubit=1)
+H = CompositeGate(n_qubit=1, name='H')
 H.add_gate(VZp)
 H.add_gate(Y2p)
 
 CZ = CPHASE_with_1qb_phases(
     0, 0)  # Start with 0, 0 as the single qubit phase shifts.
 
-CNOT = CompositeGate(n_qubit=2)
+CNOT = CompositeGate(n_qubit=2, name='CNOT')
 CNOT.add_gate(H, 1)
 CNOT.add_gate(CZ, [0, 1])
 CNOT.add_gate(H, 1)
