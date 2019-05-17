@@ -49,6 +49,7 @@ class Driver(LabberDriver):
             qubit = int(quant.name[-1])
             state = int(self.getValue('Training, input state'))
             # store training data data
+            self.log(len(self.training_data), len(self.training_data[0]), len(self.training_data[1]))
             if self.getValue('Training type') == 'Specific qubit':
                 # training specific qubit, only store if match
                 if qubit == int(self.getValue('Training, qubit')):
@@ -145,6 +146,7 @@ class Driver(LabberDriver):
 
         # train for all active qubits
         self.svm = []
+        self.log('A:', len(self.training_data), len(self.training_data[0]), len(self.training_data[1]))
         for qubit, data in enumerate(self.training_data):
             # initialize training data
             n_data = 0

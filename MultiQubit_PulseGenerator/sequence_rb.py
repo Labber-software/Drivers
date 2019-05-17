@@ -411,7 +411,12 @@ class SingleQubit_RB(Sequence):
                     # If interleave gate,
                     if interleave is True:
                         self.prev_interleaved_gate = interleaved_gate
-                        single_gate_seq.append(getattr(gates, interleaved_gate))
+
+                        # To step over "Reference Randomized Benchmarking" 05/15/2019
+                        if interleaved_gate == 'Ref':
+                            pass
+                        else:
+                            single_gate_seq.append(getattr(gates, interleaved_gate))
 
                 recovery_gate = self.get_recovery_gate(single_gate_seq)
 
@@ -624,8 +629,12 @@ class TwoQubit_RB(Sequence):
                         # TBA: adjust the duration of I gates?
                         # log.info('Qubits to benchmark: ' + str(qubits_to_benchmark))
                         # gate = gates.I(width = self.pulses_2qb[qubit]).value
-                        cliffordSeq1.append(gates.I)
-                        cliffordSeq2.append(gates.I)
+                        I_2QB = gates.IdentityGate(width =config.get('Width, 2QB'))
+
+                        cliffordSeq1.append(I_2QB)
+                        cliffordSeq2.append(I_2QB)
+                        # cliffordSeq1.append(gates.I)
+                        # cliffordSeq2.append(gates.I)
 
 
             # remove redundant Identity gates for cliffordSeq1
@@ -655,6 +664,11 @@ class TwoQubit_RB(Sequence):
             gateSeq1.extend(recoverySeq1)
             gateSeq2.extend(cliffordSeq2)
             gateSeq2.extend(recoverySeq2)
+
+            # Avoid Error: zero-size array to reduction operation maximum which has no identity (05/05/2019)
+            if (gateSeq1 == [] and gateSeq2 == []):
+                gateSeq1.append(gates.I)
+                gateSeq2.append(gates.I)
 
             # test the recovery gate
             psi_gnd = np.matrix('1; 0; 0; 0') # ground state |00>

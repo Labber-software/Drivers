@@ -171,6 +171,7 @@ class Sequence:
     def __init__(self, n_qubit):
         self.n_qubit = n_qubit
 
+        # log.info('initiating empty seqence list')
         self.sequence_list = []
 
         # process tomography
@@ -352,11 +353,17 @@ class Sequence:
                     raise ValueError(
                         "For single gates, give qubit as int (not list).")
             step.add_gate(qubit, gate)
+            # log.info('adding gate {} to {}. 2qb gate: {}'.format(gate, qubit, isinstance(gate, gates.TwoQubitGate)))
 
         if index is None:
             self.sequence_list.append(step)
+            # log.info('adding step to sequence list')
+            # log.info('sequence len is {}'.format(len(self.sequence_list)))
         else:
             self.sequence_list.insert(index + 1, step)
+            # log.info('inserting step in sequence list')
+            # log.info('sequence len is {}'.format(len(self.sequence_list)))
+
 
     def add_gate_to_all(self, gate, t0=None, dt=None, align='center'):
         """Add a single gate to all qubits.
@@ -509,6 +516,7 @@ class SequenceToWaveforms:
         self._wave_xy = [
             np.zeros(0, dtype=np.complex) for n in range(self.n_qubit)
         ]
+        # log.info('_wave_z initiated to 0s')
         self._wave_z = [np.zeros(0) for n in range(self.n_qubit)]
         self._wave_gate = [np.zeros(0) for n in range(self.n_qubit)]
 
@@ -567,13 +575,25 @@ class SequenceToWaveforms:
         """
         self.sequence = sequence
         self.sequence_list = sequence.sequence_list
+        # log.info('Start of get_waveforms. Len sequence list: {}'.format(len(self.sequence_list)))
+        # log.info('Point 1: Sequence_list[3].gates = {}'.format(self.sequence_list[3].gates))
 
         if not self.simultaneous_pulses:
             self._seperate_gates()
+        # log.info('Point 2: Sequence_list[6].gates = {}'.format(self.sequence_list[6].gates))
+
         self._explode_composite_gates()
+        # log.info('Point 3: Sequence_list[6].gates = {}'.format(self.sequence_list[6].gates))
+
         self._add_pulses_and_durations()
+        # log.info('Point 4: Sequence_list[6].gates = {}'.format(self.sequence_list[6].gates))
+
         self._add_timings()
+        # log.info('Point 5: Sequence_list[6].gates = {}'.format(self.sequence_list[6].gates))
+
         self._init_waveforms()
+        # log.info('Point 6: Sequence_list[6].gates = {}'.format(self.sequence_list[6].gates))
+
 
         if self.align_to_end:
             shift = self._round((self.n_pts - 2) / self.sample_rate -
@@ -592,6 +612,7 @@ class SequenceToWaveforms:
             for n in range(1, self.n_qubit):
                 self._wave_xy[n][:] = 0.0
 
+        # log.info('before predistortion, _wave_z max is {}'.format(np.max(self._wave_z)))
         # if self.compensate_crosstalk:
         #     self._perform_crosstalk_compensation()
         if self.perform_predistortion:
@@ -613,6 +634,8 @@ class SequenceToWaveforms:
         waveforms['gate'] = self._wave_gate
         waveforms['readout_trig'] = self.readout_trig
         waveforms['readout_iq'] = self.readout_iq
+
+        # log.info('returning z waveforms in get_waveforms. Max is {}'.format(np.max(waveforms['z'])))
         return waveforms
 
     def _seperate_gates(self):
@@ -626,11 +649,13 @@ class SequenceToWaveforms:
                 new_sequences.append(step)
                 continue
             for gate in step.gates:
+                # log.info('In seperate gates, handling gate {}'.format(gate))
                 if gate.gate is not None:
                     new_step = Step(
                         t0=step.t_start, dt=step.dt, align=step.align)
                     new_step.add_gate(gate.qubit, gate.gate)
                     new_sequences.append(new_step)
+        # log.info('New sequence [6] is {}'.format(new_sequences[6].gates))
         self.sequence_list = new_sequences
 
     def _add_timings(self):
@@ -723,6 +748,7 @@ class SequenceToWaveforms:
             while i < len(step.gates):
                 gate = step.gates[i]
                 if isinstance(gate.gate, gates.CompositeGate):
+                    # # log.info('In exploded composite, handling composite gate {} at step {}'.format(gate, n))
                     for m, g in enumerate(gate.gate.sequence):
                         new_gate = [x.gate for x in g.gates]
                         # Single gates shouldn't be lists
@@ -745,11 +771,13 @@ class SequenceToWaveforms:
                         # Single qubit shouldn't be lists
                         if len(new_qubit) == 1:
                             new_qubit = new_qubit[0]
-
+                        # # log.info('In explode composite; modifying {} by adding gate {} at index {}'.format(gate, new_gate, n+m))
                         self.sequence.add_gate(
                             new_qubit, new_gate, index=n + m)
 
                     del step.gates[i]
+                    # # log.info('In composite gates, removing step {}', i)
+
                     continue
                 i = i + 1
             n = n + 1
@@ -760,8 +788,12 @@ class SequenceToWaveforms:
             step = self.sequence_list[i]
             if len(step.gates) == 0:
                 del self.sequence_list[i]
+                # log.info('In composite gates, removing step {}', i)
                 continue
             i = i + 1
+
+        # for i, step in enumerate(self.sequence_list):
+            # log.info('At end of explode, step {} is {}'.format(i, step.gates))
 
     def _perform_virtual_z(self):
         """Shifts the phase of pulses subsequent to virtual z gates."""
@@ -898,6 +930,7 @@ class SequenceToWaveforms:
                 self.n_pts += 1
         for n in range(self.n_qubit):
             self._wave_xy[n] = np.zeros(self.n_pts, dtype=np.complex)
+            # log.info('wave z {} initiated to 0'.format(n))
             self._wave_z[n] = np.zeros(self.n_pts, dtype=float)
             self._wave_gate[n] = np.zeros(self.n_pts, dtype=float)
 
@@ -922,12 +955,16 @@ class SequenceToWaveforms:
 
     def _generate_waveforms(self):
         """Generate the waveforms corresponding to the sequence."""
+        # log.info('generating waveform from sequence. Len is {}'.format(len(self.sequence_list)))
         for step in self.sequence_list:
+            # log.info('Generating gates {}'.format(step.gates))
             for gate in step.gates:
                 qubit = gate.qubit
                 if isinstance(qubit, list):
                     qubit = qubit[0]
                 gate_obj = gate.gate
+
+
                 if isinstance(gate_obj,
                               (gates.IdentityGate, gates.VirtualZGate)):
                     continue
@@ -938,6 +975,7 @@ class SequenceToWaveforms:
                         crosstalk = self._crosstalk.compensation_matrix[:,
                                                                         qubit]
                 elif isinstance(gate_obj, gates.TwoQubitGate):
+                    # log.info('adding 2qb gate waveforms')
                     waveform = self._wave_z[qubit]
                     delay = self.wave_z_delays[qubit]
                     if self.compensate_crosstalk:

@@ -89,6 +89,8 @@ class ProcessTomography(object):
             gate = self.gate_from_index(whichGate)
 
             sequence.add_gate([qubitID1, qubitID2], gate)
+            # sequence.add_gate(qubitID1, gate)
+            # sequence.add_gate(qubitID2, gate)
 
     def gate_from_index(self, whichGate):
         """Help function to translate prepulse index into gate.
@@ -98,19 +100,35 @@ class ProcessTomography(object):
             Elements of list should be in ['0', '1', 'X', 'Y'],
             indicating which state to prepare
         """
-        indices = list(whichGate)
-        gate = None
-        for index in indices:
-            if index == '0':
-                gate = gates.I
-            elif index == '1':
-                gate = gates.Xp
-            elif index == 'X':
-                gate = gates.Y2p
-            elif index == 'Y':
-                gate = gates.X2m
-            else:
-                raise ValueError("Gate should be in ['0', '1', 'X', or 'Y']")
+
+        if self.tomography_scheme == 'Single qubit':
+            indices = list(whichGate)
+            gate = None
+            for index in indices:
+                if index == '0':
+                    gate = gates.I
+                elif index == '1':
+                    gate = gates.Xp
+                elif index == 'X':
+                    gate = gates.Y2p
+                elif index == 'Y':
+                    gate = gates.X2m
+                else:
+                    raise ValueError("Gate should be in ['0', '1', 'X', or 'Y']")
+        else:
+            indices = list(whichGate)
+            gate = []
+            for index in indices:
+                if index == '0':
+                    gate.append(gates.I)
+                elif index == '1':
+                    gate.append(gates.Xp)
+                elif index == 'X':
+                    gate.append(gates.Y2p)
+                elif index == 'Y':
+                    gate.append(gates.X2m)
+                else:
+                    raise ValueError("Gate should be in ['0', '1', 'X', or 'Y']")
 
         return gate
 

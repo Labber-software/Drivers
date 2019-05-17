@@ -10,6 +10,8 @@ from BaseDriver import LabberDriver
 from sequence_builtin import CPMG, PulseTrain, Rabi, SpinLocking
 from sequence_rb import SingleQubit_RB, TwoQubit_RB
 from sequence import SequenceToWaveforms
+import logging
+log = logging.getLogger('LabberDriver')
 
 # dictionary with built-in sequences
 SEQUENCES = {'Rabi': Rabi,
@@ -116,6 +118,7 @@ class Driver(LabberDriver):
 
                 # check if calculating multiple sequences, for randomization
                 if config.get('Output multiple sequences', False):
+
                     # create multiple randomizations, store in memory
                     n_call = int(config.get('Number of multiple sequences', 1))
                     calls = []
@@ -137,6 +140,8 @@ class Driver(LabberDriver):
                         # get size of longest waveform
                         self.waveforms[key] = []
                         for n in range(n_qubit):
+                            log.info('Generating {} waveform for qubit {}'.format(key, n))
+
                             length = max([len(call[key][n]) for call in calls])
                             # build matrix
                             datatype = calls[0][key][n].dtype
@@ -162,8 +167,10 @@ class Driver(LabberDriver):
 
                 else:
                     # normal operation, calcluate waveforms
+                    log.info('generating case 2')
                     self.waveforms = self.sequence_to_waveforms.get_waveforms(
                         self.sequence.get_sequence(config))
+                    log.info('Z waveform max: {}'.format(np.max(self.waveforms['z'])))
             # get correct data from waveforms stored in memory
             value = self.getWaveformFromMemory(quant)
         else:

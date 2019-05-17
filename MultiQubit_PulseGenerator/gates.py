@@ -268,6 +268,7 @@ class CPHASE_with_1qb_phases(CompositeGate):
 
 I = IdentityGate(width=None)
 I0 = IdentityGate(width=0)
+Ilong = IdentityGate(width=75e-9)
 
 # X gates
 Xp = SingleQubitXYRotation(phi=0, theta=np.pi)
