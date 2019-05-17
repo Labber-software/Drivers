@@ -243,10 +243,6 @@ class CZ(Pulse):
         return self.width+self.plateau
 
     def calculate_envelope(self, t0, t):
-        # notation and calculations are based on
-        # "Fast adiabatic qubit gates using only sigma_z control"
-        # PRA 90, 022307 (2014)
-
         if self.t_tau is None:
             self.calculate_cz_waveform()
 
@@ -267,15 +263,15 @@ class CZ(Pulse):
                     self.theta_tau)
 
         df = 2*self.Coupling * (1 / np.tan(theta_t) - 1 / np.tan(self.theta_i))
-        # df = 2*self.Coupling * (1 / np.tan(theta_t))
+
         if self.qubit is None:
             # Use linear dependence if no qubit was given
             values = df / self.dfdV
         else:
             values = self.qubit.df_to_dV(df)
         if self.negative_amplitude is True:
-            # if negative amplitude is needed
             values = -values
+
         return values
 
     def calculate_cz_waveform(self):
@@ -291,8 +287,8 @@ class CZ(Pulse):
         # Renormalize fourier coefficients to initial and final angles
         # Consistent with both Martinis & Geller and DiCarlo 1903.02492
         Lcoeff = self.Lcoeff
-        Lcoeff[0] =  ((self.theta_f - self.theta_i) / 2) \
-                        - np.sum(self.Lcoeff[range(2, self.F_Terms, 2)])
+        Lcoeff[0] = (((self.theta_f - self.theta_i) / 2)
+                     - np.sum(self.Lcoeff[range(2, self.F_Terms, 2)]))
 
         # defining helper variabels
         n = np.arange(1, self.F_Terms + 1, 1)
@@ -303,25 +299,22 @@ class CZ(Pulse):
         self.theta_tau = np.zeros(n_points)
         # This corresponds to the sum in Eq. (15) in Martinis & Geller
         for i in range(n_points):
-            self.theta_tau[i] = (np.sum(
-                (Lcoeff * (1 - np.cos(2 * np.pi * n * tau[i])))) +
-                                 self.theta_i)
+            self.theta_tau[i] = (
+                np.sum(Lcoeff * (1 - np.cos(2 * np.pi * n * tau[i]))) +
+                self.theta_i)
         # Now calculate t_tau according to Eq. (20)
         t_tau = np.trapz(np.sin(self.theta_tau), x=tau)
         # Find the width in units of tau:
         Width_tau = self.width / t_tau
 
-        # Calculating angle and time as functions of tau
+        # Calculating time as functions of tau
         # we normalize to width_tau (calculated above)
         tau = np.linspace(0, Width_tau, n_points)
         self.t_tau = np.zeros(n_points)
         for i in range(n_points):
-            self.theta_tau[i] = (np.sum(
-                (Lcoeff * (1 - np.cos(2 * np.pi * n * tau[i] / Width_tau)))) +
-                                 self.theta_i)
             if i > 0:
                 self.t_tau[i] = np.trapz(
-                    np.sin(self.theta_tau[0:i]), x=tau[0:i])
+                    np.sin(self.theta_tau[0:i+1]), x=tau[0:i+1])
 
 
 class NetZero(CZ):
