@@ -531,6 +531,10 @@ class SequenceToWaveforms:
         self.gate_overlap = 20E-9
         self.minimal_gate_time = 20E-9
 
+        # filters
+        self.use_gate_filter = False
+        self.use_z_filter = False
+
         # readout trig settings
         self.readout_trig_generate = False
 
@@ -579,6 +583,7 @@ class SequenceToWaveforms:
         self._predistort_waveforms()
         self._add_readout_trig()
         self._add_microwave_gate()
+        self._filter_output_waveforms()
 
         # Apply offsets
         self.readout_iq += self.readout_i_offset + 1j * self.readout_q_offset
@@ -778,6 +783,78 @@ class SequenceToWaveforms:
             gate[-1] = 0.0
             # store results
             self._wave_gate[n] = gate
+
+    def _filter_output_waveforms(self):
+        """Filter output waveforms"""
+        # start with gate
+        if self.use_gate_filter and self.gate_filter_size > 1:
+            # prepare filter
+            window = self._get_filter_window(
+                self.gate_filter_size, self.gate_filter,
+                self.gate_filter_kaiser_beta)
+            # apply filter to all output waveforms
+            n_wave = self.n_qubit if self.local_xy else 1
+            for n in range(n_wave):
+                self._wave_gate[n] = self._apply_window_filter(
+                    self._wave_gate[n], window)
+                # make sure gate starts/ends in 0
+                self._wave_gate[n][0] = 0.0
+                self._wave_gate[n][-1] = 0.0
+
+        # same for z waveforms
+        if self.use_z_filter and self.z_filter_size > 1:
+            # prepare filter
+            window = self._get_filter_window(
+                self.z_filter_size, self.z_filter, self.z_filter_kaiser_beta)
+            # apply filter to all output waveforms
+            for n in range(self.n_qubit):
+                self._wave_z[n] = self._apply_window_filter(
+                    self._wave_z[n], window)
+
+    def _get_filter_window(self, size=11, window='Kaiser', kaiser_beta=14.0):
+        """Get filter for waveform convolution"""
+        if window == 'Rectangular':
+            w = np.ones(size)
+        elif window == 'Bartlett':
+            # for filters that start/end in zeros, add 2 points and truncate
+            w = np.bartlett(max(1, size+2))
+            w = w[1:-1]
+        elif window == 'Blackman':
+            w = np.blackman(size + 2)
+            w = w[1:-1]
+        elif window == 'Hamming':
+            w = np.hamming(size)
+        elif window == 'Hanning':
+            w = np.hanning(size + 2)
+            w = w[1:-1]
+        elif window == 'Kaiser':
+            w = np.kaiser(size, kaiser_beta)
+        else:
+            raise('Unknown filter windows function %s.' % str(window))
+        return w/w.sum()
+
+    def _apply_window_filter(self, x, window):
+        """Apply window filter to input waveform
+
+        Parameters
+        ----------
+        x: np.array
+            Input waveform.
+        window: np.array
+            Filter waveform.
+
+        Returns
+        -------
+        np.array
+            Filtered waveform.
+
+        """
+        # buffer waveform to avoid wrapping effects at boundaries
+        n = len(window)
+        s = np.r_[2*x[0] - x[n-1::-1], x, 2*x[-1] - x[-1:-n:-1]]
+        # apply convolution
+        y = np.convolve(s, window, mode='same')
+        return y[n:-n+1]
 
     def _round(self, t, acc=1E-12):
         """Round the time `t` with a certain accuarcy `acc`.
@@ -1091,6 +1168,18 @@ class SequenceToWaveforms:
         self.gate_delay = config.get('Gate delay')
         self.gate_overlap = config.get('Gate overlap')
         self.minimal_gate_time = config.get('Minimal gate time')
+
+        # filters
+        self.use_gate_filter = config.get('Filter gate waveforms', False)
+        self.gate_filter = config.get('Gate filter', 'Kaiser')
+        self.gate_filter_size = int(config.get('Gate - Filter size', 5))
+        self.gate_filter_kaiser_beta = config.get(
+            'Gate - Kaiser beta', 14.0)
+        self.use_z_filter = config.get('Filter Z waveforms', False)
+        self.z_filter = config.get('Z filter', 'Kaiser')
+        self.z_filter_size = int(config.get('Z - Filter size', 5))
+        self.z_filter_kaiser_beta = config.get(
+            'Z - Kaiser beta', 14.0)
 
         # readout
         self.readout_match_main_size = config.get(
