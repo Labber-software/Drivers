@@ -194,21 +194,27 @@ class Pulse(object):
             # PRA 90, 022307 (2014)
             # self.calculate_cz_waveform()
 
-            # Plateau is added as an extra extension of theta_f.
-            theta_t = np.ones(len(t)) * self.theta_i
-            for i in range(len(t)):
-                if 0 < (t[i] - t0 + self.plateau / 2) < self.plateau:
-                    theta_t[i] = self.theta_f
-                elif (0 < (t[i] - t0 + self.width / 2 + self.plateau / 2) <
-                        (self.width + self.plateau) / 2):
-                    theta_t[i] = np.interp(
-                        t[i] - t0 + self.width / 2 + self.plateau / 2,
-                        self.t_tau, self.theta_tau)
-                elif (0 < (t[i] - t0 + self.width / 2 + self.plateau / 2) <
-                      (self.width + self.plateau)):
-                    theta_t[i] = np.interp(
-                        t[i] - t0 + self.width / 2 - self.plateau / 2,
-                        self.t_tau, self.theta_tau)
+            if self.plateau == 0:
+                # no plateau, just interpolate from pre-calculated waveform
+                theta_t = np.interp(
+                    t - t0 + self.width/2, self.t_tau, self.theta_tau)
+
+            else:
+                # plateau is added as an extra extension of theta_f.
+                theta_t = np.ones(len(t)) * self.theta_i
+                for i in range(len(t)):
+                    if 0 < (t[i] - t0 + self.plateau / 2) < self.plateau:
+                        theta_t[i] = self.theta_f
+                    elif (0 < (t[i] - t0 + self.width / 2 + self.plateau / 2) <
+                            (self.width + self.plateau) / 2):
+                        theta_t[i] = np.interp(
+                            t[i] - t0 + self.width / 2 + self.plateau / 2,
+                            self.t_tau, self.theta_tau)
+                    elif (0 < (t[i] - t0 + self.width / 2 + self.plateau / 2) <
+                        (self.width + self.plateau)):
+                        theta_t[i] = np.interp(
+                            t[i] - t0 + self.width / 2 - self.plateau / 2,
+                            self.t_tau, self.theta_tau)
 
             df = self.Coupling * (
                 1 / np.tan(theta_t) - 1 / np.tan(self.theta_i))
@@ -222,24 +228,54 @@ class Pulse(object):
                 values = -values
 
         elif self.shape == PulseShape.COSINE:
-            tau = self.width
-            if self.plateau == 0:
-                values = (self.amplitude / 2 *
-                          (1 - np.cos(2 * np.pi * (t - t0 + tau / 2) / tau)))
-            else:
-                values = np.ones_like(t) * self.amplitude
-                values[t < t0 - self.plateau / 2] = self.amplitude / 2 * \
-                    (1 - np.cos(2 * np.pi *
-                                (t[t < t0 - self.plateau / 2] - t0 +
-                                 self.plateau / 2 + tau / 2) / tau))
-                values[t > t0 + self.plateau / 2] = self.amplitude / 2 * \
-                    (1 - np.cos(2 * np.pi *
-                                (t[t > t0 + self.plateau / 2] - t0 -
-                                 self.plateau / 2 + tau / 2) / tau))
+            values = self._calc_cosine_envelope(
+                t, t0, self.width, self.plateau, self. amplitude)
 
         # Make sure the waveform is zero outside the pulse
         values[t < (t0 - self.total_duration() / 2)] = 0
         values[t > (t0 + self.total_duration() / 2)] = 0
+        return values
+
+
+    def _calc_cosine_envelope(self, t, t0, width, plateau, amplitude=1.0):
+        """Helper function for calculating cosine envelope.
+
+        Parameters
+        ----------
+        t : numpy array
+            Array with time values for which to calculate the pulse waveform.
+
+        t0 : float
+            Pulse position, referenced to center of pulse.
+
+        width : float
+            Width of rise/fall part of the pulse.
+
+        plateau : float
+            Duration of flat part of the pulse.
+
+        amplitude : float, optional
+            Pulse amplitude.  Default is 1.0.
+
+        Returns
+        -------
+        values : numpy array
+            Array containing pulse envelope.
+
+        """
+        if plateau == 0:
+            values = (amplitude / 2 *
+                      (1 - np.cos(2 * np.pi * (t - t0 + width / 2) / width)))
+        else:
+            values = np.ones_like(t) * amplitude
+            values[t < t0 - plateau / 2] = amplitude / 2 * \
+                (1 - np.cos(2 * np.pi *
+                            (t[t < t0 - plateau / 2] - t0 +
+                                plateau / 2 + width / 2) / width))
+            values[t > t0 + plateau / 2] = amplitude / 2 * \
+                (1 - np.cos(2 * np.pi *
+                            (t[t > t0 + plateau / 2] - t0 -
+                                plateau / 2 + width / 2) / width))
         return values
 
 
