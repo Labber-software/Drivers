@@ -194,21 +194,27 @@ class Pulse(object):
             # PRA 90, 022307 (2014)
             # self.calculate_cz_waveform()
 
-            # Plateau is added as an extra extension of theta_f.
-            theta_t = np.ones(len(t)) * self.theta_i
-            for i in range(len(t)):
-                if 0 < (t[i] - t0 + self.plateau / 2) < self.plateau:
-                    theta_t[i] = self.theta_f
-                elif (0 < (t[i] - t0 + self.width / 2 + self.plateau / 2) <
-                        (self.width + self.plateau) / 2):
-                    theta_t[i] = np.interp(
-                        t[i] - t0 + self.width / 2 + self.plateau / 2,
-                        self.t_tau, self.theta_tau)
-                elif (0 < (t[i] - t0 + self.width / 2 + self.plateau / 2) <
-                      (self.width + self.plateau)):
-                    theta_t[i] = np.interp(
-                        t[i] - t0 + self.width / 2 - self.plateau / 2,
-                        self.t_tau, self.theta_tau)
+            if self.plateau == 0:
+                # no plateau, just interpolate from pre-calculated waveform
+                theta_t = np.interp(
+                    t - t0 + self.width/2, self.t_tau, self.theta_tau)
+
+            else:
+                # plateau is added as an extra extension of theta_f.
+                theta_t = np.ones(len(t)) * self.theta_i
+                for i in range(len(t)):
+                    if 0 < (t[i] - t0 + self.plateau / 2) < self.plateau:
+                        theta_t[i] = self.theta_f
+                    elif (0 < (t[i] - t0 + self.width / 2 + self.plateau / 2) <
+                            (self.width + self.plateau) / 2):
+                        theta_t[i] = np.interp(
+                            t[i] - t0 + self.width / 2 + self.plateau / 2,
+                            self.t_tau, self.theta_tau)
+                    elif (0 < (t[i] - t0 + self.width / 2 + self.plateau / 2) <
+                        (self.width + self.plateau)):
+                        theta_t[i] = np.interp(
+                            t[i] - t0 + self.width / 2 - self.plateau / 2,
+                            self.t_tau, self.theta_tau)
 
             df = self.Coupling * (
                 1 / np.tan(theta_t) - 1 / np.tan(self.theta_i))
