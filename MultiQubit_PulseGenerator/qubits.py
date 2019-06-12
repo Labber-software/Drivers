@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
+import logging
+log = logging.getLogger('LabberDriver')
 
 
 class Qubit:
@@ -104,12 +106,12 @@ class Transmon(Qubit):
 
     def f_to_V(self, f):  # noqa 102
         # Make sure frequencies are inside the possible frequency range
-        if np.any(f > 2*self.f01_max): # FACTOR OF 2 IS NASTY MK HACK TO FORCE
-            # WAVEFORM GENERATION EVEN WITH BUG IN SPECTRA DEFINITIONS.
-            # DO NOT COMMIT TO ANYWHERE WITHOUT REMOVING 2x
+        f = np.round(f) # This removes numerical issues where the 10^-6
+        # decimal place causing errors.
+        if np.any(f > self.f01_max):
             raise ValueError(
                 'Frequency requested is outside the qubit spectrum')
-        if np.any(f < self.f01_min/2):
+        if np.any(f < self.f01_min):
             raise ValueError(
                 'Frequency requested is outside the qubit spectrum')
 
