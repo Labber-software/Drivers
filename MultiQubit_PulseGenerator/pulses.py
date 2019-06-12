@@ -256,17 +256,24 @@ class CZ(Pulse):
                 theta_t[i] = np.interp(
                     t[i] - t0 + self.width / 2 + self.plateau / 2, self.t_tau,
                     self.theta_tau)
+
             elif (0 < (t[i] - t0 + self.width / 2 + self.plateau / 2) <
                   (self.width + self.plateau)):
                 theta_t[i] = np.interp(
                     t[i] - t0 + self.width / 2 - self.plateau / 2, self.t_tau,
                     self.theta_tau)
+        # Clip theta_t to remove numerical outliers:
+        theta_t = np.clip(theta_t, self.theta_i, None)
 
-        df = 2*self.Coupling * (1 / np.tan(theta_t) - 1 / np.tan(self.theta_i))
+        # From definitions: theta = arctan(2*coupling / f_absolute), we invert
+        # to find df (and subtract off the initial frequency)
+        df = 2 * self.Coupling * (1 / np.tan(theta_t)) - self.Offset
 
         if self.qubit is None:
             # Use linear dependence if no qubit was given
+            log.info('---> df (linear): ' +str(df))
             values = df / self.dfdV
+            # values = theta_t
         else:
             values = self.qubit.df_to_dV(df)
         if self.negative_amplitude is True:
@@ -304,6 +311,8 @@ class CZ(Pulse):
                 self.theta_i)
         # Now calculate t_tau according to Eq. (20)
         t_tau = np.trapz(np.sin(self.theta_tau), x=tau)
+        # log.info('t tau: ' + str(t_tau))
+        # t_tau = np.sum(np.sin(self.theta_tau))*(tau[1] - tau[0])
         # Find the width in units of tau:
         Width_tau = self.width / t_tau
 
@@ -311,11 +320,12 @@ class CZ(Pulse):
         # we normalize to width_tau (calculated above)
         tau = np.linspace(0, Width_tau, n_points)
         self.t_tau = np.zeros(n_points)
+        self.t_tau2 = np.zeros(n_points)
         for i in range(n_points):
             if i > 0:
                 self.t_tau[i] = np.trapz(
                     np.sin(self.theta_tau[0:i+1]), x=tau[0:i+1])
-
+                # self.t_tau[i] = np.sum(np.sin(self.theta_tau[0:i+1]))*(tau[1]-tau[0])
 
 class NetZero(CZ):
     def __init__(self, *args, **kwargs):

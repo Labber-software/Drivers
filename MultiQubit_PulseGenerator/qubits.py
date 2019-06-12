@@ -107,6 +107,7 @@ class Transmon(Qubit):
     def f_to_V(self, f):  # noqa 102
         # Make sure frequencies are inside the possible frequency range
         f = np.round(f) # This removes numerical issues where the 10^-6
+        log.info('---> max(f): '+str(max(f)))
         # decimal place causing errors.
         if np.any(f > self.f01_max):
             raise ValueError(
@@ -139,4 +140,7 @@ class Transmon(Qubit):
 
     def df_to_dV(self, df):  # noqa 102
         f0 = self.V_to_f(self.V0)
+        log.info('---> f0: ' + str(f0))
+        log.info('--> df: ' + str(df))
+        log.info('--> df + f0: ' + str(df+f0))
         return self.f_to_V(df + f0) - self.V0
