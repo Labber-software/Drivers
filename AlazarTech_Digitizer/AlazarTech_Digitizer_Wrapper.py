@@ -382,7 +382,7 @@ class AlazarTechDigitizer():
             bytesTransferred = 0
             #initialize data array
             nPtsOut = samplesPerRecord * nRecord
-            nAvPerBuffer = recordsPerBuffer/nRecord
+            nAvPerBuffer = int(recordsPerBuffer // nRecord)
             vData = [np.zeros(nPtsOut, dtype=float), np.zeros(nPtsOut, dtype=float)]
             #range and zero for conversion to voltages
             codeZero = 2 ** (float(self.bitsPerSample) - 1) - 0.5
