@@ -262,6 +262,8 @@ class CZ(Pulse):
                     t[i] - t0 + self.width / 2 - self.plateau / 2, self.t_tau,
                     self.theta_tau)
 
+        # clip theta_f to remove numerical outliers
+        theta_t = np.clip(theta_t, self.theta_i, None)
         df = 2*self.Coupling * (1 / np.tan(theta_t) - 1 / np.tan(self.theta_i))
 
         if self.qubit is None:
