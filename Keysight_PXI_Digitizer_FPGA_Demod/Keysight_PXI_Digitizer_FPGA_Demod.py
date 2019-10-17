@@ -354,8 +354,11 @@ class Driver(LabberDriver):
             nSeg = int(self.getValue('Number of records'))
 
         nAv = int(self.getValue('Number of averages'))
-        # trigger delay is in 1/sample rate
-        nTrigDelay = int(round(self.getValue('Trig Delay') / self.dt))
+        # trigger delay is in 1/sample rate, not available for FPGA demod
+        if self.fpga_config == 'Only signals':
+            nTrigDelay = int(round(self.getValue('Trig Delay') / self.dt))
+        else:
+            nTrigDelay = 0
         # special high-speed FPGA mode, don't convert, just transfer
         if (self.fpga_config == 'Only FPGA I/Q' and
                 self.getValue('Hide I/Q') and

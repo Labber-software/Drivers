@@ -167,10 +167,10 @@ class Driver(LabberDriver):
 
                 else:
                     # normal operation, calcluate waveforms
-                    log.info('generating case 2')
+                    # log.info('generating case 2')
                     self.waveforms = self.sequence_to_waveforms.get_waveforms(
                         self.sequence.get_sequence(config))
-                    log.info('Z waveform max: {}'.format(np.max(self.waveforms['z'])))
+                    # log.info('Z waveform max: {}'.format(np.max(self.waveforms['z'])))
             # get correct data from waveforms stored in memory
             value = self.getWaveformFromMemory(quant)
         else:

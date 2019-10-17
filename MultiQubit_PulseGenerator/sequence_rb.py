@@ -53,34 +53,34 @@ def add_singleQ_clifford(index, gate_seq, pad_with_I=True):
     elif index == 2:
         gate_seq.append(gates.Yp)
     elif index == 3:
-        gate_seq.append(gates.Xp)
         gate_seq.append(gates.Yp)
+        gate_seq.append(gates.Xp)
 
     # 2pi/3 rotations
     elif index == 4:
-        gate_seq.append(gates.Y2p)
         gate_seq.append(gates.X2p)
+        gate_seq.append(gates.Y2p)
     elif index == 5:
-        gate_seq.append(gates.Y2m)
         gate_seq.append(gates.X2p)
+        gate_seq.append(gates.Y2m)
     elif index == 6:
-        gate_seq.append(gates.Y2p)
         gate_seq.append(gates.X2m)
+        gate_seq.append(gates.Y2p)
     elif index == 7:
-        gate_seq.append(gates.Y2m)
         gate_seq.append(gates.X2m)
+        gate_seq.append(gates.Y2m)
     elif index == 8:
-        gate_seq.append(gates.X2p)
         gate_seq.append(gates.Y2p)
+        gate_seq.append(gates.X2p)
     elif index == 9:
-        gate_seq.append(gates.X2m)
         gate_seq.append(gates.Y2p)
-    elif index == 10:
-        gate_seq.append(gates.X2p)
-        gate_seq.append(gates.Y2m)
-    elif index == 11:
         gate_seq.append(gates.X2m)
+    elif index == 10:
         gate_seq.append(gates.Y2m)
+        gate_seq.append(gates.X2p)
+    elif index == 11:
+        gate_seq.append(gates.Y2m)
+        gate_seq.append(gates.X2m)
 
     # pi/2 rotations
     elif index == 12:
@@ -92,27 +92,27 @@ def add_singleQ_clifford(index, gate_seq, pad_with_I=True):
     elif index == 15:
         gate_seq.append(gates.Y2m)
     elif index == 16:
-        gate_seq.append(gates.X2p)
+        gate_seq.append(gates.X2m)
         gate_seq.append(gates.Y2p)
-        gate_seq.append(gates.X2m)
-    elif index == 17:
         gate_seq.append(gates.X2p)
-        gate_seq.append(gates.Y2m)
+    elif index == 17:
         gate_seq.append(gates.X2m)
+        gate_seq.append(gates.Y2m)
+        gate_seq.append(gates.X2p)
 
     # Hadamard-Like
     elif index == 18:
+        gate_seq.append(gates.Xp)
         gate_seq.append(gates.Y2p)
-        gate_seq.append(gates.Xp)
     elif index == 19:
-        gate_seq.append(gates.Y2m)
         gate_seq.append(gates.Xp)
+        gate_seq.append(gates.Y2m)
     elif index == 20:
+        gate_seq.append(gates.Yp)
         gate_seq.append(gates.X2p)
-        gate_seq.append(gates.Yp)
     elif index == 21:
-        gate_seq.append(gates.X2m)
         gate_seq.append(gates.Yp)
+        gate_seq.append(gates.X2m)
     elif index == 22:
         gate_seq.append(gates.X2p)
         gate_seq.append(gates.Y2p)
@@ -165,12 +165,12 @@ def add_singleQ_S1(index, gate_seq):
         gate_seq.append(gates.I)  # auxiliary
         gate_seq.append(gates.I)  # auxiliary
     elif index == 1:
-        gate_seq.append(gates.X2p)
         gate_seq.append(gates.Y2p)
+        gate_seq.append(gates.X2p)
         gate_seq.append(gates.I)  # auxiliary
     elif index == 2:
-        gate_seq.append(gates.Y2m)
         gate_seq.append(gates.X2m)
+        gate_seq.append(gates.Y2m)
         gate_seq.append(gates.I)  # auxiliary
 
 
@@ -203,13 +203,13 @@ def add_singleQ_S1_Y2p(index, gate_seq):
         gate_seq.append(gates.I)  # auxiliary
         gate_seq.append(gates.I)  # auxiliary
     elif index == 1:
-        gate_seq.append(gates.X2p)
         gate_seq.append(gates.Yp)
+        gate_seq.append(gates.X2p)
         gate_seq.append(gates.I)  # auxiliary
     elif index == 2:
-        gate_seq.append(gates.X2p)
-        gate_seq.append(gates.Y2m)
         gate_seq.append(gates.X2m)
+        gate_seq.append(gates.Y2m)
+        gate_seq.append(gates.X2p)
 
 def add_singleQ_S1_Z2p(index, gate_seq):
     """Add single qubit clifford from S1_Z2p.
@@ -217,16 +217,16 @@ def add_singleQ_S1_Z2p(index, gate_seq):
     (Z2p-like-subset of single qubit clifford group) (3)
     """
     if index == 0:
-        gate_seq.append(gates.X2p)
-        gate_seq.append(gates.Y2m)
         gate_seq.append(gates.X2m)
-    elif index == 1:
         gate_seq.append(gates.Y2m)
+        gate_seq.append(gates.X2p)
+    elif index == 1:
+        gate_seq.append(gates.Y2p)
         gate_seq.append(gates.I)  # auxiliary
         gate_seq.append(gates.I)  # auxiliary
     elif index == 2:
-        gate_seq.append(gates.Ym)
         gate_seq.append(gates.X2m)
+        gate_seq.append(gates.Ym)
         gate_seq.append(gates.I)  # auxiliary
 
 def add_singleQ_based_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
@@ -235,10 +235,12 @@ def add_singleQ_based_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
     (24*24 = 576)
     (gate_seq_1: gate seq. of qubit #1, gate_seq_t: gate seq. of qubit #2)
     """
-    index_1 = index % 24  # randomly sample from single qubit cliffords (24)
+    # randomly sample from single qubit cliffords (24)
+    index_1 = index % 24
+
     # randomly sample from single qubit cliffords (24)
     index_2 = (index // 24) % 24
-    add_singleQ_clifford(index_1, gate_seq_1, )
+    add_singleQ_clifford(index_1, gate_seq_1)
     add_singleQ_clifford(index_2, gate_seq_2)
 
 
@@ -248,33 +250,40 @@ def add_CNOT_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
     (24*24*3*3 = 5184)
     (gate_seq_1: gate seq. of qubit #1, gate_seq_t: gate seq. of qubit #2)
     """
-    index_1 = index % 3  # randomly sample from S1 (3)
-    index_2 = (index // 3) % 3  # randomly sample from S1 (3)
     # randomly sample from single qubit cliffords (24)
-    index_3 = (index // 3 // 3) % 24
+    index_1 = index % 24
+
     # randomly sample from single qubit cliffords (24)
-    index_4 = (index // 3 // 3 // 24) % 24
+    index_2 = (index // 24) % 24
+
+    # randomly sample from S1 (3)
+    index_3 = (index // 24 // 24) % 3
+
+    # randomly sample from S1_Y2p (3) or S1_Z2p (3)
+    index_4 = (index // 24 // 24 // 3) % 3
 
     generator = kwargs.get('generator', 'CZ')
     if generator == 'CZ':
-        add_singleQ_S1(index_1, gate_seq_1)
-        add_singleQ_S1_Y2p(index_2, gate_seq_2)
+        add_singleQ_clifford(index_1, gate_seq_1)
+        add_singleQ_clifford(index_2, gate_seq_2)
         gate_seq_1.append(gates.I)
         gate_seq_2.append(gates.CZ)
-        add_singleQ_clifford(index_3, gate_seq_1)
-        add_singleQ_clifford(index_4, gate_seq_2)
+        add_singleQ_S1(index_3, gate_seq_1)
+        add_singleQ_S1_Y2p(index_4, gate_seq_2)
 
     elif generator == 'iSWAP':
-        add_singleQ_S1(index_1, gate_seq_1)
-        add_singleQ_S1_Z2p(index_2, gate_seq_2)
+        add_singleQ_clifford(index_1, gate_seq_1)
+        add_singleQ_clifford(index_2, gate_seq_2)
+
         gate_seq_1.append(gates.I)
         gate_seq_2.append(gates.iSWAP)
         gate_seq_1.append(gates.X2p)
         gate_seq_2.append(gates.I)
         gate_seq_1.append(gates.I)
         gate_seq_2.append(gates.iSWAP)
-        add_singleQ_clifford(index_3, gate_seq_1)
-        add_singleQ_clifford(index_4, gate_seq_2)
+
+        add_singleQ_S1(index_3, gate_seq_1)
+        add_singleQ_S1_Z2p(index_4, gate_seq_2)
 
 
 
@@ -285,32 +294,40 @@ def add_iSWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
     (gate_seq_1: gate seq. of qubit #1, gate_seq_t: gate seq. of qubit #2)
     """
     generator = kwargs.get('generator', 'CZ')
-    index_1 = index % 3  # randomly sample from S1_Y2p (3)
-    index_2 = (index // 3) % 3  # randomly sample from S1_X2p(3)
+
     # randomly sample from single qubit cliffords (24)
-    index_3 = (index // 3 // 3) % 24
+    index_1 = index % 24
+
     # randomly sample from single qubit cliffords (24)
-    index_4 = (index // 3 // 3 // 24) % 24
+    index_2 = (index // 24) % 24
+
+    # randomly sample from S1_Y2p (3) or S1 (3)
+    index_3 = (index // 24 // 24) % 3
+
+    # randomly sample from S1_X2p (3) or S1 (3)
+    index_4 = (index // 24 // 24 // 3) % 3
+
+
 
     if generator == 'CZ':
-        add_singleQ_S1_Y2p(index_1, gate_seq_1)
-        add_singleQ_S1_X2p(index_2, gate_seq_2)
+        add_singleQ_clifford(index_1, gate_seq_1)
+        add_singleQ_clifford(index_2, gate_seq_2)
         gate_seq_1.append(gates.I)
         gate_seq_2.append(gates.CZ)
         gate_seq_1.append(gates.Y2p)
         gate_seq_2.append(gates.X2m)
         gate_seq_1.append(gates.I)
         gate_seq_2.append(gates.CZ)
-        add_singleQ_clifford(index_3, gate_seq_1)
-        add_singleQ_clifford(index_4, gate_seq_2)
+        add_singleQ_S1_Y2p(index_3, gate_seq_1)
+        add_singleQ_S1_X2p(index_4, gate_seq_2)
 
     elif generator == 'iSWAP':
-        add_singleQ_S1(index_1, gate_seq_1)
-        add_singleQ_S1(index_2, gate_seq_2)
+        add_singleQ_clifford(index_1, gate_seq_1)
+        add_singleQ_clifford(index_2, gate_seq_2)
         gate_seq_1.append(gates.I)
         gate_seq_2.append(gates.iSWAP)
-        add_singleQ_clifford(index_3, gate_seq_1)
-        add_singleQ_clifford(index_4, gate_seq_2)
+        add_singleQ_S1(index_1, gate_seq_1)
+        add_singleQ_S1(index_2, gate_seq_2)
 
 
 def add_SWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
@@ -319,12 +336,19 @@ def add_SWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
     (24*24*= 576)
     (gate_seq_1: gate seq. of qubit #1, gate_seq_t: gate seq. of qubit #2)
     """
-    index_1 = index % 24  # randomly sample from single qubit cliffords (24)
+    # randomly sample from single qubit cliffords (24)
+    index_1 = index % 24
+
     # randomly sample from single qubit cliffords (24)
     index_2 = (index // 24) % 24
+
     generator = kwargs.get('generator', 'CZ')
     if generator == 'CZ':
+        add_singleQ_clifford(index_1, gate_seq_1)
+        add_singleQ_clifford(index_2, gate_seq_2)
         gate_seq_1.append(gates.I)
+        gate_seq_2.append(gates.CZ)
+        gate_seq_1.append(gates.Y2m)
         gate_seq_2.append(gates.Y2p)
         gate_seq_1.append(gates.I)
         gate_seq_2.append(gates.CZ)
@@ -332,14 +356,14 @@ def add_SWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
         gate_seq_2.append(gates.Y2m)
         gate_seq_1.append(gates.I)
         gate_seq_2.append(gates.CZ)
-        gate_seq_1.append(gates.Y2m)
-        gate_seq_2.append(gates.Y2p)
         gate_seq_1.append(gates.I)
-        gate_seq_2.append(gates.CZ)
-        add_singleQ_clifford(index_1, gate_seq_1)
-        add_singleQ_clifford(index_2, gate_seq_2)
+        gate_seq_2.append(gates.Y2p)
 
     elif generator == 'iSWAP':
+        add_singleQ_clifford(index_1, gate_seq_1)
+        add_singleQ_clifford(index_2, gate_seq_2)
+        gate_seq_1.append(gates.I)
+        gate_seq_2.append(gates.iSWAP)
         gate_seq_1.append(gates.I)
         gate_seq_2.append(gates.X2m)
         gate_seq_1.append(gates.I)
@@ -350,10 +374,6 @@ def add_SWAP_like_twoQ_clifford(index, gate_seq_1, gate_seq_2, **kwargs):
         gate_seq_2.append(gates.iSWAP)
         gate_seq_1.append(gates.I)
         gate_seq_2.append(gates.X2m)
-        gate_seq_1.append(gates.I)
-        gate_seq_2.append(gates.iSWAP)
-        add_singleQ_clifford(index_1, gate_seq_1)
-        add_singleQ_clifford(index_2, gate_seq_2)
 
 
 class SingleQubit_RB(Sequence):
@@ -439,7 +459,11 @@ class SingleQubit_RB(Sequence):
                 single_gate_seq.append(recovery_gate)
                 multi_gate_seq.append(single_gate_seq)
             # transpose list of lists
-            multi_gate_seq = list(map(list, itertools.zip_longest(*multi_gate_seq, fillvalue=gates.I))) # Not to chop
+            # - (06/23/2019 Update) Fill identity gates to the shorter sequence at the end -> at the beginning
+            multi_gate_seq_reversed = [i[::-1] for i in multi_gate_seq]
+            multi_gate_seq_reversed_tr = list(map(list, itertools.zip_longest(*multi_gate_seq_reversed, fillvalue=gates.I))) # Not to chop
+            multi_gate_seq = multi_gate_seq_reversed_tr[::-1]
+
             self.add_gates(multi_gate_seq)
             self.prev_gate_seq = multi_gate_seq
         else:
@@ -944,63 +968,6 @@ class TwoQubit_RB(Sequence):
 
                 else:
                     return(recovery_seq_1,recovery_seq_2)
-
-        # for i in range(total_num_cliffords):
-        #     recovery_seq_1 = []
-        #     recovery_seq_2 = []
-        #     add_twoQ_clifford(i, recovery_seq_1, recovery_seq_2)
-        #     qubit_final_state = np.matmul(self.evaluate_sequence(
-        #         recovery_seq_1, recovery_seq_2), qubit_state)
-        #     if np.abs(np.abs(qubit_final_state[0]) - 1) < 1e-6:
-        #         if (find_cheapest == True):
-        #             # Less 2QB Gates, Less 1QB Gates, and More I Gates = the cheapest gates.
-        #             # The priority: less 2QB gates > less 1QB gates > more I gates
-        #             N_2QB_gate = 0
-        #             N_1QB_gate = 0
-        #             N_I_gate = 0
-
-        #             # count the numbers of the gates
-        #             for j in range(len(recovery_seq_1)):
-        #                 if (gate_seq_1[j] == gates.CZ or gate_seq_2[j] == gates.CZ):
-        #                     N_2QB_gate += 1
-        #                 else:
-        #                     N_1QB_gate += 2
-        #                 if (gate_seq_1[j] == gates.I):
-        #                     N_I_gate += 1
-        #                 if (gate_seq_2[j] == gates.I):
-        #                     N_I_gate += 1
-
-        #             if (N_2QB_gate <= min_N_2QB_gate): # if it has less 2QB gates, always update it
-        #                 min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
-
-        #                 if (N_1QB_gate <= min_N_1QB_gate): # *only if it has less 2QB gates*, check whether it has less 1QB gates
-        #                     min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
-
-        #                     if (N_I_gate >= max_N_I_gate): # *only if it has less 2QB gates & only if it has less 1QB gates*, check whether it has more I gates
-        #                         min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
-
-        #             # check whether it is the cheapest
-        #             # if it has less 2QB gates, always update it.
-        #             if (N_2QB_gate < min_N_2QB_gate):
-        #                 min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
-        #                 log.info('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
-        #             else:
-        #                 # if it has equal # of 2QB gates and less 1QB gates, update it.
-        #                 if (N_2QB_gate == min_N_2QB_gate and
-        #                     N_1QB_gate < min_N_1QB_gate):
-        #                     min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
-        #                     log.info('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
-        #                 else:
-        #                     # if it has equal # of 2QB & 1QB gates, and more 1QB gates, update it.
-        #                     if (N_2QB_gate == min_N_2QB_gate and
-        #                         N_1QB_gate == min_N_1QB_gate and
-        #                         N_I_gate >= max_N_I_gate):
-        #                         min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index = (N_2QB_gate, N_1QB_gate, N_I_gate, j)
-        #                         log.info('the cheapest sequence update! [N_2QB_gate, N_1QB_gate, N_I_gate, seq. index] ' + str([min_N_2QB_gate, min_N_1QB_gate, max_N_I_gate, cheapest_index]))
-
-
-        #         else:
-        #             break
 
         if (find_cheapest == True):
             recovery_seq_1 = []
