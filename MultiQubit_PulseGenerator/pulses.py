@@ -271,7 +271,7 @@ class CZ(Pulse):
 
         if self.qubit is None:
             # Use linear dependence if no qubit was given
-            log.info('---> df (linear): ' +str(df))
+            # log.info('---> df (linear): ' +str(df))
             values = df / self.dfdV
             # values = theta_t
         else:
@@ -289,7 +289,7 @@ class CZ(Pulse):
         # Initial and final angles on the |11>-|02> bloch sphere
         self.theta_i = np.arctan(2*self.Coupling / self.Offset)
         self.theta_f = np.arctan(2*self.Coupling / self.amplitude)
-        log.log(msg="calc", level=30)
+        # log.log(msg="calc", level=30)
 
         # Renormalize fourier coefficients to initial and final angles
         # Consistent with both Martinis & Geller and DiCarlo 1903.02492

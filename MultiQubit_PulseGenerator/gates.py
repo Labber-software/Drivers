@@ -59,7 +59,7 @@ class SingleQubitXYRotation(OneQubitGate):
 
     def __str__(self):
         if self.name is None:
-            return "XY Phi={:+.2f} theta={:+.2f}".format(self.phi, self.theta)
+            return "XYPhi={:+.6f}theta={:+.6f}".format(self.phi, self.theta)
         else:
             return self.name
 
@@ -96,7 +96,7 @@ class SingleQubitZRotation(OneQubitGate):
 
     def __str__(self):
         if self.name is None:
-            return "Z theta={:+.2f}".format(self.theta)
+            return "Ztheta={:+.2f}".format(self.theta)
         else:
             return self.name
 
@@ -157,7 +157,7 @@ class VirtualZGate(OneQubitGate):
 
     def __str__(self):
         if self.name is None:
-            return "VZ theta={:+.2f}".format(self.theta)
+            return "VZtheta={:+.2f}".format(self.theta)
         else:
             return self.name
 
