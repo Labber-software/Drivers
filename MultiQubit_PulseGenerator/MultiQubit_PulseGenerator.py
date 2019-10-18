@@ -10,6 +10,8 @@ from BaseDriver import LabberDriver
 from sequence_builtin import CPMG, PulseTrain, Rabi, SpinLocking
 from sequence_rb import SingleQubit_RB, TwoQubit_RB
 from sequence import SequenceToWaveforms
+import logging
+log = logging.getLogger('LabberDriver')
 
 # dictionary with built-in sequences
 SEQUENCES = {'Rabi': Rabi,
@@ -17,7 +19,7 @@ SEQUENCES = {'Rabi': Rabi,
              'Pulse train': PulseTrain,
              '1-QB Randomized Benchmarking': SingleQubit_RB,
              '2-QB Randomized Benchmarking': TwoQubit_RB,
-             'Spin-locking' : SpinLocking,
+             'Spin-locking': SpinLocking,
              'Custom': type(None)}
 
 
@@ -28,7 +30,7 @@ class Driver(LabberDriver):
         """Perform the operation of opening the instrument connection."""
         # init variables
         self.sequence = None
-        self.sequence_to_waveforms = SequenceToWaveforms()
+        self.sequence_to_waveforms = SequenceToWaveforms(1)
         self.waveforms = {}
         # always create a sequence at startup
         name = self.getValue('Sequence')
@@ -53,10 +55,10 @@ class Driver(LabberDriver):
                     # the custom sequence class has to be named
                     # 'CustomSequence'
                     if not isinstance(self.sequence, mod.CustomSequence):
-                        self.sequence = mod.CustomSequence()
+                        self.sequence = mod.CustomSequence(1)
                 else:
                     # standard built-in sequence
-                    self.sequence = new_type()
+                    self.sequence = new_type(1)
 
         elif (quant.name == 'Custom Python file' and
               self.getValue('Sequence') == 'Custom'):
@@ -68,7 +70,7 @@ class Driver(LabberDriver):
             mod = importlib.import_module(modName)
             # the custom sequence class has to be named 'CustomSequence'
             if not isinstance(self.sequence, mod.CustomSequence):
-                self.sequence = mod.CustomSequence()
+                self.sequence = mod.CustomSequence(1)
         return value
 
     def performGetValue(self, quant, options={}):
@@ -116,6 +118,7 @@ class Driver(LabberDriver):
 
                 # check if calculating multiple sequences, for randomization
                 if config.get('Output multiple sequences', False):
+
                     # create multiple randomizations, store in memory
                     n_call = int(config.get('Number of multiple sequences', 1))
                     calls = []
@@ -130,12 +133,15 @@ class Driver(LabberDriver):
                     self.waveforms = dict()
                     n_qubit = self.sequence.n_qubit
                     # Align RB waveforms to end
-                    align_RB_to_end = config.get('Align RB waveforms to end', False)
+                    align_RB_to_end = config.get('Align RB waveforms to end',
+                                                 False)
                     # start with xy, z and gate waveforms, list of data
                     for key in ['xy', 'z', 'gate']:
                         # get size of longest waveform
                         self.waveforms[key] = []
                         for n in range(n_qubit):
+                            log.info('Generating {} waveform for qubit {}'.format(key, n))
+
                             length = max([len(call[key][n]) for call in calls])
                             # build matrix
                             datatype = calls[0][key][n].dtype
@@ -161,8 +167,10 @@ class Driver(LabberDriver):
 
                 else:
                     # normal operation, calcluate waveforms
+                    # log.info('generating case 2')
                     self.waveforms = self.sequence_to_waveforms.get_waveforms(
                         self.sequence.get_sequence(config))
+                    # log.info('Z waveform max: {}'.format(np.max(self.waveforms['z'])))
             # get correct data from waveforms stored in memory
             value = self.getWaveformFromMemory(quant)
         else:

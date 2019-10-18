@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # add logger, to allow logging to Labber's instrument log
 import logging
-
 import numpy as np
 
-from gates import Gate, IdentityGate, RabiGate, CustomGate
-from pulse import Pulse
+import gates
 from sequence import Sequence
 
 log = logging.getLogger('LabberDriver')
@@ -17,7 +15,7 @@ class Rabi(Sequence):
     def generate_sequence(self, config):
         """Generate sequence by adding gates/pulses to waveforms."""
         # just add pi-pulses for the number of available qubits
-        self.add_gate_to_all(Gate.Xp, align='right')
+        self.add_gate_to_all(gates.Xp, align='right')
 
 
 class CPMG(Sequence):
@@ -32,19 +30,19 @@ class CPMG(Sequence):
         edge_to_edge = config['Edge-to-edge pulses']
 
         # select type of refocusing pi pulse
-        gate_pi = Gate.Yp if pi_to_q else Gate.Xp
+        gate_pi = gates.Yp if pi_to_q else gates.Xp
 
         # always do T1 same way, regardless if edge-to-edge or center-center
         if n_pulse < 0:
             self.add_gate_to_all(gate_pi)
-            self.add_gate_to_all(IdentityGate(width=duration))
+            self.add_gate_to_all(gates.IdentityGate(width=duration), dt=0)
 
         elif edge_to_edge:
             # edge-to-edge pulsing, set pulse separations
-            self.add_gate_to_all(Gate.X2p)
+            self.add_gate_to_all(gates.X2p)
             # for ramsey, just add final pulse
             if n_pulse == 0:
-                self.add_gate_to_all(Gate.X2p, dt=duration)
+                self.add_gate_to_all(gates.X2p, dt=duration)
             else:
                 dt = duration / n_pulse
                 # add first pi pulse after half duration
@@ -53,17 +51,17 @@ class CPMG(Sequence):
                 for i in range(n_pulse - 1):
                     self.add_gate_to_all(gate_pi, dt=dt)
                 # add final pi/2 pulse
-                self.add_gate_to_all(Gate.X2p, dt=dt/2)
+                self.add_gate_to_all(gates.X2p, dt=dt/2)
 
         else:
             # center-to-center spacing, set absolute pulse positions
-            self.add_gate_to_all(Gate.X2p, t0=0)
+            self.add_gate_to_all(gates.X2p, t0=0)
             # add pi pulses at right position
             for i in range(n_pulse):
                 self.add_gate_to_all(gate_pi,
                                      t0=(i + 0.5) * (duration / n_pulse))
             # add final pi/2 pulse
-            self.add_gate_to_all(Gate.X2p, t0=duration)
+            self.add_gate_to_all(gates.X2p, t0=duration)
 
 
 class PulseTrain(Sequence):
@@ -76,16 +74,17 @@ class PulseTrain(Sequence):
         alternate = config['Alternate pulse direction']
 
         if n_pulse == 0:
-            self.add_gate_to_all(Gate.I)
+            self.add_gate_to_all(gates.I)
         for n in range(n_pulse):
             pulse_type = config['Pulse']
-            # check if alternate pulses
-            if alternate and (n % 2) == 1:
-                pulse_type = pulse_type.replace('p', 'm')
-                gate = Gate.__getattr__(pulse_type)
+            if pulse_type == 'CPh':
+                for i in range(self.n_qubit-1):
+                    self.add_gate([i, i+1], gates.CPh)
             else:
-                gate = Gate.__getattr__(pulse_type)
-            self.add_gate_to_all(gate)
+                if alternate and (n % 2) == 1:
+                    pulse_type = pulse_type.replace('p', 'm')
+                gate = getattr(gates, pulse_type)
+                self.add_gate_to_all(gate)
 
 
 class SpinLocking(Sequence):
@@ -105,29 +104,29 @@ class SpinLocking(Sequence):
         pulse_sequence = config['Pulse sequence']
 
         if pulse_sequence == 'SL-3':
-            self.add_gate_to_all(Gate.Y2p)
+            self.add_gate_to_all(gates.Y2p)
         if pulse_sequence == 'SL-5a':
-            self.add_gate_to_all(Gate.Y2m)
+            self.add_gate_to_all(gates.Y2m)
         if pulse_sequence == 'SL-5b':
-            self.add_gate_to_all(Gate.Y2p)
+            self.add_gate_to_all(gates.Y2p)
 
         if pulse_sequence != 'SL-3':
-            self.add_gate_to_all(Gate.Xp)
+            self.add_gate_to_all(gates.Xp)
 
         rabi_gates = []
         for ii in range(self.n_qubit):
             rabi_gates.append(
-                RabiGate(pulse_amps[ii], pulse_duration, pulse_phase))
+                gates.RabiGate(pulse_amps[ii], pulse_duration, pulse_phase))
         self.add_gate(list(range(self.n_qubit)), rabi_gates)
         if pulse_sequence != 'SL-3':
-            self.add_gate_to_all(Gate.Xp)
+            self.add_gate_to_all(gates.Xp)
 
         if pulse_sequence == 'SL-3':
-            self.add_gate_to_all(Gate.Y2p)
+            self.add_gate_to_all(gates.Y2p)
         if pulse_sequence == 'SL-5a':
-            self.add_gate_to_all(Gate.Y2m)
+            self.add_gate_to_all(gates.Y2m)
         if pulse_sequence == 'SL-5b':
-            self.add_gate_to_all(Gate.Y2p)
+            self.add_gate_to_all(gates.Y2p)
 
         return
 
