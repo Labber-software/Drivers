@@ -41,11 +41,11 @@ class Driver(VISA_Driver):
                 dataset = ','.join(data)
                 self.writeAndLog('SENS:SEGM:LIST SSTOP, %s, %s' % (numPoints, dataset))
         # update visa commands for triggers
-        if quant.name in ('S11 - Enabled', 'S21 - Enabled', 'S12 - Enabled',
-                          'S22 - Enabled'):
+        if quant.name in ('S11 - Enabled', 'S21 - Enabled', 'S12 - Enabled','S22 - Enabled',
+                            'S33 - Enabled', 'S43 - Enabled', 'S34 - Enabled','S44 - Enabled'):
             if self.getModel() in ('E5071C',):
                 # new trace handling, use trace numbers, set all at once
-                lParam = ['S11', 'S21', 'S12', 'S22']
+                lParam = ['S11', 'S21', 'S12', 'S22','S33', 'S43', 'S34', 'S44']
                 dParamValue = dict()
                 for param in lParam:
                     dParamValue[param] = self.getValue('%s - Enabled' % param)
@@ -74,7 +74,7 @@ class Driver(VISA_Driver):
                     newName = 'LabC_%s' % param
                     self.writeAndLog("CALC:PAR:EXT '%s','%s'" % (newName, param))
                     # show on PNA screen
-                    iTrace = 1 + ['S11', 'S21', 'S12', 'S22'].index(param)
+                    iTrace = 1 + ['S11', 'S21', 'S12', 'S22','S33', 'S43', 'S34', 'S44'].index(param)
     #                sPrev = self.askAndLog('DISP:WIND:CAT?')
     #                if sPrev.find('EMPTY')>0:
     #                    # no previous traces
@@ -116,18 +116,18 @@ class Driver(VISA_Driver):
     def performGetValue(self, quant, options={}):
         """Perform the Get Value instrument operation"""
         # check type of quantity
-        if quant.name in ('S11 - Enabled', 'S21 - Enabled', 'S12 - Enabled',
-                          'S22 - Enabled'):
+        if quant.name in ('S11 - Enabled', 'S21 - Enabled', 'S12 - Enabled','S22 - Enabled',
+                            'S33 - Enabled', 'S43 - Enabled', 'S34 - Enabled','S44 - Enabled'):
             # update list of channels in use
             self.getActiveMeasurements()
             # get selected parameter
             param = quant.name[:3]
             value = (param in self.dMeasParam)
-        elif quant.name in ('S11 - Value', 'S21 - Value', 'S12 - Value', 'S22 - Value'):
+        elif quant.name in ('S11 - Value', 'S21 - Value', 'S12 - Value', 'S22 - Value','S33 - Value', 'S43 - Value', 'S34 - Value', 'S44 - Value'):
             # read trace, return averaged data
             data = self.readValueFromOther(quant.name[:3])
             return np.mean(data['y'])
-        elif quant.name in ('S11', 'S21', 'S12', 'S22'):
+        elif quant.name in ('S11', 'S21', 'S12', 'S22','S33', 'S43', 'S34', 'S44'):
             # check if channel is on
             if quant.name not in self.dMeasParam:
                 # get active measurements again, in case they changed
