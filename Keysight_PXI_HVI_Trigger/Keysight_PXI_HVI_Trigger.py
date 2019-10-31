@@ -36,9 +36,11 @@ class Driver(LabberDriver):
         self.units = [0] * self.n_slot
         self.old_trig_period = -1.0
         self.old_dig_delay = -1.0
+        self.old_dig_delay_2 = -1
 
         # Create HVI object
         self.HVI = keysightSD1.SD_HVI()
+
 
     def performClose(self, bError=False, options={}):
         """Perform the close instrument connection operation"""
@@ -50,6 +52,7 @@ class Driver(LabberDriver):
         except Exception:
             # never return error here
             pass
+
 
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
         """Perform the Set Value instrument operation. This function should
@@ -71,6 +74,7 @@ class Driver(LabberDriver):
             self.configure_hvi()
 
         return value
+
 
     def configure_hvi(self):
         """Configure and start/stop HVI depending on UI settings"""
@@ -96,10 +100,16 @@ class Driver(LabberDriver):
                 raise Error('This driver requires at least one AWG.')
             # currently only support 2 digitizers
             if n_dig > 2:
-                raise Error('This driver only supports up to two digitizers.')
+            	if n_dig != 3 or n_awg != 3:
+                	raise Error('This driver only supports up to two digitizers.')
 
             # get HVI name and open
-            hvi_name = 'InternalTrigger_%d_%d.HVI' % (n_awg, n_dig)
+            if n_awg == 3 and n_dig == 2 and self.getValue('Interleaved Triggers'):
+            	hvi_name = 'InternalTrigger_%d_%d_Interleaved.HVI' % (n_awg, n_dig)
+            	self.log('it got the right hvi, ', hvi_name)
+            else:
+            	self.log('it got the wrong hvi')
+            	hvi_name = 'InternalTrigger_%d_%d.HVI' % (n_awg, n_dig)
             dir_path = os.path.dirname(os.path.realpath(__file__))
             self.HVI.open(os.path.join(dir_path, 'HVI_Delay', hvi_name))
 
@@ -129,12 +139,15 @@ class Driver(LabberDriver):
 
         # only update trig period if necessary, takes time to re-compile
         if (self.getValue('Trig period') != self.old_trig_period or
-                self.getValue('Digitizer delay') != self.old_dig_delay):
+                self.getValue('Digitizer delay') != self.old_dig_delay or 
+                (self.getValue('Interleaved Triggers') and self.getValue('Digitizer trigger 2 delay') != self.old_dig_delay_2)):
             self.old_trig_period = self.getValue('Trig period')
             self.old_dig_delay = self.getValue('Digitizer delay')
+            self.old_dig_delay_2 = self.getValue('Digitizer trigger 2 delay')
             # update trig period, include 460 ns delay in HVI
             wait = round(self.getValue('Trig period') / 10E-9) - 46
             digi_wait = round(self.getValue('Digitizer delay') / 10E-9)
+            digi_wait2 = round(self.getValue('Digitizer trigger 2 delay') / 10E-9)
             # special case if only one module: add 240 ns extra delay
             if (n_awg + n_dig) == 1:
                 wait += 24
@@ -144,14 +157,20 @@ class Driver(LabberDriver):
             self.check_keysight_error(r)
             self.log('Number of modules', self.HVI.getNumberOfModules())
             for n in range(n_dig):
+                self.log('num of dig',str(n_dig))
                 r = self.HVI.writeIntegerConstantWithUserName(
                     'DAQ %d' % n, 'Digi wait', digi_wait)
                 self.check_keysight_error(r)
+                self.log(str(self.check_keysight_error(r)))
+                if self.getValue('Interleaved Triggers'):
+	                r2 = self.HVI.writeIntegerConstantWithUserName(
+	                    'DAQ %d' % n, 'Digi trig 2 delay', digi_wait2)
+	                self.check_keysight_error(r2)
 
             # need to recompile after setting wait time, not sure why
             self.check_keysight_error(self.HVI.compile())
-            # try to load a few times, sometimes hangs on first try
-            n_try = 5
+            # try to load twice, sometimes hangs on first try
+            n_try = 2
             while True:
                 try:
                     self.check_keysight_error(self.HVI.load())
@@ -168,12 +187,14 @@ class Driver(LabberDriver):
         else:
             self.HVI.stop()
 
+
     def check_keysight_error(self, code):
         """Check and raise error"""
         if code >= 0:
             return
         # get error message
         raise Error(keysightSD1.SD_Error.getErrorMessage(code))
+
 
     def auto_detect(self):
         """Auto-detect units"""
@@ -194,12 +215,15 @@ class Driver(LabberDriver):
                 elif model[:5] in self.DIGS:
                     self.setValue('Slot %d' % slot, 'Digitizer')
 
+
     def get_pxi_config_from_ui(self):
         """Get PXI config from user interface"""
         units = []
         for n in range(self.n_slot):
             units.append(self.getValueIndex('Slot %d' % (n + 1)))
         return units
+
+
 
 
 if __name__ == '__main__':
