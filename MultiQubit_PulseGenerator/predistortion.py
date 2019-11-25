@@ -170,8 +170,19 @@ class ExponentialPredistortion:
         self.tau3 = 0
         self.A4 = 0
         self.tau4 = 0
+
+        self.A1_it2 = 0
+        self.tau1_it2 = 0
+        self.A2_it2 = 0
+        self.tau2_it2 = 0
+        self.A3_it2 = 0
+        self.tau3_it2 = 0
+        self.A4_it2 = 0
+        self.tau4_it2 = 0
+
         self.dt = 1
         self.n = int(waveform_number)
+        self.use_2nd_it=False
 
     def set_parameters(self, config={}):
         """Set base parameters using config from from Labber driver.
@@ -182,7 +193,11 @@ class ExponentialPredistortion:
             Configuration as defined by Labber driver configuration window
 
         """
+
+        self.use_2nd_it=config.get('Predistort Z, Use 2nd iteration')
+
         m = self.n + 1
+
         self.A1 = config.get('Predistort Z{} - A1'.format(m))
         self.tau1 = config.get('Predistort Z{} - tau1'.format(m))
         self.A2 = config.get('Predistort Z{} - A2'.format(m))
@@ -192,6 +207,17 @@ class ExponentialPredistortion:
         self.tau3 = config.get('Predistort Z{} - tau3'.format(m))
         self.A4 = config.get('Predistort Z{} - A4'.format(m))
         self.tau4 = config.get('Predistort Z{} - tau4'.format(m))
+
+        if self.use_2nd_it:
+            self.A1_it2 = config.get('Predistort Z{} it2 - A1'.format(m))
+            self.tau1_it2 = config.get('Predistort Z{} it2 - tau1'.format(m))
+            self.A2_it2 = config.get('Predistort Z{} it2 - A2'.format(m))
+            self.tau2_it2 = config.get('Predistort Z{} it2 - tau2'.format(m))
+
+            self.A3_it2 = config.get('Predistort Z{} it2 - A3'.format(m))
+            self.tau3_it2 = config.get('Predistort Z{} it2 - tau3'.format(m))
+            self.A4_it2 = config.get('Predistort Z{} it2 - A4'.format(m))
+            self.tau4_it2 = config.get('Predistort Z{} it2 - tau4'.format(m))
 
         self.dt = 1 / config.get('Sample rate')
 
@@ -210,13 +236,15 @@ class ExponentialPredistortion:
 
         """
         # pad with zeros at end to make sure response has time to go to zero
-        pad_time = 6 * max([self.tau1, self.tau2, self.tau3])
+        pad_time = 6 * max([self.tau1, self.tau2, self.tau3, self.tau4, \
+                     self.tau1_it2, self.tau2_it2, self.tau3_it2, self.tau4_it2])
         padded = np.zeros(len(waveform) + round(pad_time / self.dt))
         padded[:len(waveform)] = waveform
 
         Y = np.fft.rfft(padded, norm='ortho')
 
         omega = 2 * np.pi * np.fft.rfftfreq(len(padded), self.dt)
+
         H = (1 +
              (1j * self.A1 * omega * self.tau1) /
              (1j * omega * self.tau1 + 1) +
@@ -226,8 +254,19 @@ class ExponentialPredistortion:
              (1j * omega * self.tau3 + 1) +
              (1j * self.A4 * omega * self.tau4) /
              (1j * omega * self.tau4 + 1))
-
         Yc = Y / H
+
+        if self.use_2nd_it:
+            H = (1 +
+                (1j * self.A1_it2 * omega * self.tau1_it2) /
+                (1j * omega * self.tau1_it2 + 1) +
+                (1j * self.A2_it2 * omega * self.tau2_it2) /
+                (1j * omega * self.tau2_it2 + 1) +
+                (1j * self.A3_it2 * omega * self.tau3_it2) /
+                (1j * omega * self.tau3_it2 + 1) +
+                (1j * self.A4_it2 * omega * self.tau4_it2) /
+                (1j * omega * self.tau4_it2 + 1))
+            Yc = Yc / H
 
         yc = np.fft.irfft(Yc, norm='ortho')
         return yc[:len(waveform)]
