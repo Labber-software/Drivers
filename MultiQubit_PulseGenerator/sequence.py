@@ -592,6 +592,7 @@ class SequenceToWaveforms:
         self._add_readout_trig()
         self._add_microwave_gate()
         self._filter_output_waveforms()
+        self._zero_last_z_point()
 
         # Apply offsets
         self.readout_iq += self.readout_i_offset + 1j * self.readout_q_offset
@@ -895,6 +896,13 @@ class SequenceToWaveforms:
         # apply convolution
         y = np.convolve(s, window, mode='same')
         return y[n:-n+1]
+
+    def _zero_last_z_point(self):
+        """Make sure last point in z waveforms is always zero, since this is 
+           the value output by the AWG between sequences.
+        """
+        for n in range(self.n_qubit):
+            self._wave_z[n][-1]=0
 
     def _round(self, t, acc=1E-12):
         """Round the time `t` with a certain accuarcy `acc`.
