@@ -269,6 +269,8 @@ class ExponentialPredistortion:
             Yc = Yc / H
 
         yc = np.fft.irfft(Yc, norm='ortho')
+
+        #cut to previous window length
         return yc[:len(waveform)]
 
 
