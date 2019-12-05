@@ -235,7 +235,10 @@ class Driver(LabberDriver):
                 base = '/%s/awgs/%d/' % (self.device, core)
                 self.daq.setInt(base + 'waveform/index', 0)
                 self.daq.sync()
-                self.daq.vectorWrite(base + 'waveform/data', data.flatten())
+                if hasattr(self.daq, 'setVector'):
+                    self.daq.setVector(base + 'waveform/data', data.flatten())
+                else:
+                    self.daq.vectorWrite(base + 'waveform/data', data.flatten())
                 # set enabled
                 self.daq.setInt(base + 'enable', 1)
 
