@@ -3,6 +3,8 @@
 from BaseDriver import LabberDriver
 import numpy as np
 from sklearn.svm import SVC
+from sklearn.svm import LinearSVC
+from sklearn.metrics import accuracy_score
 
 
 class Error(Exception):
@@ -58,7 +60,7 @@ class Driver(LabberDriver):
                 self.training_data[qubit - 1][state] = training_vector
 
         # if changing to use median, flag that re-training is necessary
-        elif quant.name.startswith('Use median value'):
+        elif quant.name.startswith('Use median value'): # and self.getValue('Perform training'):
             self.training_valid = False
 
         # if changing pointer states, flag need for for re-training
@@ -77,11 +79,20 @@ class Driver(LabberDriver):
             self.calculate_states()
         # check input
         if quant.name.startswith('QB'):
-            qubit = int(quant.name[2]) - 1
+            #qubit = int(quant.name[2]) - 1
+            qubit = int(quant.name.split("QB")[1].split(' ')[0]) - 1
             value = self.qubit_states[qubit]
         elif quant.name.startswith('Average QB'):
-            qubit = int(quant.name[10]) - 1
+            #qubit = int(quant.name[10]) - 1
+            qubit = int(quant.name.split('Average QB')[1].split(' ')[0]) - 1
             value = np.mean(self.qubit_states[qubit])
+        elif quant.name.startswith('Assignment fidelity QB'):
+            #qubit = int(quant.name[22]) - 1
+            qubit = int(quant.name.split('Assignment fidelity QB')[1].split(' ')[0]) - 1
+            if self.assignment_fidelity is not None:
+                value = self.assignment_fidelity[qubit]
+            else:
+                value = -1
         elif quant.name.startswith('Average state vector'):
             # states are encoded in array of ints
             m = self.n_state ** self.n_qubit
@@ -145,6 +156,7 @@ class Driver(LabberDriver):
 
         # train for all active qubits
         self.svm = []
+        self.assignment_fidelity = [-1] * self.MAX_QUBITS
         for qubit, data in enumerate(self.training_data):
             # initialize training data
             n_data = 0
@@ -162,6 +174,10 @@ class Driver(LabberDriver):
                     x = np.array([np.median(x.real) + 1j * np.median(x.imag)])
                     self.setValue('Pointer, QB%d-S%d' % (qubit + 1, m), x[0])
 
+                self.setValue('Pointer, QB%d-S%d' % (qubit + 1, m),
+                              np.median(x.real) + 1j * np.median(x.imag))
+
+
                 X[k:(k + len(x)), 0] = x.real
                 X[k:(k + len(x)), 1] = x.imag
                 if self.training_cfg['training_type'] == 'All combinations':
@@ -175,10 +191,18 @@ class Driver(LabberDriver):
                 k += len(x)
 
             # create SVM and fit data
-            svc = SVC(**kwargs)
+            if self.getValue('Kernel') == 'linear':
+                svc = LinearSVC(C=self.getValue('C-parameter'))
+            else:
+                svc = SVC(**kwargs)
             svc.fit(X, y)
             # store in list of SVMs
             self.svm.append(svc)
+
+            # update qubit state assignment fidelity value controls (Added, Ben 9/26/2019, start)
+            self.assignment_fidelity[qubit] = accuracy_score(y, svc.predict(X))
+            #self.setValue('Assignment Fidelity QB%d state' % (qubit + 1), accuracy_score(y, X))
+            # update qubit state assignment fidelity value controls (Added, Ben 9/26/2019, end)
 
         # mark training as valid
         self.training_valid = True
@@ -188,6 +212,7 @@ class Driver(LabberDriver):
         """Train discriminator based on pointer states"""
         # train for all active qubits
         self.svm = []
+        #self.assignment_fidelity = [] * self.MAX_QUBITS
         for qubit in range(self.n_qubit):
             X = np.zeros((self.n_state, 2))
             y = np.zeros(self.n_state, dtype=int)
@@ -200,10 +225,18 @@ class Driver(LabberDriver):
                 y[m] = m
 
             # create SVM and fit data
+            #if self.getValue('Kernel') == 'linear':
+            #    svc = LinearSVC(C=self.getValue('C-parameter'))
+            #else:
             svc = SVC(**kwargs)
             svc.fit(X, y)
             # store in list of SVMs
             self.svm.append(svc)
+
+            # update qubit state assignment fidelity value controls (Added, Ben 9/26/2019, start)
+            #self.assignment_fidelity[qubit] = accuracy_score(y, svc.predict(X))
+            #self.setValue('Assignment Fidelity QB%d state' % (qubit + 1), accuracy_score(y, X))
+            # update qubit state assignment fidelity value controls (Added, Ben 9/26/2019, end)
 
         # mark training as valid
         self.training_valid = True
