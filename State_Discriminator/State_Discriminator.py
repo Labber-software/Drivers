@@ -191,10 +191,7 @@ class Driver(LabberDriver):
                 k += len(x)
 
             # create SVM and fit data
-            if self.getValue('Kernel') == 'linear':
-                svc = LinearSVC(C=self.getValue('C-parameter'))
-            else:
-                svc = SVC(**kwargs)
+            svc = SVC(**kwargs)
             svc.fit(X, y)
             # store in list of SVMs
             self.svm.append(svc)
@@ -225,18 +222,10 @@ class Driver(LabberDriver):
                 y[m] = m
 
             # create SVM and fit data
-            #if self.getValue('Kernel') == 'linear':
-            #    svc = LinearSVC(C=self.getValue('C-parameter'))
-            #else:
             svc = SVC(**kwargs)
             svc.fit(X, y)
             # store in list of SVMs
             self.svm.append(svc)
-
-            # update qubit state assignment fidelity value controls (Added, Ben 9/26/2019, start)
-            #self.assignment_fidelity[qubit] = accuracy_score(y, svc.predict(X))
-            #self.setValue('Assignment Fidelity QB%d state' % (qubit + 1), accuracy_score(y, X))
-            # update qubit state assignment fidelity value controls (Added, Ben 9/26/2019, end)
 
         # mark training as valid
         self.training_valid = True
