@@ -152,6 +152,11 @@ class Driver(LabberDriver):
                 nMask = int(2**self.nCh - 1)
                 self.AWG.AWGtriggerMultiple(nMask)
 
+        elif quant.name in ('Trig delay', 'Delay after end',
+                            'Waveform alignment'):
+            # TODO doesn't strictly require re-uploading, just re-queue
+            self.waveform_updated = [True] * self.nCh
+
         elif name in ('Function', 'Enabled'):
             if self.getChannelValue(ch, 'Enabled'):
                 func = int(self.getChannelCmd(ch, 'Function'))
