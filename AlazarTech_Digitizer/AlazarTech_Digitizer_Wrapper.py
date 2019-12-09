@@ -1,5 +1,7 @@
 import ctypes, os
-from ctypes import c_int, c_uint8, c_uint16, c_uint32, c_int32, c_float, c_char_p, c_void_p, c_long, byref, windll
+from ctypes import (
+    c_int, c_uint8, c_uint16, c_uint32, c_int32, c_float, c_char_p, c_void_p,
+    c_long, byref, windll, c_double)
 import numpy as np
 
 # add logger, to allow logging to Labber's instrument log 
@@ -10,6 +12,7 @@ import time
 # define constants
 ADMA_NPT = 0x200
 ADMA_EXTERNAL_STARTCAPTURE = 0x1
+DSP_MODULE_FFT = 0x10000
 
 # match naming convertinos in DLL
 U8 = c_uint8
@@ -133,7 +136,6 @@ class AlazarTechDigitizer():
             sError = self.getError(status)
             raise Error(sError)
 
-    
     def getError(self, status):
         """Convert the error in status to a string"""
         func = getattr(DLL, 'AlazarErrorToText')
@@ -142,6 +144,54 @@ class AlazarTechDigitizer():
         errorText = func(c_int(status))
         return str(errorText)
         
+    def AlazarDSPGetModules(self):
+        # call twice to get number of modules followed by all modules
+        numModules = U32(0)
+        self.callFunc(
+            'AlazarDSPGetModules', self.handle, 
+            U32(0), c_void_p(), byref(numModules))
+        dsp_handles = (c_void_p * numModules.value)()
+        self.callFunc(
+            'AlazarDSPGetModules', self.handle,
+            numModules,
+            dsp_handles,
+            c_void_p())
+
+        # for default values, FFT is disabled
+        self.fft_enabled = False
+        self.fft_module = None
+
+        # find FFT module
+        for dsp in dsp_handles:
+            dspModuleId = U32(0)
+            versionMajor = U16(0)
+            versionMinor = U16(0)
+            maxLength = U32(0)
+            reserved0 = U32(0)
+            reserved1 = U32(0)
+            self.callFunc(
+                'AlazarDSPGetInfo',
+                c_void_p(dsp),
+                byref(dspModuleId),
+                byref(versionMajor),
+                byref(versionMinor),
+                byref(maxLength),
+                byref(reserved0),
+                byref(reserved1))
+
+            if dspModuleId.value == DSP_MODULE_FFT:
+                self.fft_enabled = True
+                self.fft_module = c_void_p(dsp)
+                self.fft_max_length = maxLength.value
+                self.fft_rate = self.AlazarFFTGetMaxTriggerRepeatRate(
+                    self.fft_max_length)
+
+    def AlazarFFTGetMaxTriggerRepeatRate(self, fftSize):
+        rate = c_double(0.0)
+        self.callFunc(
+            'AlazarFFTGetMaxTriggerRepeatRate', self.fft_module, U32(fftSize),
+            byref(rate))
+        return rate.value
         
     def AlazarGetChannelInfo(self):
         '''Get the on-board memory in samples per channe and sample size in bits per sample'''
@@ -522,7 +572,11 @@ class AlazarTechDigitizer():
 if __name__ == '__main__':
     #
     # test driver
-    Digitizer = AlazarTechDigitizer()
+    dig = AlazarTechDigitizer()
+    x = dig.AlazarGetChannelInfo()
+    dig.AlazarDSPGetModules()
+    print(dig.fft_enabled, dig.fft_max_length, dig.fft_rate)
+    print('Done')
 
 
     
