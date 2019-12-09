@@ -197,7 +197,54 @@ class AlazarTechDigitizer():
             'AlazarFFTGetMaxTriggerRepeatRate', self.fft_module, U32(fftSize),
             byref(rate))
         return rate.value
-        
+
+    def AlazarDSPGenerateWindowFunction(
+            windowType, windowLength_samples, paddingLength_samples):
+        # get windows
+        window = np.zeros(
+            windowLength_samples + paddingLength_samples, dtype=np.float32)
+        self.callFunc(
+            'AlazarDSPGenerateWindowFunction',
+            U32(windowType),
+            window.ctypes.data_as(POINTER(c_float)),
+            U32(windowLength_samples),
+            U32(paddingLength_samples))
+        # set window
+        self.callFunc(
+            'AlazarFFTSetWindowFunction', self.fft_module,
+            U32(windowLength_samples + paddingLength_samples),
+            window.ctypes.data_as(POINTER(c_float)),
+            c_void_p())
+        return window
+
+    # ats.AlazarFFTSetup.restype = U32
+    # ats.AlazarFFTSetup.argtypes = [c_void_p, U16,
+    #     U32, U32, U32, U32, U32, POINTER(c_uint32)]
+    # ats.AlazarFFTSetup.errcheck = returnCodeCheck
+
+    def AlazarFFTSetup(self, inputChannelMask, recordLength_samples,
+                       fftLength_samples, outputFormat, footer, reserved):
+        bytesPerOutRecord = c_uint32(0)
+        self.callFunc(
+            'AlazarFFTSetup', self.fft_module,
+            U16(inputChannelMask),
+            U32(recordLength_samples),
+            U32(fftLength_samples),
+            U32(outputFormat),
+            U32(footer),
+            U32(reserved),
+            byref(bytesPerOutRecord))
+        return bytesPerOutRecord.value
+
+    # ats.AlazarFFTBackgroundSubtractionSetEnabled.restype = U32
+    # ats.AlazarFFTBackgroundSubtractionSetEnabled.argtypes = [c_void_p, U32]
+    # ats.AlazarFFTBackgroundSubtractionSetEnabled.errcheck = returnCodeCheck
+
+    def AlazarFFTBackgroundSubtractionSetEnabled(self, enabled):
+        self.callFunc(
+            'AlazarFFTBackgroundSubtractionSetEnabled', self.fft_module,
+            U32(1 if enabled else 0))
+
     def AlazarGetChannelInfo(self):
         '''Get the on-board memory in samples per channe and sample size in bits per sample'''
         memorySize_samples = U32(0)
@@ -320,7 +367,7 @@ class AlazarTechDigitizer():
     def readTracesDMA(self, bGetCh1, bGetCh2, nSamples, nRecord, nBuffer, nAverage=1,
                       bConfig=True, bArm=True, bMeasure=True,
                       funcStop=None, funcProgress=None, timeout=None, bufferSize=512,
-                      firstTimeout=None, maxBuffers=1024):
+                      firstTimeout=None, maxBuffers=1024, fft=False, ):
         """read traces in NPT AutoDMA mode, convert to float, average to single trace"""
         t0 = time.clock()
         lT = []
@@ -356,7 +403,12 @@ class AlazarTechDigitizer():
         if nRecordTotal < recordsPerBuffer:
             recordsPerBuffer = nRecordTotal
 
-        #Select the active channels.
+        # change settings if 1 if FFT.
+        if fft:
+            bGetCh1 = True
+            bGetCh2 = False
+
+        # select the active channels
         Channel1 = 1 if bGetCh1 else 0
         Channel2 = 2 if bGetCh2 else 0
 
