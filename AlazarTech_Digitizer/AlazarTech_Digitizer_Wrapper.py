@@ -69,7 +69,7 @@ class DMABuffer:
             kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
             kernel32.VirtualFree.argtypes = [c_void_p, c_long, c_long]
             kernel32.VirtualFree.restype = c_int
-            kernel32.VirtualFree(c_void_p(self.addr), 0, MEM_RELEASE);
+            kernel32.VirtualFree(c_void_p(self.addr), 0, MEM_RELEASE)
         elif os.name == 'posix':
             libc.free(self.addr)
         else:
@@ -112,7 +112,12 @@ class AlazarTechDigitizer():
         self.handle = c_void_p(handle)
         # get mem and bitsize
         (self.memorySize_samples, self.bitsPerSample) = self.AlazarGetChannelInfo()
-
+        # look for FFT functionality
+        try:
+            self.AlazarDSPGetModules()
+        except Exception:
+            self.fft_enabled = False
+            self.fft_module = None
 
     def testLED(self):
         import time
@@ -132,14 +137,14 @@ class AlazarTechDigitizer():
             bIgnoreError = kargs['bIgnoreError']
         else:
             bIgnoreError = False
-        if status>512 and not bIgnoreError:
+        if status > 512 and not bIgnoreError:
             sError = self.getError(status)
             raise Error(sError)
 
     def getError(self, status):
         """Convert the error in status to a string"""
         func = getattr(DLL, 'AlazarErrorToText')
-        func.restype = c_char_p 
+        func.restype = c_char_p
         # const char* AlazarErrorToText(RETURN_CODE retCode)
         errorText = func(c_int(status))
         return str(errorText)
