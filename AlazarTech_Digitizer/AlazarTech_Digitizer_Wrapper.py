@@ -424,7 +424,6 @@ class AlazarTechDigitizer():
                 fftLength *= 2
             # samples per record will match fft length
             bytesPerRecord = bytesPerSample * fftLength
-        else:
 
         # select the active channels
         Channel1 = 1 if bGetCh1 else 0
