@@ -218,11 +218,6 @@ class AlazarTechDigitizer():
             c_void_p())
         return window
 
-    # ats.AlazarFFTSetup.restype = U32
-    # ats.AlazarFFTSetup.argtypes = [c_void_p, U16,
-    #     U32, U32, U32, U32, U32, ctypes.POINTER(c_uint32)]
-    # ats.AlazarFFTSetup.errcheck = returnCodeCheck
-
     def AlazarFFTSetup(self, inputChannelMask, recordLength_samples,
                        fftLength_samples, outputFormat, footer, reserved):
         bytesPerOutRecord = c_uint32(0)
@@ -237,9 +232,9 @@ class AlazarTechDigitizer():
             byref(bytesPerOutRecord))
         return bytesPerOutRecord.value
 
-    # ats.AlazarFFTBackgroundSubtractionSetEnabled.restype = U32
-    # ats.AlazarFFTBackgroundSubtractionSetEnabled.argtypes = [c_void_p, U32]
-    # ats.AlazarFFTBackgroundSubtractionSetEnabled.errcheck = returnCodeCheck
+    def AlazarDSPAbortCapture(self):
+        self.callFunc(
+            'AlazarDSPAbortCapture', self.fft_module)
 
     def AlazarFFTBackgroundSubtractionSetEnabled(self, enabled):
         self.callFunc(
@@ -422,8 +417,9 @@ class AlazarTechDigitizer():
             fftLength = 1
             while fftLength < samplesPerRecord:
                 fftLength *= 2
-            # samples per record will match fft length
-            bytesPerRecord = bytesPerSample * fftLength
+            # samples per record will match fft length / 2 (single sided spec)
+            bytesPerRecord = bytesPerSample * fftLength / 2
+            nPtsOut = int(nPtsOut // 2)
 
         # select the active channels
         Channel1 = 1 if bGetCh1 else 0
@@ -541,7 +537,6 @@ class AlazarTechDigitizer():
                      np.zeros(nPtsOut, dtype=float)]
             #range and zero for conversion to voltages
             if fft_config.get('enabled', False):
-                lT.append('Buffer size, FFT: %d, %d' % (self.bytesPerOutputRecord, recordsPerBuffer))
                 range1 = self.fft_scale
                 offset = 0.0
             else:
@@ -581,7 +576,7 @@ class AlazarTechDigitizer():
                 if bytesPerBuffer == bytesPerBufferMem:
                     buf_truncated = buf.buffer
                 else:
-                    buf_truncated = buf.buffer[:(bytesPerBuffer//bytesPerSample)]
+                    buf_truncated = buf.buffer[:int(bytesPerBuffer//bytesPerSample)]
 
                 # reshape, sort and average data
                 if nAverage > 1:
@@ -616,11 +611,19 @@ class AlazarTechDigitizer():
     
                 # Add the buffer to the end of the list of available buffers.
                 self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
+        except Exception:
+            try:
+                self.removeBuffersDMA()
+            except Exception:
+                pass
         finally:
             # release resources
             try:
-                self.AlazarAbortAsyncRead()
-            except:
+                if fft_config.get('enabled', False):
+                    self.AlazarDSPAbortCapture()
+                else:
+                    self.AlazarAbortAsyncRead()
+            except Exception:
                 pass
             lT.append('Abort: %.1f ms' % ((time.clock()-t0)*1000))
         # normalize
