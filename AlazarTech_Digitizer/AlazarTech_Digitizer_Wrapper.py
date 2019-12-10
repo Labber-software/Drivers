@@ -12,6 +12,7 @@ import time
 # define constants
 ADMA_NPT = 0x200
 ADMA_EXTERNAL_STARTCAPTURE = 0x1
+ADMA_DSP = 0x4000
 DSP_MODULE_FFT = 0x10000
 
 # match naming convertinos in DLL
@@ -367,7 +368,8 @@ class AlazarTechDigitizer():
     def readTracesDMA(self, bGetCh1, bGetCh2, nSamples, nRecord, nBuffer, nAverage=1,
                       bConfig=True, bArm=True, bMeasure=True,
                       funcStop=None, funcProgress=None, timeout=None, bufferSize=512,
-                      firstTimeout=None, maxBuffers=1024, fft=False, ):
+                      firstTimeout=None, maxBuffers=1024,
+                      fft_config={'enabled': False}):
         """read traces in NPT AutoDMA mode, convert to float, average to single trace"""
         t0 = time.clock()
         lT = []
@@ -390,7 +392,11 @@ class AlazarTechDigitizer():
         #change alignment to be 128
         postTriggerSamples = int(np.ceil(postTriggerSamplesValue / 128.)*128)
         samplesPerRecordValue = preTriggerSamplesValue + postTriggerSamplesValue
-        
+        # number of samples
+        bytesPerSample = (self.bitsPerSample + 7) // 8
+        samplesPerRecord = preTriggerSamples + postTriggerSamples
+        bytesPerRecord = bytesPerSample * samplesPerRecord
+
         #Select the number of records per DMA buffer.
         nRecordTotal = nRecord * nAverage
         if nRecord > 1:
@@ -403,10 +409,22 @@ class AlazarTechDigitizer():
         if nRecordTotal < recordsPerBuffer:
             recordsPerBuffer = nRecordTotal
 
-        # change settings if 1 if FFT.
-        if fft:
+        nPtsOut = samplesPerRecord * nRecord
+
+
+        # only channel 1 can be used in FFT mode
+        if fft_config.get('enabled', False):
             bGetCh1 = True
             bGetCh2 = False
+            # always 4 bytes (32 bit) per sample in fft mode
+            bytesPerSample = 4
+            # number of actual points in fft is even in 2**n 
+            fftLength = 1
+            while fftLength < samplesPerRecord:
+                fftLength *= 2
+            # samples per record will match fft length
+            bytesPerRecord = bytesPerSample * fftLength
+        else:
 
         # select the active channels
         Channel1 = 1 if bGetCh1 else 0
@@ -422,10 +440,6 @@ class AlazarTechDigitizer():
         if channelCount == 0:
             return [np.array([], dtype=float), np.array([], dtype=float)]
     
-        # Compute the number of bytes per record and per buffer
-        bytesPerSample = (self.bitsPerSample + 7) // 8
-        samplesPerRecord = preTriggerSamples + postTriggerSamples
-        bytesPerRecord = bytesPerSample * samplesPerRecord
         bytesPerBuffer = bytesPerRecord * recordsPerBuffer * channelCount
         # force buffer size to be integer of 256 * 16 = 4096, not sure why
         bytesPerBufferMem = int(4096 * np.ceil(bytesPerBuffer/4096.))
@@ -446,34 +460,70 @@ class AlazarTechDigitizer():
     
         # configure board, if wanted
         if bConfig:
-            self.AlazarSetRecordSize(preTriggerSamples, postTriggerSamples)
-            self.AlazarSetRecordCount(recordsPerAcquisition)
-            # Allocate DMA buffers
-            sample_type = ctypes.c_uint8
-            if bytesPerSample > 1:
-                sample_type = ctypes.c_uint16
+            # special case for FFT
+            if fft_config.get('enabled', False):
+                # configure window
+                self.AlazarDSPGenerateWindowFunction(
+                    windowType, nSamples, fftLength - nSamples)
+                # disable offset
+                self.AlazarFFTBackgroundSubtractionSetEnabled(False)
+                # configure FFT
+                self.bytesPerOutputRecord = self.AlazarFFTSetup(
+                    channels, samplesPerRecord, fftLength,
+                    fft_config['output'], 0, 0)
+                # get datatype
+                bytesPerBufferMem = self.bytesPerOutputRecord * recordsPerBuffer
+                lT.append('Buffer size, FFT: %d' % bytesPerBufferMem)
+
+                if fft_config['output'] in (3, 4):
+                    # real or imag, signed int
+                    sample_type = ctypes.c_int32
+                    self.fft_scale = self.dRange[1] / (2**31)
+                else:
+                    # amp2 or log amp, 32bit float
+                    sample_type = ctypes.c_float
+                    self.fft_scale = 1.0
+
+            else:
+                self.AlazarSetRecordSize(preTriggerSamples, postTriggerSamples)
+                self.AlazarSetRecordCount(recordsPerAcquisition)
+                # Allocate DMA buffers
+                sample_type = ctypes.c_uint8
+                if bytesPerSample > 1:
+                    sample_type = ctypes.c_uint16
             # clear old buffers
             self.removeBuffersDMA()
             # create new buffers
             self.buffers = []
             for i in range(bufferCount):
-                self.buffers.append(DMABuffer(sample_type, bytesPerBufferMem))
+                self.buffers.append(
+                    DMABuffer(sample_type, bytesPerBufferMem))
 
         # arm and start capture, if wanted
         if bArm:
             # Configure the board to make a Traditional AutoDMA acquisition
-            self.AlazarBeforeAsyncRead(channels,
-                                  -preTriggerSamples,
-                                  samplesPerRecord,
-                                  recordsPerBuffer,
-                                  recordsPerAcquisition,
-                                  ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT)
+            if fft_config.get('enabled', False):
+                self.AlazarBeforeAsyncRead(
+                    channels,
+                    0,
+                    self.bytesPerOutputRecord,
+                    recordsPerBuffer,
+                    0x7FFFFFFF,
+                    ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT | ADMA_DSP)
+            else:
+                self.AlazarBeforeAsyncRead(
+                    channels,
+                    -preTriggerSamples,
+                    samplesPerRecord,
+                    recordsPerBuffer,
+                    recordsPerAcquisition,
+                    ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT)
             # Post DMA buffers to board
             for buf in self.buffers:
                 self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
             try:
                 self.AlazarStartCapture()
-            except:
+            except Exception:
                 # make sure buffers release memory if failed
                 self.removeBuffersDMA()
                 raise
@@ -488,16 +538,20 @@ class AlazarTechDigitizer():
             buffersCompleted = 0
             bytesTransferred = 0
             #initialize data array
-            nPtsOut = samplesPerRecord * nRecord
             nAvPerBuffer = int(recordsPerBuffer // nRecord)
-            vData = [np.zeros(nPtsOut, dtype=float), np.zeros(nPtsOut, dtype=float)]
+            vData = [np.zeros(nPtsOut, dtype=float),
+                     np.zeros(nPtsOut, dtype=float)]
             #range and zero for conversion to voltages
-            codeZero = 2 ** (float(self.bitsPerSample) - 1) - 0.5
-            codeRange = 2 ** (float(self.bitsPerSample) - 1) - 0.5 
-            # range and zero for each channel, combined with bit shifting
-            range1 = self.dRange[1]/codeRange/16.
-            range2 = self.dRange[2]/codeRange/16.
-            offset = 16.*codeZero
+            if fft_config.get('enabled', False):
+                range1 = self.fft_scale
+                offset = 0.0
+            else:
+                codeZero = 2 ** (float(self.bitsPerSample) - 1) - 0.5
+                codeRange = 2 ** (float(self.bitsPerSample) - 1) - 0.5
+                # range and zero for each channel, combined with bit shifting
+                range1 = self.dRange[1]/codeRange/16.
+                range2 = self.dRange[2]/codeRange/16.
+                offset = 16.*codeZero
 
             timeout_ms = int(firstTimeout*1000)
 
@@ -534,23 +588,23 @@ class AlazarTechDigitizer():
                 if nAverage > 1:
                     if channels == 1:
                         rs = buf_truncated.reshape((nAvPerBuffer, nPtsOut))
-                        vData[0] += range1 * (np.mean(rs, 0)  - offset)
+                        vData[0] += range1 * (np.mean(rs, 0) - offset)
                     elif channels == 2:
                         rs = buf_truncated.reshape((nAvPerBuffer, nPtsOut))
-                        vData[1] += range2 * (np.mean(rs, 0)  - offset)
+                        vData[1] += range2 * (np.mean(rs, 0) - offset)
                     elif channels == 3:
                         rs = buf_truncated.reshape((nAvPerBuffer, nPtsOut, 2))
-                        vData[0] += range1 * (np.mean(rs[:,:,0], 0)  - offset)
-                        vData[1] += range2 * (np.mean(rs[:,:,1], 0)  - offset)
+                        vData[0] += range1 * (np.mean(rs[:, :, 0], 0) - offset)
+                        vData[1] += range2 * (np.mean(rs[:, :, 1], 0) - offset)
                 else:
                     if channels == 1:
-                        vData[0] = range1 * (buf_truncated  - offset)
+                        vData[0] = range1 * (buf_truncated - offset)
                     elif channels == 2:
-                        vData[1] = range2 * (buf_truncated  - offset)
+                        vData[1] = range2 * (buf_truncated - offset)
                     elif channels == 3:
                         rs = buf_truncated.reshape((nPtsOut, 2))
-                        vData[0] = range1 * (rs[:,0]  - offset)
-                        vData[1] = range2 * (rs[:,1]  - offset)
+                        vData[0] = range1 * (rs[:, 0] - offset)
+                        vData[1] = range2 * (rs[:, 1] - offset)
 
                 # lT.append('Sort/Avg: %.1f ms' % ((time.clock()-t0)*1000))
                 # log.info(str(lT))
@@ -570,19 +624,24 @@ class AlazarTechDigitizer():
             except:
                 pass
             lT.append('Abort: %.1f ms' % ((time.clock()-t0)*1000))
-        # normalize        
+        # normalize
         # log.info('Average: %.1f ms' % np.mean(lAvTime))
         vData[0] /= buffersPerAcquisition
         vData[1] /= buffersPerAcquisition
         # # log timing information
         lT.append('Done: %.1f ms' % ((time.clock()-t0)*1000))
         log.info(str(lT))
-        #return data - requested vector length, not restricted to 128 multiple
-        if nPtsOut != (samplesPerRecordValue*nRecord):
-            if len(vData[0])>0:
-                vData[0] = vData[0].reshape((nRecord,samplesPerRecord))[:,:samplesPerRecordValue].flatten()
-            if len(vData[1])>0:
-                vData[1] = vData[1].reshape((nRecord,samplesPerRecord))[:,:samplesPerRecordValue].flatten()
+        if not fft_config.get('enabled', False):
+            # return data - requested length, not restricted to 128 multiple
+            if nPtsOut != (samplesPerRecordValue*nRecord):
+                if len(vData[0]) > 0:
+                    vData[0] = (
+                        vData[0].reshape((nRecord, samplesPerRecord))
+                        [:, :samplesPerRecordValue].flatten())
+                if len(vData[1]) > 0:
+                    vData[1] = (
+                        vData[1].reshape((nRecord, samplesPerRecord))
+                        [:, :samplesPerRecordValue].flatten())
         return vData
 
 
