@@ -28,7 +28,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         options = []
         if self.dig.fft_enabled:
             options.append('FFT')
-        self.setOptions(options)
+        self.setInstalledOptions(options)
 
 
     def performClose(self, bError=False, options={}):

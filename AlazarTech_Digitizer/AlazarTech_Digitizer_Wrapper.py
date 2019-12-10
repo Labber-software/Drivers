@@ -200,27 +200,27 @@ class AlazarTechDigitizer():
         return rate.value
 
     def AlazarDSPGenerateWindowFunction(
-            windowType, windowLength_samples, paddingLength_samples):
+            self, windowType, windowLength_samples, paddingLength_samples):
         # get windows
         window = np.zeros(
             windowLength_samples + paddingLength_samples, dtype=np.float32)
         self.callFunc(
             'AlazarDSPGenerateWindowFunction',
             U32(windowType),
-            window.ctypes.data_as(POINTER(c_float)),
+            window.ctypes.data_as(ctypes.POINTER(c_float)),
             U32(windowLength_samples),
             U32(paddingLength_samples))
         # set window
         self.callFunc(
             'AlazarFFTSetWindowFunction', self.fft_module,
             U32(windowLength_samples + paddingLength_samples),
-            window.ctypes.data_as(POINTER(c_float)),
+            window.ctypes.data_as(ctypes.POINTER(c_float)),
             c_void_p())
         return window
 
     # ats.AlazarFFTSetup.restype = U32
     # ats.AlazarFFTSetup.argtypes = [c_void_p, U16,
-    #     U32, U32, U32, U32, U32, POINTER(c_uint32)]
+    #     U32, U32, U32, U32, U32, ctypes.POINTER(c_uint32)]
     # ats.AlazarFFTSetup.errcheck = returnCodeCheck
 
     def AlazarFFTSetup(self, inputChannelMask, recordLength_samples,
@@ -463,7 +463,7 @@ class AlazarTechDigitizer():
             if fft_config.get('enabled', False):
                 # configure window
                 self.AlazarDSPGenerateWindowFunction(
-                    windowType, nSamples, fftLength - nSamples)
+                    fft_config['window'], nSamples, fftLength - nSamples)
                 # disable offset
                 self.AlazarFFTBackgroundSubtractionSetEnabled(False)
                 # configure FFT
@@ -472,7 +472,6 @@ class AlazarTechDigitizer():
                     fft_config['output'], 0, 0)
                 # get datatype
                 bytesPerBufferMem = self.bytesPerOutputRecord * recordsPerBuffer
-                lT.append('Buffer size, FFT: %d' % bytesPerBufferMem)
 
                 if fft_config['output'] in (3, 4):
                     # real or imag, signed int
@@ -542,6 +541,7 @@ class AlazarTechDigitizer():
                      np.zeros(nPtsOut, dtype=float)]
             #range and zero for conversion to voltages
             if fft_config.get('enabled', False):
+                lT.append('Buffer size, FFT: %d, %d' % (self.bytesPerOutputRecord, recordsPerBuffer))
                 range1 = self.fft_scale
                 offset = 0.0
             else:
