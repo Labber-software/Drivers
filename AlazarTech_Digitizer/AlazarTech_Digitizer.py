@@ -26,7 +26,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                    timeout=timeout)
         self.dig.testLED()
         options = []
-        if dig.fft_enabled:
+        if self.dig.fft_enabled:
             options.append('FFT')
         self.setOptions(options)
 
