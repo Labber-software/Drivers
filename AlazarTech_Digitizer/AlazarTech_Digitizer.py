@@ -25,6 +25,10 @@ class Driver(InstrumentDriver.InstrumentWorker):
         self.dig = AlazarDig.AlazarTechDigitizer(systemId=1, boardId=boardId,
                    timeout=timeout)
         self.dig.testLED()
+        options = []
+        if dig.fft_enabled:
+            options.append('FFT')
+        self.setOptions(options)
 
 
     def performClose(self, bError=False, options={}):
@@ -92,6 +96,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         nBuffer = int(self.getValue('Records per Buffer'))
         nMemSize = int(self.getValue('Max buffer size'))
         nMaxBuffer = int(self.getValue('Max number of buffers'))
+        fft_config = self.get_fft_config()
         if (not bGetCh1) and (not bGetCh2):
             return
         # configure and start acquisition
@@ -103,12 +108,14 @@ class Driver(InstrumentDriver.InstrumentWorker):
             # need to re-configure the card since record size was not known at config
             self.dig.readTracesDMA(bGetCh1, bGetCh2, nSample, n_seq, nBuffer, nAverage,
                                    bConfig=True, bArm=True, bMeasure=False, 
-                                   bufferSize=nMemSize, maxBuffers=nMaxBuffer)
+                                   bufferSize=nMemSize, maxBuffers=nMaxBuffer,
+                                   fft_config=fft_config)
         else:
             # if not hardware looping, just trig the card, buffers are already configured 
             self.dig.readTracesDMA(bGetCh1, bGetCh2, nSample, nRecord, nBuffer, nAverage,
                                    bConfig=False, bArm=True, bMeasure=False,
-                                   bufferSize=nMemSize, maxBuffers=nMaxBuffer)
+                                   bufferSize=nMemSize, maxBuffers=nMaxBuffer,
+                                   fft_config=fft_config)
 
 
     def _callbackProgress(self, progress):
@@ -129,6 +136,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             nBuffer = int(self.getValue('Records per Buffer'))
             nMemSize = int(self.getValue('Max buffer size'))
             nMaxBuffer = int(self.getValue('Max number of buffers'))
+            fft_config = self.get_fft_config()
             # show status before starting acquisition
             self.reportStatus('Digitizer - Waiting for signal')
             # get data
@@ -139,7 +147,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
                            funcProgress=self._callbackProgress,
                            firstTimeout=self.dComCfg['Timeout']+180.0,
                            bufferSize=nMemSize,
-                           maxBuffers=nMaxBuffer)
+                           maxBuffers=nMaxBuffer,
+                           fft_config=fft_config)
             # re-shape data and place in trace buffer
             self.lTrace[0] = vCh1.reshape((n_seq, nSample))
             self.lTrace[1] = vCh2.reshape((n_seq, nSample))
@@ -249,12 +258,14 @@ class Driver(InstrumentDriver.InstrumentWorker):
         nBuffer = int(self.getValue('Records per Buffer'))
         nMemSize = int(self.getValue('Max buffer size'))
         nMaxBuffer = int(self.getValue('Max number of buffers'))
+        fft_config = self.get_fft_config()
         # configure DMA read
         self.dig.readTracesDMA(bGetCh1, bGetCh2,
                                nPostSize, nRecord, nBuffer, nAverage,
                                bConfig=True, bArm=False, bMeasure=False,
                                bufferSize=nMemSize,
-                               maxBuffers=nMaxBuffer)
+                               maxBuffers=nMaxBuffer,
+                               fft_config=fft_config)
 
 
     def getTracesDMA(self, hardware_trig=False):
@@ -268,6 +279,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         nBuffer = int(self.getValue('Records per Buffer'))
         nMemSize = int(self.getValue('Max buffer size'))
         nMaxBuffer = int(self.getValue('Max number of buffers'))
+        fft_config = self.get_fft_config()
         # in hardware trig mode, there is no noed to re-arm the card
         bArm = not hardware_trig
         # get data
@@ -276,7 +288,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
                                          bConfig=False, bArm=bArm, bMeasure=True,
                                          funcStop=self.isStopped,
                                          bufferSize=nMemSize,
-                                         maxBuffers=nMaxBuffer)
+                                         maxBuffers=nMaxBuffer,
+                                         fft_config=fft_config)
 
 
     def getTracesNonDMA(self):
@@ -315,7 +328,14 @@ class Driver(InstrumentDriver.InstrumentWorker):
             self.lTrace[0] = self.dig.readTraces(1)
         if bGetCh2:
             self.lTrace[1] = self.dig.readTraces(2)
-            
+
+    def get_fft_config(self):
+        """Get FFT configuration in format suitable for Alazartech settings"""
+        d = {}
+        d['enabled'] = self.dig.fft_enabled and self.getValue('FFT - Enabled')
+        d['window'] = self.getValueIndex('FFT - Window')
+        d['output'] = int(self.getCmdStringFromValue('FFT - Output'))
+        return d     
 
 
 if __name__ == '__main__':
