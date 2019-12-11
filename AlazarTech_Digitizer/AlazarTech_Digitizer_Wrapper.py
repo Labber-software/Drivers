@@ -417,6 +417,12 @@ class AlazarTechDigitizer():
             fftLength = 1
             while fftLength < samplesPerRecord:
                 fftLength *= 2
+            
+            # show error if fft length is too long
+            if fftLength > self.fft_max_length:
+                raise Exception(
+                    'The instrument only supports on-board FFT of up to ' +
+                    '%d points.' % self.fft_max_length)
             # samples per record will match fft length / 2 (single sided spec)
             bytesPerRecord = bytesPerSample * fftLength / 2
             nPtsOut = int(nPtsOut // 2)
