@@ -478,9 +478,17 @@ class AlazarTechDigitizer():
                 if fft_config['output'] in (3, 4):
                     # real or imag, signed int
                     sample_type = ctypes.c_int32
-                    self.fft_scale = self.dRange[1] / (2**31)
-                else:
-                    # amp2 or log amp, 32bit float
+                    self.fft_scale = ((self.dRange[1] /
+                                      2**(self.bitsPerSample - 1)) /
+                                      (fftLength / 2))
+                elif fft_config['output'] in (10, ):
+                    # amp2, 32bit float
+                    sample_type = ctypes.c_float
+                    self.fft_scale = ((self.dRange[1] / 
+                                      2**(self.bitsPerSample - 1)) /
+                                      (fftLength / 2))**2
+                elif fft_config['output'] in (11, ):
+                    # log amp, 32bit float, scaling happens by sub at end
                     sample_type = ctypes.c_float
                     self.fft_scale = 1.0
 
@@ -616,7 +624,8 @@ class AlazarTechDigitizer():
                 # - 0xFF represents a positive full scale input signal.
     
                 # Add the buffer to the end of the list of available buffers.
-                self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
+                if (buffersCompleted < buffersPerAcquisition):
+                    self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
         except Exception:
             try:
                 self.removeBuffersDMA()
@@ -650,6 +659,14 @@ class AlazarTechDigitizer():
                     vData[1] = (
                         vData[1].reshape((nRecord, samplesPerRecord))
                         [:, :samplesPerRecordValue].flatten())
+
+        else:
+            if fft_config['output'] in (11, ):
+                # log amp, 32bit float, re-scale by subtracting
+                vData[0] *= 0.1
+                vData[0] += np.log10(
+                    ((self.dRange[1] / 2**(self.bitsPerSample - 1)) /
+                    (fftLength / 2))**2)
         return vData
 
 
