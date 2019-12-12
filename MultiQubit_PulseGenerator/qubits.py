@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
+import logging
+log = logging.getLogger('LabberDriver')
 
 
 class Qubit:
@@ -135,4 +137,7 @@ class Transmon(Qubit):
 
     def df_to_dV(self, df):  # noqa 102
         f0 = self.V_to_f(self.V0)
+        # log.info('---> f0: ' + str(f0))
+        # log.info('--> df: ' + str(df))
+        # log.info('--> df + f0: ' + str(df+f0))
         return self.f_to_V(df + f0) - self.V0

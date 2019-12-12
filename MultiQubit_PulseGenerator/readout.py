@@ -7,22 +7,21 @@ import numpy as np
 log = logging.getLogger('LabberDriver')
 
 
-class Readout(object):
+class Demodulation(object):
     """Demodulate multi-tone qubit readout.
 
     Parameters
     ----------
-    max_qubit : int
-        The maximum number of qubits (the default is 9).
+    n_qubit : int
+        The number of qubits to readout.
 
     """
 
-    def __init__(self, max_qubit=9):
+    def __init__(self, n_qubit):
         # define variables
-        self.max_qubit = max_qubit
-        self.n_readout = max_qubit
+        self.n_qubit = n_qubit
         self.sample_rate = 1E9
-        self.frequencies = np.zeros(self.max_qubit)
+        self.frequencies = np.zeros(self.n_qubit)
 
         # demodulation
         self.demod_skip = 0.0
@@ -47,7 +46,7 @@ class Readout(object):
         self.n_readout = d[config.get('Number of qubits')]
 
         # demodulation
-        for n in range(self.max_qubit):
+        for n in range(self.n_qubit):
             self.frequencies[n] = config.get('Readout frequency #%d' % (n + 1))
         self.demod_skip = config.get('Demodulation - Skip')
         self.demod_length = config.get('Demodulation - Length')

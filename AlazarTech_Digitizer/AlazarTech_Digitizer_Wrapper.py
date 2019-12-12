@@ -41,9 +41,10 @@ class DMABuffer:
         if os.name == 'nt':
             MEM_COMMIT = 0x1000
             PAGE_READWRITE = 0x4
-            windll.kernel32.VirtualAlloc.argtypes = [c_void_p, c_long, c_long, c_long]
-            windll.kernel32.VirtualAlloc.restype = c_void_p
-            self.addr = windll.kernel32.VirtualAlloc(
+            kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+            kernel32.VirtualAlloc.argtypes = [c_void_p, c_long, c_long, c_long]
+            kernel32.VirtualAlloc.restype = c_void_p
+            self.addr = kernel32.VirtualAlloc(
                 0, c_long(size_bytes), MEM_COMMIT, PAGE_READWRITE)
         elif os.name == 'posix':
             libc.valloc.argtypes = [c_long]
@@ -62,9 +63,10 @@ class DMABuffer:
     def __exit__(self):
         if os.name == 'nt':
             MEM_RELEASE = 0x8000
-            windll.kernel32.VirtualFree.argtypes = [c_void_p, c_long, c_long]
-            windll.kernel32.VirtualFree.restype = c_int
-            windll.kernel32.VirtualFree(c_void_p(self.addr), 0, MEM_RELEASE);
+            kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+            kernel32.VirtualFree.argtypes = [c_void_p, c_long, c_long]
+            kernel32.VirtualFree.restype = c_int
+            kernel32.VirtualFree(c_void_p(self.addr), 0, MEM_RELEASE);
         elif os.name == 'posix':
             libc.free(self.addr)
         else:
@@ -104,7 +106,7 @@ class AlazarTechDigitizer():
         handle = func(U32(systemId), U32(boardId))
         if handle is None:
             raise Error('Device with system ID=%d and board ID=%d could not be found.' % (systemId, boardId))
-        self.handle = handle
+        self.handle = c_void_p(handle)
         # get mem and bitsize
         (self.memorySize_samples, self.bitsPerSample) = self.AlazarGetChannelInfo()
 
@@ -252,12 +254,12 @@ class AlazarTechDigitizer():
         
     def AlazarPostAsyncBuffer(self, buffer, bufferLength):
         '''Posts a DMA buffer to a board.'''
-        self.callFunc('AlazarPostAsyncBuffer', self.handle, buffer, bufferLength)
+        self.callFunc('AlazarPostAsyncBuffer', self.handle, c_void_p(buffer), bufferLength)
         
         
     def AlazarWaitAsyncBufferComplete(self, buffer, timeout_ms):
         '''Blocks until the board confirms that buffer is filled with data.'''
-        self.callFunc('AlazarWaitAsyncBufferComplete', self.handle, buffer, timeout_ms)
+        self.callFunc('AlazarWaitAsyncBufferComplete', self.handle, c_void_p(buffer), timeout_ms)
 
 
     def readTracesDMA(self, bGetCh1, bGetCh2, nSamples, nRecord, nBuffer, nAverage=1,
@@ -380,7 +382,7 @@ class AlazarTechDigitizer():
             bytesTransferred = 0
             #initialize data array
             nPtsOut = samplesPerRecord * nRecord
-            nAvPerBuffer = recordsPerBuffer/nRecord
+            nAvPerBuffer = int(recordsPerBuffer // nRecord)
             vData = [np.zeros(nPtsOut, dtype=float), np.zeros(nPtsOut, dtype=float)]
             #range and zero for conversion to voltages
             codeZero = 2 ** (float(self.bitsPerSample) - 1) - 0.5
