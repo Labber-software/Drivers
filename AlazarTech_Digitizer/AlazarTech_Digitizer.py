@@ -74,7 +74,9 @@ class Driver(InstrumentDriver.InstrumentWorker):
                     self.getTracesDMA(hardware_trig=self.isHardwareTrig(options))
             indx = self.signal_index[quant.name]
             # return correct data
-            value = quant.getTraceDict(self.lTrace[indx], dt=self.dt)
+            fft_config = self.get_fft_config()
+            dt = fft_config['df'] if fft_config['enabled'] else self.dt
+            value = quant.getTraceDict(self.lTrace[indx], dt=dt)
         else:
             # just return the quantity value
             value = quant.getValue()
@@ -158,8 +160,9 @@ class Driver(InstrumentDriver.InstrumentWorker):
             self.lTrace[1] = vCh2.reshape((n_seq, nSample))
         # after getting data, pick values to return
         indx = self.signal_index[quant.name]
+        dt = fft_config['df'] if fft_config['enabled'] else self.dt
         value = quant.getTraceDict(
-            self.lTrace[indx][seq_no], dt=self.dt)
+            self.lTrace[indx][seq_no], dt=dt)
         return value
 
 
@@ -340,7 +343,13 @@ class Driver(InstrumentDriver.InstrumentWorker):
         d['enabled'] = self.dig.fft_enabled and self.getValue('FFT - Enabled')
         d['window'] = self.getValueIndex('FFT - Window')
         d['output'] = int(self.getCmdStringFromValue('FFT - Output'))
-        return d     
+        # get frequency
+        n_sample = int(self.getValue('Number of samples'))
+        fft_length = 1
+        while fft_length < n_sample:
+            fft_length *= 2
+        d['df'] = 1 / (2*self.dt*fft_length)
+        return d
 
 
 if __name__ == '__main__':
