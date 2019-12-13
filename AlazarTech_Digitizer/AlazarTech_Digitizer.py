@@ -76,19 +76,6 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 else:
                     self.getTracesDMA(hardware_trig=self.isHardwareTrig(options))
             value = self.extract_trace_value(quant)
-            # indx = self.signal_index[quant.name]
-            # # return correct data
-            # fft_config = self.get_fft_config()
-            # dt = fft_config['df'] if fft_config['enabled'] else self.dt
-            # value = quant.getTraceDict(self.lTrace[indx], dt=dt)
-            # if quant.name.startswith('FFT - Value'):
-            #     indx_fft = int(quant.name.split('FFT - Value ')[1])
-            #     freq = self.getValue('FFT - Frequency %d' % indx_fft)
-            #     # find closest frequency
-            #     (fx, fy) = quant.getTraceXY(value)
-            #     interp1 = interp1d(
-            #         fx, fy, kind='quadratic', copy=False, assume_sorted=True)
-            #     value = float(interp1(freq))
         else:
             # just return the quantity value
             value = quant.getValue()
@@ -172,10 +159,6 @@ class Driver(InstrumentDriver.InstrumentWorker):
             self.lTrace[1] = vCh2.reshape((n_seq, nSample))
         # after getting data, pick values to return
         value = self.extract_trace_value(quant, seq_no)
-        # indx = self.signal_index[quant.name]
-        # dt = fft_config['df'] if fft_config['enabled'] else self.dt
-        # value = quant.getTraceDict(
-        #     self.lTrace[indx][seq_no], dt=dt)
         return value
 
 
@@ -388,7 +371,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             # find closest frequency
             (fx, fy) = quant.getTraceXY(value)
             interp1 = interp1d(
-                fx, fy, kind='quadratic', copy=False, assume_sorted=True)
+                fx, fy, kind='linear', copy=False, assume_sorted=True)
             value = float(interp1(freq))
         return value
 
