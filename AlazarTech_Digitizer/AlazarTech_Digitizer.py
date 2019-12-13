@@ -3,7 +3,7 @@
 import AlazarTech_Digitizer_Wrapper as AlazarDig
 import InstrumentDriver
 import numpy as np
-
+from scipy.interpolate import interp1d
 
 class Error(Exception):
     pass
@@ -21,12 +21,15 @@ class Driver(InstrumentDriver.InstrumentWorker):
             'Ch1 - Data': 0,
             'Ch2 - Data': 1,
             'FFT - Data': 0}
+        # add single-frequency values
+        for n in range(9):
+            self.signal_index['FFT - Value %d' % (n+1)] = 0
         self.dt = 1.0
         # open connection
         boardId = int(self.comCfg.address)
         timeout = self.dComCfg['Timeout']
-        self.dig = AlazarDig.AlazarTechDigitizer(systemId=1, boardId=boardId,
-                   timeout=timeout)
+        self.dig = AlazarDig.AlazarTechDigitizer(
+            systemId=1, boardId=boardId, timeout=timeout)
         self.dig.testLED()
         options = []
         if self.dig.fft_enabled:
@@ -72,11 +75,20 @@ class Driver(InstrumentDriver.InstrumentWorker):
                     self.getTracesNonDMA()
                 else:
                     self.getTracesDMA(hardware_trig=self.isHardwareTrig(options))
-            indx = self.signal_index[quant.name]
-            # return correct data
-            fft_config = self.get_fft_config()
-            dt = fft_config['df'] if fft_config['enabled'] else self.dt
-            value = quant.getTraceDict(self.lTrace[indx], dt=dt)
+            value = self.extract_trace_value(quant)
+            # indx = self.signal_index[quant.name]
+            # # return correct data
+            # fft_config = self.get_fft_config()
+            # dt = fft_config['df'] if fft_config['enabled'] else self.dt
+            # value = quant.getTraceDict(self.lTrace[indx], dt=dt)
+            # if quant.name.startswith('FFT - Value'):
+            #     indx_fft = int(quant.name.split('FFT - Value ')[1])
+            #     freq = self.getValue('FFT - Frequency %d' % indx_fft)
+            #     # find closest frequency
+            #     (fx, fy) = quant.getTraceXY(value)
+            #     interp1 = interp1d(
+            #         fx, fy, kind='quadratic', copy=False, assume_sorted=True)
+            #     value = float(interp1(freq))
         else:
             # just return the quantity value
             value = quant.getValue()
@@ -159,10 +171,11 @@ class Driver(InstrumentDriver.InstrumentWorker):
             self.lTrace[0] = vCh1.reshape((n_seq, nSample))
             self.lTrace[1] = vCh2.reshape((n_seq, nSample))
         # after getting data, pick values to return
-        indx = self.signal_index[quant.name]
-        dt = fft_config['df'] if fft_config['enabled'] else self.dt
-        value = quant.getTraceDict(
-            self.lTrace[indx][seq_no], dt=dt)
+        value = self.extract_trace_value(quant, seq_no)
+        # indx = self.signal_index[quant.name]
+        # dt = fft_config['df'] if fft_config['enabled'] else self.dt
+        # value = quant.getTraceDict(
+        #     self.lTrace[indx][seq_no], dt=dt)
         return value
 
 
@@ -350,6 +363,34 @@ class Driver(InstrumentDriver.InstrumentWorker):
             fft_length *= 2
         d['df'] = 1 / (self.dt*fft_length)
         return d
+
+    def extract_trace_value(self, quant, record=None):
+        """Get value from traces, either as pure data, fft, or fft value
+        
+        Parameters
+        ----------
+        quant : Quantity
+            Quantity to extract
+        record : int, optional
+            Record to get, by default None
+        """
+        indx = self.signal_index[quant.name]
+        # return correct data
+        fft_config = self.get_fft_config()
+        dt = fft_config['df'] if fft_config['enabled'] else self.dt
+        if record is None:
+            value = quant.getTraceDict(self.lTrace[indx], dt=dt)
+        else:
+            value = quant.getTraceDict(self.lTrace[indx][record], dt=dt)
+        if quant.name.startswith('FFT - Value'):
+            indx_fft = int(quant.name.split('FFT - Value ')[1])
+            freq = self.getValue('FFT - Frequency %d' % indx_fft)
+            # find closest frequency
+            (fx, fy) = quant.getTraceXY(value)
+            interp1 = interp1d(
+                fx, fy, kind='quadratic', copy=False, assume_sorted=True)
+            value = float(interp1(freq))
+        return value
 
 
 if __name__ == '__main__':
