@@ -348,7 +348,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         fft_length = 1
         while fft_length < n_sample:
             fft_length *= 2
-        d['df'] = 1 / (2*self.dt*fft_length)
+        d['df'] = 1 / (self.dt*fft_length)
         return d
 
 
