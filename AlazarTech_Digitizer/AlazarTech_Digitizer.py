@@ -17,7 +17,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         self.dig = None
         # keep track of sampled traces
         self.lTrace = [np.array([]), np.array([])]
-        self.signal_index = dict{
+        self.signal_index = {
             'Ch1 - Data': 0,
             'Ch2 - Data': 1,
             'FFT - Data': 0}
@@ -72,7 +72,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                     self.getTracesNonDMA()
                 else:
                     self.getTracesDMA(hardware_trig=self.isHardwareTrig(options))
-            indx = self.signal_index(quant.name)
+            indx = self.signal_index[quant.name]
             # return correct data
             value = quant.getTraceDict(self.lTrace[indx], dt=self.dt)
         else:
@@ -157,7 +157,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             self.lTrace[0] = vCh1.reshape((n_seq, nSample))
             self.lTrace[1] = vCh2.reshape((n_seq, nSample))
         # after getting data, pick values to return
-        indx = self.signal_index(quant.name)
+        indx = self.signal_index[quant.name]
         value = quant.getTraceDict(
             self.lTrace[indx][seq_no], dt=self.dt)
         return value
