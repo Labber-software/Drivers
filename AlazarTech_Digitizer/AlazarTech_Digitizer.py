@@ -366,6 +366,8 @@ class Driver(InstrumentDriver.InstrumentWorker):
         else:
             value = quant.getTraceDict(self.lTrace[indx][record], dt=dt)
         if quant.name.startswith('FFT - Value'):
+            if not fft_config['enabled']:
+                return 0.0
             indx_fft = int(quant.name.split('FFT - Value ')[1])
             freq = self.getValue('FFT - Frequency %d' % indx_fft)
             # find closest frequency
