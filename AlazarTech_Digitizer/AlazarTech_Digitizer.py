@@ -17,7 +17,10 @@ class Driver(InstrumentDriver.InstrumentWorker):
         self.dig = None
         # keep track of sampled traces
         self.lTrace = [np.array([]), np.array([])]
-        self.lSignalNames = ['Ch1 - Data', 'Ch2 - Data']
+        self.signal_index = dict{
+            'Ch1 - Data': 0,
+            'Ch2 - Data': 1,
+            'FFT - Data': 0}
         self.dt = 1.0
         # open connection
         boardId = int(self.comCfg.address)
@@ -56,7 +59,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
     def performGetValue(self, quant, options={}):
         """Perform the Get Value instrument operation"""
         # only implmeneted for traces
-        if quant.name in self.lSignalNames:
+        if quant.name in self.signal_index:
             # special case for hardware looping
             if self.isHardwareLoop(options):
                 return self.getSignalHardwareLoop(quant, options)
@@ -69,7 +72,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                     self.getTracesNonDMA()
                 else:
                     self.getTracesDMA(hardware_trig=self.isHardwareTrig(options))
-            indx = self.lSignalNames.index(quant.name)
+            indx = self.signal_index(quant.name)
             # return correct data
             value = quant.getTraceDict(self.lTrace[indx], dt=self.dt)
         else:
@@ -84,7 +87,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         if self.getModel() in ('9870',):
             return
         # make sure we are arming for reading traces, if not return
-        signals = [name in self.lSignalNames for name in quant_names]
+        signals = [name in self.signal_index for name in quant_names]
         if not np.any(signals):
             return
         # get config
@@ -150,12 +153,13 @@ class Driver(InstrumentDriver.InstrumentWorker):
                            maxBuffers=nMaxBuffer,
                            fft_config=fft_config)
             # re-shape data and place in trace buffer
+            nSample = len(vCh1) / n_seq
             self.lTrace[0] = vCh1.reshape((n_seq, nSample))
             self.lTrace[1] = vCh2.reshape((n_seq, nSample))
         # after getting data, pick values to return
-        indx = self.lSignalNames.index(quant.name)
-        value = quant.getTraceDict(self.lTrace[indx][seq_no],
-                                                dt=self.dt)
+        indx = self.signal_index(quant.name)
+        value = quant.getTraceDict(
+            self.lTrace[indx][seq_no], dt=self.dt)
         return value
 
 
@@ -283,13 +287,14 @@ class Driver(InstrumentDriver.InstrumentWorker):
         # in hardware trig mode, there is no noed to re-arm the card
         bArm = not hardware_trig
         # get data
-        self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(bGetCh1, bGetCh2,
-                                         nPostSize, nRecord, nBuffer, nAverage,
-                                         bConfig=False, bArm=bArm, bMeasure=True,
-                                         funcStop=self.isStopped,
-                                         bufferSize=nMemSize,
-                                         maxBuffers=nMaxBuffer,
-                                         fft_config=fft_config)
+        self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(
+            bGetCh1, bGetCh2,
+            nPostSize, nRecord, nBuffer, nAverage,
+            bConfig=False, bArm=bArm, bMeasure=True,
+            funcStop=self.isStopped,
+            bufferSize=nMemSize,
+            maxBuffers=nMaxBuffer,
+            fft_config=fft_config)
 
 
     def getTracesNonDMA(self):
