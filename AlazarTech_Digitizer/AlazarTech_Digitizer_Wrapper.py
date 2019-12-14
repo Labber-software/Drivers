@@ -626,11 +626,12 @@ class AlazarTechDigitizer():
                 # Add the buffer to the end of the list of available buffers.
                 if (buffersCompleted < buffersPerAcquisition):
                     self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
-        except Exception:
+        except Exception as e:
             try:
                 self.removeBuffersDMA()
             except Exception:
                 pass
+            raise e
         finally:
             # release resources
             try:
