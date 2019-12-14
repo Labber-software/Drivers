@@ -262,6 +262,9 @@ class Driver(InstrumentDriver.InstrumentWorker):
         nMemSize = int(self.getValue('Max buffer size'))
         nMaxBuffer = int(self.getValue('Max number of buffers'))
         fft_config = self.get_fft_config()
+        # set ignore error flag
+        self.dig.ignore_buffer_overflow = bool(
+            self.getValue('Ignore buffer overflow'))
         # configure DMA read
         self.dig.readTracesDMA(bGetCh1, bGetCh2,
                                nPostSize, nRecord, nBuffer, nAverage,

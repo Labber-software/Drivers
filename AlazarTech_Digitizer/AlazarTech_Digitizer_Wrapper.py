@@ -119,6 +119,7 @@ class AlazarTechDigitizer():
         except Exception:
             self.fft_enabled = False
             self.fft_module = None
+        self.ignore_buffer_overflow = False
 
     def testLED(self):
         import time
@@ -627,11 +628,12 @@ class AlazarTechDigitizer():
                 if (buffersCompleted < buffersPerAcquisition):
                     self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
         except Exception as e:
-            try:
-                self.removeBuffersDMA()
-            except Exception:
-                pass
-            raise e
+            if not self.ignore_buffer_overflow:
+                try:
+                    self.removeBuffersDMA()
+                except Exception:
+                    pass
+                raise e
         finally:
             # release resources
             try:
