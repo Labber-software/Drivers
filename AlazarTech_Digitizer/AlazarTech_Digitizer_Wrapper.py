@@ -454,6 +454,11 @@ class AlazarTechDigitizer():
         bufferCount = max(1, 2*maxBufferCount)
         # don't allocate more buffers than needed for all data
         bufferCount = min(bufferCount, buffersPerAcquisition, maxBuffers)
+        # initialize data array, if measure
+        if bMeasure:
+            vData = [np.zeros(nPtsOut, dtype=float),
+                     np.zeros(nPtsOut, dtype=float)]
+
         lT.append('Total buffers needed: %d' % buffersPerAcquisition)
         lT.append('Buffer count: %d' % bufferCount)
         lT.append('Buffer size: %d' % bytesPerBuffer)
@@ -546,11 +551,8 @@ class AlazarTechDigitizer():
             lT.append('Start: %.1f ms' % ((time.clock()-t0)*1000))
             buffersCompleted = 0
             bytesTransferred = 0
-            #initialize data array
             nAvPerBuffer = int(recordsPerBuffer // nRecord)
-            vData = [np.zeros(nPtsOut, dtype=float),
-                     np.zeros(nPtsOut, dtype=float)]
-            #range and zero for conversion to voltages
+            # range and zero for conversion to voltages
             if fft_config.get('enabled', False):
                 range1 = self.fft_scale
                 offset = 0.0
@@ -563,9 +565,6 @@ class AlazarTechDigitizer():
                 offset = 16.*codeZero
 
             timeout_ms = int(firstTimeout*1000)
-
-            log.info(str(lT))
-            lT = []
 
             while (buffersCompleted < buffersPerAcquisition):
                 # Wait for the buffer at the head of the list of available
