@@ -3,7 +3,7 @@
 from BaseDriver import LabberDriver
 import numpy as np
 from sklearn.svm import SVC
-from sklearn.svm import LinearSVC
+#from sklearn.svm import LinearSVC
 from sklearn.metrics import accuracy_score
 
 
