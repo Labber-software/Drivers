@@ -130,5 +130,44 @@ class SpinLocking(Sequence):
 
         return
 
+
+class ReadoutTraining(Sequence):
+    """Sequence for training readout state discriminator.
+
+    """
+
+    def generate_sequence(self, config):
+        """Generate sequence by adding gates/pulses to waveforms."""
+
+        training_type = config['Training type']
+        state = int(config['Training, input state'])
+        # currently only supports two states
+        n_state = 2
+
+        if training_type == 'Specific qubit':
+            # specific qubit, just add gate
+            qubit = int(config['Training, qubit']) - 1
+            if state:
+                self.add_gate(qubit, gates.Xp)
+
+        elif training_type == 'All qubits at once':
+            # add to all qubits
+            if state:
+                self.add_gate_to_all(gates.Xp)
+
+        elif training_type == 'All combinations':
+            # get bitstring for current state
+            bitstring = np.base_repr(state, n_state, self.n_qubit)
+            bitstring = bitstring[::-1][:self.n_qubit]
+            qubit_list = []
+            gate_list = []
+            for n in range(self.n_qubit):
+                if int(bitstring[n]):
+                    qubit_list.append(n)
+                    gate_list.append(gates.Xp)
+
+            self.add_gate(qubit_list, gate_list)
+
+
 if __name__ == '__main__':
     pass

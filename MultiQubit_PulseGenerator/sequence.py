@@ -994,10 +994,17 @@ class SequenceToWaveforms:
         # find the end of the sequence
         # only include readout in size estimate if all waveforms have same size
         if self.readout_match_main_size:
-            end = np.max([s.t_end for s in self.sequence_list]) + max_delay
+            if len(self.sequence_list) == 0:
+                end = max_delay
+            else:
+                end = np.max(
+                    [s.t_end for s in self.sequence_list]) + max_delay
         else:
-            end = np.max([s.t_end
-                          for s in self.sequence_list[0:-1]]) + max_delay
+            if len(self.sequence_list) <= 1:
+                end = max_delay
+            else:
+                end = np.max(
+                    [s.t_end for s in self.sequence_list[0:-1]]) + max_delay
 
         # create empty waveforms of the correct size
         if self.trim_to_sequence:
