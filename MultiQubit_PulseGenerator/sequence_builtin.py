@@ -28,6 +28,10 @@ class CPMG(Sequence):
         pi_to_q = config['Add pi pulses to Q']
         duration = config['Sequence duration']
         edge_to_edge = config['Edge-to-edge pulses']
+        if config['Add last pi/2 pulse to Q']:
+            pi2_final = gates.Y2p
+        else:
+            pi2_final = gates.X2p
 
         # select type of refocusing pi pulse
         gate_pi = gates.Yp if pi_to_q else gates.Xp
@@ -51,7 +55,7 @@ class CPMG(Sequence):
                 for i in range(n_pulse - 1):
                     self.add_gate_to_all(gate_pi, dt=dt)
                 # add final pi/2 pulse
-                self.add_gate_to_all(gates.X2p, dt=dt/2)
+                self.add_gate_to_all(pi2_final, dt=dt/2)
 
         else:
             # center-to-center spacing, set absolute pulse positions
@@ -61,7 +65,7 @@ class CPMG(Sequence):
                 self.add_gate_to_all(gate_pi,
                                      t0=(i + 0.5) * (duration / n_pulse))
             # add final pi/2 pulse
-            self.add_gate_to_all(gates.X2p, t0=duration)
+            self.add_gate_to_all(pi2_final, t0=duration)
 
 
 class PulseTrain(Sequence):
