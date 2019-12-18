@@ -3,10 +3,12 @@
 from BaseDriver import LabberDriver
 import numpy as np
 from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
 
 
 class Error(Exception):
     pass
+
 
 class Driver(LabberDriver):
     """ This class implements a Labber driver"""
@@ -19,11 +21,9 @@ class Driver(LabberDriver):
         self.training_cfg = {}
         self.init_training_data()
 
-
     def performClose(self, bError=False, options={}):
         """Perform the close instrument connection operation"""
         pass
-
 
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
         """Perform the Set Value instrument operation. This function should
@@ -78,7 +78,6 @@ class Driver(LabberDriver):
 
         return value
 
-
     def performGetValue(self, quant, options={}):
         """Perform the Get Value instrument operation"""
         # get traces if first call
@@ -91,6 +90,11 @@ class Driver(LabberDriver):
         elif quant.name.startswith('Average QB'):
             qubit = int(quant.name[10]) - 1
             value = np.mean(self.qubit_states[qubit])
+        elif quant.name.startswith('Assignment fidelity QB'):
+            #qubit = int(quant.name[22]) - 1
+            qubit = int(
+                quant.name.split('Assignment fidelity QB')[1].split(' ')[0])-1
+            value = self.assignment_fidelity[qubit]
         elif quant.name.startswith('Average state vector'):
             # states are encoded in array of ints
             m = self.n_state ** self.n_qubit
@@ -104,7 +108,6 @@ class Driver(LabberDriver):
             # just return the quantity value
             value = quant.getValue()
         return value
-
 
     def init_training_data(self):
         """Init training data"""
@@ -129,7 +132,7 @@ class Driver(LabberDriver):
         self.n_total_states = int(n_total)
         self.training_data = [
             [None for n1 in range(n_total)] for n2 in range(d['n_qubit'])]
-
+        self.assignment_fidelity = [0.0] * self.MAX_QUBITS
 
     def train_discriminator(self):
         """Train discriminator based on training data"""
@@ -155,6 +158,7 @@ class Driver(LabberDriver):
 
         # train for all active qubits
         self.svm = []
+        self.assignment_fidelity = [0.0] * self.MAX_QUBITS
         for qubit, data in enumerate(self.training_data):
             # initialize training data
             n_data = 0
@@ -190,6 +194,8 @@ class Driver(LabberDriver):
             svc.fit(X, y)
             # store in list of SVMs
             self.svm.append(svc)
+            # calculate assignment fidelity
+            self.assignment_fidelity[qubit] = accuracy_score(y, svc.predict(X))
 
         # mark training as valid
         self.training_valid = True
