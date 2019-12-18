@@ -48,14 +48,22 @@ class Driver(LabberDriver):
             # get qubit/state for which data is valid
             qubit = int(quant.name[-1])
             state = int(self.getValue('Training, input state'))
-            # store training data data
-            self.log(len(self.training_data), len(self.training_data[0]), len(self.training_data[1]))
-            if self.getValue('Training type') == 'Specific qubit':
-                # training specific qubit, only store if match
-                if qubit == int(self.getValue('Training, qubit')):
-                    self.training_data[qubit - 1][state] = training_vector
+            all_states = self.getValue('Train all states at once')
+
+            # do nothing and return directly if the call is for the wrong qubit
+            if (self.getValue('Training type') == 'Specific qubit' and
+                    qubit != int(self.getValue('Training, qubit'))):
+                return value
+
+            # reshape input data if training for all states at once
+            if all_states:
+                n_data = len(training_vector) // self.n_total_states
+                training_vector = training_vector.reshape(
+                    n_data, self.n_total_states)
+                for m in self.n_total_states:
+                    self.training_data[qubit - 1][m] = training_vector[:, m]
             else:
-                # data is for all qubits
+                # one state at a time
                 self.training_data[qubit - 1][state] = training_vector
 
         # if changing to use median, flag that re-training is necessary
@@ -118,6 +126,7 @@ class Driver(LabberDriver):
             n_total = d['n_state']
         elif d['training_type'] == 'All combinations':
             n_total = d['n_state'] ** d['n_qubit']
+        self.n_total_states = int(n_total)
         self.training_data = [
             [None for n1 in range(n_total)] for n2 in range(d['n_qubit'])]
 
@@ -146,7 +155,6 @@ class Driver(LabberDriver):
 
         # train for all active qubits
         self.svm = []
-        self.log('A:', len(self.training_data), len(self.training_data[0]), len(self.training_data[1]))
         for qubit, data in enumerate(self.training_data):
             # initialize training data
             n_data = 0
@@ -169,6 +177,7 @@ class Driver(LabberDriver):
                 if self.training_cfg['training_type'] == 'All combinations':
                     # if using all combinations, figure out what the state is
                     state = np.base_repr(m, self.n_state, self.MAX_QUBITS)
+                    state = state[::-1]
                     y[k:(k + len(x))] = int(state[qubit])
 
                 else:
