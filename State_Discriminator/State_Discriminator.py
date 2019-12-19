@@ -135,6 +135,38 @@ class Driver(LabberDriver):
             [None for n1 in range(n_total)] for n2 in range(d['n_qubit'])]
         self.assignment_fidelity = [0.0] * self.MAX_QUBITS
 
+    def _prepare_data(self, qubit, data, use_median=False):
+        """Prepare data to right format for SVM"""
+        # initialize training data
+        n_data = 0
+        for x in data:
+            if x is None:
+                return
+            n_data += (1 if use_median else len(x))
+        X = np.zeros((n_data, 2))
+        y = np.zeros(n_data, dtype=int)
+        k = 0
+        # collect training data
+        for m, x in enumerate(data):
+            # if using median, calculate real and imaginary separately
+            if use_median:
+                x = np.array([np.median(x.real) + 1j * np.median(x.imag)])
+                self.setValue('Pointer, QB%d-S%d' % (qubit + 1, m), x[0])
+
+            X[k:(k + len(x)), 0] = x.real
+            X[k:(k + len(x)), 1] = x.imag
+            if self.training_cfg['training_type'] == 'All combinations':
+                # if using all combinations, figure out what the state is
+                state = np.base_repr(m, self.n_state, self.MAX_QUBITS)
+                state = state[::-1]
+                y[k:(k + len(x))] = int(state[qubit])
+
+            else:
+                y[k:(k + len(x))] = m
+            # increase counter
+            k += len(x)
+        return (X, y)
+
     def train_discriminator(self):
         """Train discriminator based on training data"""
         # don't do anything is training data is unchanged
@@ -161,45 +193,19 @@ class Driver(LabberDriver):
         self.svm = []
         self.assignment_fidelity = [0.0] * self.MAX_QUBITS
         for qubit, data in enumerate(self.training_data):
-            # initialize training data
-            n_data = 0
-            for x in data:
-                if x is None:
-                    return
-                n_data += (1 if use_median else len(x))
-            X = np.zeros((n_data, 2))
-            y = np.zeros(n_data, dtype=int)
-            k = 0
-            # collect training data
-            for m, x in enumerate(data):
-                # if using median, calculate real and imaginary separately
-                if use_median:
-                    x = np.array([np.median(x.real) + 1j * np.median(x.imag)])
-                    self.setValue('Pointer, QB%d-S%d' % (qubit + 1, m), x[0])
-                else:
-                    # always update pointer state to median
-                    self.setValue('Pointer, QB%d-S%d' % (qubit + 1, m),
-                                  np.median(x.real) + 1j * np.median(x.imag))
-
-                X[k:(k + len(x)), 0] = x.real
-                X[k:(k + len(x)), 1] = x.imag
-                if self.training_cfg['training_type'] == 'All combinations':
-                    # if using all combinations, figure out what the state is
-                    state = np.base_repr(m, self.n_state, self.MAX_QUBITS)
-                    state = state[::-1]
-                    y[k:(k + len(x))] = int(state[qubit])
-
-                else:
-                    y[k:(k + len(x))] = m
-                # increase counter
-                k += len(x)
+            # prepare data both for full set and just median
+            (X, y) = self._prepare_data(qubit, data, use_median=False)
+            (Xm, ym) = self._prepare_data(qubit, data, use_median=True)
 
             # create SVM and fit data
             svc = SVC(**kwargs)
-            svc.fit(X, y)
+            if use_median:
+                svc.fit(Xm, ym)
+            else:
+                svc.fit(X, y)
             # store in list of SVMs
             self.svm.append(svc)
-            # calculate assignment fidelity
+            # calculate assignment fidelity using full data set
             self.assignment_fidelity[qubit] = accuracy_score(y, svc.predict(X))
 
         # mark training as valid
