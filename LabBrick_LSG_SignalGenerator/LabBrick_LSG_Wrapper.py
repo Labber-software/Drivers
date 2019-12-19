@@ -86,8 +86,9 @@ class LabBrick_SignalGenerator():
         lSerial = [d['serial'] for d in lDev]
         if iSerial not in lSerial:
             # raise error if device not found
-            sErr = ('Device with serial number "%d" cannot be found.\n\n' % iSerial) +\
-                    'Devices detected:\n'
+            sErr = (
+                ('Device with serial number "%d" cannot be found.' % iSerial) +
+                '\n\nDevices detected:\n')
             for dDev in lDev:
                 sErr += ('Name: %s, Serial: %d\n' % (dDev['name'], dDev['serial']))
             raise Error(sErr)
