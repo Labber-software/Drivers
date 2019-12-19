@@ -118,7 +118,7 @@ class LabBrick_SignalGenerator():
             fnLSG_GetModelName(devices[n1], nameBuffer)
             serial = int(fnLSG_GetSerialNumber(devices[n1]))
             d = dict()
-            d['name'] = str(nameBuffer.value)
+            d['name'] = str(nameBuffer.value.decode())
             d['serial'] = serial
             d['device_id'] = int(devices[n1])
             lDevice.append(d)
