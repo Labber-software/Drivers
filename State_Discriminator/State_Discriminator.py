@@ -85,15 +85,16 @@ class Driver(LabberDriver):
             self.calculate_states()
         # check input
         if quant.name.startswith('QB'):
-            qubit = int(quant.name[2]) - 1
+            # qubit = int(quant.name[2]) - 1
+            qubit = int(quant.name.split("QB")[1].split(' ')[0]) - 1
             value = self.qubit_states[qubit]
         elif quant.name.startswith('Average QB'):
-            qubit = int(quant.name[10]) - 1
+            # qubit = int(quant.name[10]) - 1
+            qubit = int(quant.name.split('QB')[1].split(' ')[0]) - 1
             value = np.mean(self.qubit_states[qubit])
         elif quant.name.startswith('Assignment fidelity QB'):
             #qubit = int(quant.name[22]) - 1
-            qubit = int(
-                quant.name.split('Assignment fidelity QB')[1].split(' ')[0])-1
+            qubit = int(quant.name.split('QB')[1].split(' ')[0]) - 1
             value = self.assignment_fidelity[qubit]
         elif quant.name.startswith('Average state vector'):
             # states are encoded in array of ints
@@ -175,6 +176,10 @@ class Driver(LabberDriver):
                 if use_median:
                     x = np.array([np.median(x.real) + 1j * np.median(x.imag)])
                     self.setValue('Pointer, QB%d-S%d' % (qubit + 1, m), x[0])
+                else:
+                    # always update pointer state to median
+                    self.setValue('Pointer, QB%d-S%d' % (qubit + 1, m),
+                                  np.median(x.real) + 1j * np.median(x.imag))
 
                 X[k:(k + len(x)), 0] = x.real
                 X[k:(k + len(x)), 1] = x.imag
