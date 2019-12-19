@@ -126,7 +126,7 @@ class LabBrick_Synthesizer():
         devices = ACTIVEDEVICES()
         nDev = fnLMS_GetDevInfo(byref(devices))
         for n1 in range(nDev):
-            nameBuffer = STRING(' '*32)
+            nameBuffer = STRING(b' '*32)
             fnLMS_GetModelName(devices[n1], nameBuffer)
             serial = int(fnLMS_GetSerialNumber(devices[n1]))
             d = dict()
