@@ -2,10 +2,7 @@ import InstrumentDriver
 import numpy as np
 import sys, time
 
-if sys.platform == 'win32':
-    from time import clock as timer
-else:
-    from time import time as timer
+from time import perf_counter as timer
 
 class Driver(InstrumentDriver.InstrumentWorker):
     """ This class implements a simple signal generator driver"""

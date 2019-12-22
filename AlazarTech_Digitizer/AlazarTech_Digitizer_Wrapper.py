@@ -367,7 +367,7 @@ class AlazarTechDigitizer():
                       firstTimeout=None, maxBuffers=1024,
                       fft_config={'enabled': False}):
         """read traces in NPT AutoDMA mode, convert to float, average to single trace"""
-        t0 = time.clock()
+        t0 = time.perf_counter()
         lT = []
 
         # use global timeout if not given
@@ -546,9 +546,9 @@ class AlazarTechDigitizer():
         if not bMeasure:
             return
 
-        lT.append('Post: %.1f ms' % ((time.clock()-t0)*1000))
+        lT.append('Post: %.1f ms' % ((time.perf_counter()-t0)*1000))
         try:
-            lT.append('Start: %.1f ms' % ((time.clock()-t0)*1000))
+            lT.append('Start: %.1f ms' % ((time.perf_counter()-t0)*1000))
             buffersCompleted = 0
             bytesTransferred = 0
             nAvPerBuffer = int(recordsPerBuffer // nRecord)
@@ -571,7 +571,7 @@ class AlazarTechDigitizer():
                 # buffers to be filled by the board.
                 buf = self.buffers[buffersCompleted % len(self.buffers)]
                 self.AlazarWaitAsyncBufferComplete(buf.addr, timeout_ms=timeout_ms)
-                # lT.append('Wait: %.1f ms' % ((time.clock()-t0)*1000))
+                # lT.append('Wait: %.1f ms' % ((time.perf_counter()-t0)*1000))
 
                 # reset timeout time, can be different than first call
                 timeout_ms = int(timeout*1000)
@@ -614,7 +614,7 @@ class AlazarTechDigitizer():
                         vData[0] = range1 * (rs[:, 0] - offset)
                         vData[1] = range2 * (rs[:, 1] - offset)
 
-                # lT.append('Sort/Avg: %.1f ms' % ((time.clock()-t0)*1000))
+                # lT.append('Sort/Avg: %.1f ms' % ((time.perf_counter()-t0)*1000))
                 # log.info(str(lT))
                 # lT = []
                 #
@@ -642,13 +642,13 @@ class AlazarTechDigitizer():
                     self.AlazarAbortAsyncRead()
             except Exception:
                 pass
-            lT.append('Abort: %.1f ms' % ((time.clock()-t0)*1000))
+            lT.append('Abort: %.1f ms' % ((time.perf_counter()-t0)*1000))
         # normalize
         # log.info('Average: %.1f ms' % np.mean(lAvTime))
         vData[0] /= buffersPerAcquisition
         vData[1] /= buffersPerAcquisition
         # # log timing information
-        lT.append('Done: %.1f ms' % ((time.clock()-t0)*1000))
+        lT.append('Done: %.1f ms' % ((time.perf_counter()-t0)*1000))
         log.info(str(lT))
         if not fft_config.get('enabled', False):
             # return data - requested length, not restricted to 128 multiple

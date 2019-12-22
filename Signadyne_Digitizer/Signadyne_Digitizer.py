@@ -129,7 +129,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         """Get all active traces"""
         # test timing
 #        import time
-#        t0 = time.clock()
+#        t0 = time.perf_counter()
 #        lT = []
         # find out which traces to get
         self.lTrace = [np.array([])] * self.nCh
@@ -168,7 +168,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             #
             # start acquiring data
             self.dig.DAQstartMultiple(iChMask)
-#        lT.append('Start %.1f ms' % (1000*(time.clock()-t0)))
+#        lT.append('Start %.1f ms' % (1000*(time.perf_counter()-t0)))
         #
         # return if not measure
         if not bMeasure:
@@ -200,7 +200,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                     self.lTrace[ch] = data*scale
                 else:
                     self.lTrace[ch] += data*scale
-#                lT.append('N: %d, Tot %.1f ms' % (n, 1000*(time.clock()-t0)))
+#                lT.append('N: %d, Tot %.1f ms' % (n, 1000*(time.perf_counter()-t0)))
 #        # log timing info
 #        self.log(': '.join(lT))
 
