@@ -60,7 +60,7 @@ class Driver(LabberDriver):
                 n_data = len(training_vector) // self.n_total_states
                 training_vector = training_vector.reshape(
                     n_data, self.n_total_states)
-                for m in self.n_total_states:
+                for m in range(self.n_total_states):
                     self.training_data[qubit - 1][m] = training_vector[:, m]
             else:
                 # one state at a time
@@ -140,8 +140,6 @@ class Driver(LabberDriver):
         # initialize training data
         n_data = 0
         for x in data:
-            if x is None:
-                return
             n_data += (1 if use_median else len(x))
         X = np.zeros((n_data, 2))
         y = np.zeros(n_data, dtype=int)
@@ -151,7 +149,8 @@ class Driver(LabberDriver):
             # if using median, calculate real and imaginary separately
             if use_median:
                 x = np.array([np.median(x.real) + 1j * np.median(x.imag)])
-                self.setValue('Pointer, QB%d-S%d' % (qubit + 1, m), x[0])
+                if m <= self.n_state:
+                    self.setValue('Pointer, QB%d-S%d' % (qubit + 1, m), x[0])
 
             X[k:(k + len(x)), 0] = x.real
             X[k:(k + len(x)), 1] = x.imag
@@ -190,10 +189,12 @@ class Driver(LabberDriver):
             return
 
         # train for all active qubits
-        self.svm = []
-        self.assignment_fidelity = [0.0] * self.MAX_QUBITS
+        self.svm = [None] * self.n_qubit
+        self.assignment_fidelity = [0.0] * self.n_qubit
         for qubit, data in enumerate(self.training_data):
             # prepare data both for full set and just median
+            if np.any([x is None for x in data]):
+                continue
             (X, y) = self._prepare_data(qubit, data, use_median=False)
             (Xm, ym) = self._prepare_data(qubit, data, use_median=True)
 
@@ -204,7 +205,7 @@ class Driver(LabberDriver):
             else:
                 svc.fit(X, y)
             # store in list of SVMs
-            self.svm.append(svc)
+            self.svm[qubit] = svc
             # calculate assignment fidelity using full data set
             self.assignment_fidelity[qubit] = accuracy_score(y, svc.predict(X))
 
@@ -247,10 +248,13 @@ class Driver(LabberDriver):
         for n, svm in enumerate(self.svm):
             x = self.getValueArray('Input data, QB%d' % (n + 1))
             if len(x) > 0:
-                input_data = np.zeros((len(x), 2))
-                input_data[:, 0] = x.real
-                input_data[:, 1] = x.imag
-                output = svm.predict(input_data)
+                if svm is None:
+                    output = np.zeros(len(x), dtype=int)
+                else:
+                    input_data = np.zeros((len(x), 2))
+                    input_data[:, 0] = x.real
+                    input_data[:, 1] = x.imag
+                    output = svm.predict(input_data)
             else:
                 output = np.array([], dtype=int)
             self.qubit_states[n] = output
