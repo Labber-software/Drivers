@@ -3,7 +3,7 @@
 import AlazarTech_Digitizer_Wrapper as AlazarDig
 import InstrumentDriver
 import numpy as np
-
+from scipy.interpolate import interp1d
 
 class Error(Exception):
     pass
@@ -17,14 +17,24 @@ class Driver(InstrumentDriver.InstrumentWorker):
         self.dig = None
         # keep track of sampled traces
         self.lTrace = [np.array([]), np.array([])]
-        self.lSignalNames = ['Ch1 - Data', 'Ch2 - Data']
+        self.signal_index = {
+            'Ch1 - Data': 0,
+            'Ch2 - Data': 1,
+            'FFT - Data': 0}
+        # add single-frequency values
+        for n in range(9):
+            self.signal_index['FFT - Value %d' % (n+1)] = 0
         self.dt = 1.0
         # open connection
         boardId = int(self.comCfg.address)
         timeout = self.dComCfg['Timeout']
-        self.dig = AlazarDig.AlazarTechDigitizer(systemId=1, boardId=boardId,
-                   timeout=timeout)
+        self.dig = AlazarDig.AlazarTechDigitizer(
+            systemId=1, boardId=boardId, timeout=timeout)
         self.dig.testLED()
+        options = []
+        if self.dig.fft_enabled:
+            options.append('FFT')
+        self.setInstalledOptions(options)
 
 
     def performClose(self, bError=False, options={}):
@@ -52,7 +62,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
     def performGetValue(self, quant, options={}):
         """Perform the Get Value instrument operation"""
         # only implmeneted for traces
-        if quant.name in self.lSignalNames:
+        if quant.name in self.signal_index:
             # special case for hardware looping
             if self.isHardwareLoop(options):
                 return self.getSignalHardwareLoop(quant, options)
@@ -65,9 +75,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
                     self.getTracesNonDMA()
                 else:
                     self.getTracesDMA(hardware_trig=self.isHardwareTrig(options))
-            indx = self.lSignalNames.index(quant.name)
-            # return correct data
-            value = quant.getTraceDict(self.lTrace[indx], dt=self.dt)
+            value = self.extract_trace_value(quant)
         else:
             # just return the quantity value
             value = quant.getValue()
@@ -80,7 +88,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         if self.getModel() in ('9870',):
             return
         # make sure we are arming for reading traces, if not return
-        signals = [name in self.lSignalNames for name in quant_names]
+        signals = [name in self.signal_index for name in quant_names]
         if not np.any(signals):
             return
         # get config
@@ -92,6 +100,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
         nBuffer = int(self.getValue('Records per Buffer'))
         nMemSize = int(self.getValue('Max buffer size'))
         nMaxBuffer = int(self.getValue('Max number of buffers'))
+        fft_config = self.get_fft_config()
         if (not bGetCh1) and (not bGetCh2):
             return
         # configure and start acquisition
@@ -103,12 +112,14 @@ class Driver(InstrumentDriver.InstrumentWorker):
             # need to re-configure the card since record size was not known at config
             self.dig.readTracesDMA(bGetCh1, bGetCh2, nSample, n_seq, nBuffer, nAverage,
                                    bConfig=True, bArm=True, bMeasure=False, 
-                                   bufferSize=nMemSize, maxBuffers=nMaxBuffer)
+                                   bufferSize=nMemSize, maxBuffers=nMaxBuffer,
+                                   fft_config=fft_config)
         else:
             # if not hardware looping, just trig the card, buffers are already configured 
             self.dig.readTracesDMA(bGetCh1, bGetCh2, nSample, nRecord, nBuffer, nAverage,
                                    bConfig=False, bArm=True, bMeasure=False,
-                                   bufferSize=nMemSize, maxBuffers=nMaxBuffer)
+                                   bufferSize=nMemSize, maxBuffers=nMaxBuffer,
+                                   fft_config=fft_config)
 
 
     def _callbackProgress(self, progress):
@@ -129,6 +140,7 @@ class Driver(InstrumentDriver.InstrumentWorker):
             nBuffer = int(self.getValue('Records per Buffer'))
             nMemSize = int(self.getValue('Max buffer size'))
             nMaxBuffer = int(self.getValue('Max number of buffers'))
+            fft_config = self.get_fft_config()
             # show status before starting acquisition
             self.reportStatus('Digitizer - Waiting for signal')
             # get data
@@ -139,14 +151,14 @@ class Driver(InstrumentDriver.InstrumentWorker):
                            funcProgress=self._callbackProgress,
                            firstTimeout=self.dComCfg['Timeout']+180.0,
                            bufferSize=nMemSize,
-                           maxBuffers=nMaxBuffer)
+                           maxBuffers=nMaxBuffer,
+                           fft_config=fft_config)
             # re-shape data and place in trace buffer
+            nSample = len(vCh1) / n_seq
             self.lTrace[0] = vCh1.reshape((n_seq, nSample))
             self.lTrace[1] = vCh2.reshape((n_seq, nSample))
         # after getting data, pick values to return
-        indx = self.lSignalNames.index(quant.name)
-        value = quant.getTraceDict(self.lTrace[indx][seq_no],
-                                                dt=self.dt)
+        value = self.extract_trace_value(quant, seq_no)
         return value
 
 
@@ -249,12 +261,17 @@ class Driver(InstrumentDriver.InstrumentWorker):
         nBuffer = int(self.getValue('Records per Buffer'))
         nMemSize = int(self.getValue('Max buffer size'))
         nMaxBuffer = int(self.getValue('Max number of buffers'))
+        fft_config = self.get_fft_config()
+        # set ignore error flag
+        self.dig.ignore_buffer_overflow = bool(
+            self.getValue('Ignore buffer overflow'))
         # configure DMA read
         self.dig.readTracesDMA(bGetCh1, bGetCh2,
                                nPostSize, nRecord, nBuffer, nAverage,
                                bConfig=True, bArm=False, bMeasure=False,
                                bufferSize=nMemSize,
-                               maxBuffers=nMaxBuffer)
+                               maxBuffers=nMaxBuffer,
+                               fft_config=fft_config)
 
 
     def getTracesDMA(self, hardware_trig=False):
@@ -268,15 +285,18 @@ class Driver(InstrumentDriver.InstrumentWorker):
         nBuffer = int(self.getValue('Records per Buffer'))
         nMemSize = int(self.getValue('Max buffer size'))
         nMaxBuffer = int(self.getValue('Max number of buffers'))
+        fft_config = self.get_fft_config()
         # in hardware trig mode, there is no noed to re-arm the card
         bArm = not hardware_trig
         # get data
-        self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(bGetCh1, bGetCh2,
-                                         nPostSize, nRecord, nBuffer, nAverage,
-                                         bConfig=False, bArm=bArm, bMeasure=True,
-                                         funcStop=self.isStopped,
-                                         bufferSize=nMemSize,
-                                         maxBuffers=nMaxBuffer)
+        self.lTrace[0], self.lTrace[1] = self.dig.readTracesDMA(
+            bGetCh1, bGetCh2,
+            nPostSize, nRecord, nBuffer, nAverage,
+            bConfig=False, bArm=bArm, bMeasure=True,
+            funcStop=self.isStopped,
+            bufferSize=nMemSize,
+            maxBuffers=nMaxBuffer,
+            fft_config=fft_config)
 
 
     def getTracesNonDMA(self):
@@ -315,7 +335,50 @@ class Driver(InstrumentDriver.InstrumentWorker):
             self.lTrace[0] = self.dig.readTraces(1)
         if bGetCh2:
             self.lTrace[1] = self.dig.readTraces(2)
-            
+
+    def get_fft_config(self):
+        """Get FFT configuration in format suitable for Alazartech settings"""
+        d = {}
+        d['enabled'] = self.dig.fft_enabled and self.getValue('FFT - Enabled')
+        d['window'] = self.getValueIndex('FFT - Window')
+        d['output'] = int(self.getCmdStringFromValue('FFT - Output'))
+        # get frequency
+        n_sample = int(self.getValue('Number of samples'))
+        fft_length = 1
+        while fft_length < n_sample:
+            fft_length *= 2
+        d['df'] = 1 / (self.dt*fft_length)
+        return d
+
+    def extract_trace_value(self, quant, record=None):
+        """Get value from traces, either as pure data, fft, or fft value
+        
+        Parameters
+        ----------
+        quant : Quantity
+            Quantity to extract
+        record : int, optional
+            Record to get, by default None
+        """
+        indx = self.signal_index[quant.name]
+        # return correct data
+        fft_config = self.get_fft_config()
+        dt = fft_config['df'] if fft_config['enabled'] else self.dt
+        if record is None:
+            value = quant.getTraceDict(self.lTrace[indx], dt=dt)
+        else:
+            value = quant.getTraceDict(self.lTrace[indx][record], dt=dt)
+        if quant.name.startswith('FFT - Value'):
+            if not fft_config['enabled']:
+                return 0.0
+            indx_fft = int(quant.name.split('FFT - Value ')[1])
+            freq = self.getValue('FFT - Frequency %d' % indx_fft)
+            # find closest frequency
+            (fx, fy) = quant.getTraceXY(value)
+            interp1 = interp1d(
+                fx, fy, kind='linear', copy=False, assume_sorted=True)
+            value = float(interp1(freq))
+        return value
 
 
 if __name__ == '__main__':

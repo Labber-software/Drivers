@@ -3,10 +3,12 @@
 from BaseDriver import LabberDriver
 import numpy as np
 from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
 
 
 class Error(Exception):
     pass
+
 
 class Driver(LabberDriver):
     """ This class implements a Labber driver"""
@@ -19,11 +21,9 @@ class Driver(LabberDriver):
         self.training_cfg = {}
         self.init_training_data()
 
-
     def performClose(self, bError=False, options={}):
         """Perform the close instrument connection operation"""
         pass
-
 
     def performSetValue(self, quant, value, sweepRate=0.0, options={}):
         """Perform the Set Value instrument operation. This function should
@@ -48,14 +48,22 @@ class Driver(LabberDriver):
             # get qubit/state for which data is valid
             qubit = int(quant.name[-1])
             state = int(self.getValue('Training, input state'))
-            # store training data data
-            self.log(len(self.training_data), len(self.training_data[0]), len(self.training_data[1]))
-            if self.getValue('Training type') == 'Specific qubit':
-                # training specific qubit, only store if match
-                if qubit == int(self.getValue('Training, qubit')):
-                    self.training_data[qubit - 1][state] = training_vector
+            all_states = self.getValue('Train all states at once')
+
+            # do nothing and return directly if the call is for the wrong qubit
+            if (self.getValue('Training type') == 'Specific qubit' and
+                    qubit != int(self.getValue('Training, qubit'))):
+                return value
+
+            # reshape input data if training for all states at once
+            if all_states:
+                n_data = len(training_vector) // self.n_total_states
+                training_vector = training_vector.reshape(
+                    n_data, self.n_total_states)
+                for m in range(self.n_total_states):
+                    self.training_data[qubit - 1][m] = training_vector[:, m]
             else:
-                # data is for all qubits
+                # one state at a time
                 self.training_data[qubit - 1][state] = training_vector
 
         # if changing to use median, flag that re-training is necessary
@@ -70,7 +78,6 @@ class Driver(LabberDriver):
 
         return value
 
-
     def performGetValue(self, quant, options={}):
         """Perform the Get Value instrument operation"""
         # get traces if first call
@@ -78,11 +85,17 @@ class Driver(LabberDriver):
             self.calculate_states()
         # check input
         if quant.name.startswith('QB'):
-            qubit = int(quant.name[2]) - 1
+            # qubit = int(quant.name[2]) - 1
+            qubit = int(quant.name.split("QB")[1].split(' ')[0]) - 1
             value = self.qubit_states[qubit]
         elif quant.name.startswith('Average QB'):
-            qubit = int(quant.name[10]) - 1
+            # qubit = int(quant.name[10]) - 1
+            qubit = int(quant.name.split('QB')[1].split(' ')[0]) - 1
             value = np.mean(self.qubit_states[qubit])
+        elif quant.name.startswith('Assignment fidelity QB'):
+            #qubit = int(quant.name[22]) - 1
+            qubit = int(quant.name.split('QB')[1].split(' ')[0]) - 1
+            value = self.assignment_fidelity[qubit]
         elif quant.name.startswith('Average state vector'):
             # states are encoded in array of ints
             m = self.n_state ** self.n_qubit
@@ -96,7 +109,6 @@ class Driver(LabberDriver):
             # just return the quantity value
             value = quant.getValue()
         return value
-
 
     def init_training_data(self):
         """Init training data"""
@@ -118,9 +130,41 @@ class Driver(LabberDriver):
             n_total = d['n_state']
         elif d['training_type'] == 'All combinations':
             n_total = d['n_state'] ** d['n_qubit']
+        self.n_total_states = int(n_total)
         self.training_data = [
             [None for n1 in range(n_total)] for n2 in range(d['n_qubit'])]
+        self.assignment_fidelity = [0.0] * self.MAX_QUBITS
 
+    def _prepare_data(self, qubit, data, use_median=False):
+        """Prepare data to right format for SVM"""
+        # initialize training data
+        n_data = 0
+        for x in data:
+            n_data += (1 if use_median else len(x))
+        X = np.zeros((n_data, 2))
+        y = np.zeros(n_data, dtype=int)
+        k = 0
+        # collect training data
+        for m, x in enumerate(data):
+            # if using median, calculate real and imaginary separately
+            if use_median:
+                x = np.array([np.median(x.real) + 1j * np.median(x.imag)])
+                if m <= self.n_state:
+                    self.setValue('Pointer, QB%d-S%d' % (qubit + 1, m), x[0])
+
+            X[k:(k + len(x)), 0] = x.real
+            X[k:(k + len(x)), 1] = x.imag
+            if self.training_cfg['training_type'] == 'All combinations':
+                # if using all combinations, figure out what the state is
+                state = np.base_repr(m, self.n_state, self.MAX_QUBITS)
+                state = state[::-1]
+                y[k:(k + len(x))] = int(state[qubit])
+
+            else:
+                y[k:(k + len(x))] = m
+            # increase counter
+            k += len(x)
+        return (X, y)
 
     def train_discriminator(self):
         """Train discriminator based on training data"""
@@ -145,42 +189,25 @@ class Driver(LabberDriver):
             return
 
         # train for all active qubits
-        self.svm = []
-        self.log('A:', len(self.training_data), len(self.training_data[0]), len(self.training_data[1]))
+        self.svm = [None] * self.n_qubit
+        self.assignment_fidelity = [0.0] * self.n_qubit
         for qubit, data in enumerate(self.training_data):
-            # initialize training data
-            n_data = 0
-            for x in data:
-                if x is None:
-                    return
-                n_data += (1 if use_median else len(x))
-            X = np.zeros((n_data, 2))
-            y = np.zeros(n_data, dtype=int)
-            k = 0
-            # collect training data
-            for m, x in enumerate(data):
-                # if using median, calculate real and imaginary separately
-                if use_median:
-                    x = np.array([np.median(x.real) + 1j * np.median(x.imag)])
-                    self.setValue('Pointer, QB%d-S%d' % (qubit + 1, m), x[0])
-
-                X[k:(k + len(x)), 0] = x.real
-                X[k:(k + len(x)), 1] = x.imag
-                if self.training_cfg['training_type'] == 'All combinations':
-                    # if using all combinations, figure out what the state is
-                    state = np.base_repr(m, self.n_state, self.MAX_QUBITS)
-                    y[k:(k + len(x))] = int(state[qubit])
-
-                else:
-                    y[k:(k + len(x))] = m
-                # increase counter
-                k += len(x)
+            # prepare data both for full set and just median
+            if np.any([x is None for x in data]):
+                continue
+            (X, y) = self._prepare_data(qubit, data, use_median=False)
+            (Xm, ym) = self._prepare_data(qubit, data, use_median=True)
 
             # create SVM and fit data
             svc = SVC(**kwargs)
-            svc.fit(X, y)
+            if use_median:
+                svc.fit(Xm, ym)
+            else:
+                svc.fit(X, y)
             # store in list of SVMs
-            self.svm.append(svc)
+            self.svm[qubit] = svc
+            # calculate assignment fidelity using full data set
+            self.assignment_fidelity[qubit] = accuracy_score(y, svc.predict(X))
 
         # mark training as valid
         self.training_valid = True
@@ -221,10 +248,13 @@ class Driver(LabberDriver):
         for n, svm in enumerate(self.svm):
             x = self.getValueArray('Input data, QB%d' % (n + 1))
             if len(x) > 0:
-                input_data = np.zeros((len(x), 2))
-                input_data[:, 0] = x.real
-                input_data[:, 1] = x.imag
-                output = svm.predict(input_data)
+                if svm is None:
+                    output = np.zeros(len(x), dtype=int)
+                else:
+                    input_data = np.zeros((len(x), 2))
+                    input_data[:, 0] = x.real
+                    input_data[:, 1] = x.imag
+                    output = svm.predict(input_data)
             else:
                 output = np.array([], dtype=int)
             self.qubit_states[n] = output

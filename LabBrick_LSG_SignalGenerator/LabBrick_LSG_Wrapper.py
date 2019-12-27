@@ -86,8 +86,9 @@ class LabBrick_SignalGenerator():
         lSerial = [d['serial'] for d in lDev]
         if iSerial not in lSerial:
             # raise error if device not found
-            sErr = ('Device with serial number "%d" cannot be found.\n\n' % iSerial) +\
-                    'Devices detected:\n'
+            sErr = (
+                ('Device with serial number "%d" cannot be found.' % iSerial) +
+                '\n\nDevices detected:\n')
             for dDev in lDev:
                 sErr += ('Name: %s, Serial: %d\n' % (dDev['name'], dDev['serial']))
             raise Error(sErr)
@@ -114,11 +115,11 @@ class LabBrick_SignalGenerator():
         devices = ACTIVEDEVICES()
         nDev = fnLSG_GetDevInfo(byref(devices))
         for n1 in range(nDev):
-            nameBuffer = STRING(' '*32)
+            nameBuffer = STRING(b' '*32)
             fnLSG_GetModelName(devices[n1], nameBuffer)
             serial = int(fnLSG_GetSerialNumber(devices[n1]))
             d = dict()
-            d['name'] = str(nameBuffer.value)
+            d['name'] = str(nameBuffer.value.decode())
             d['serial'] = serial
             d['device_id'] = int(devices[n1])
             lDevice.append(d)

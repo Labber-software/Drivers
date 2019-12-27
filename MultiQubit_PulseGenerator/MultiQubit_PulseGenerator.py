@@ -7,7 +7,8 @@ import copy
 import numpy as np
 
 from BaseDriver import LabberDriver
-from sequence_builtin import CPMG, PulseTrain, Rabi, SpinLocking
+from sequence_builtin import (
+    CPMG, PulseTrain, Rabi, SpinLocking, ReadoutTraining)
 from sequence_rb import SingleQubit_RB, TwoQubit_RB
 from sequence import SequenceToWaveforms
 import logging
@@ -20,6 +21,7 @@ SEQUENCES = {'Rabi': Rabi,
              '1-QB Randomized Benchmarking': SingleQubit_RB,
              '2-QB Randomized Benchmarking': TwoQubit_RB,
              'Spin-locking': SpinLocking,
+             'Readout training': ReadoutTraining,
              'Custom': type(None)}
 
 
@@ -117,13 +119,34 @@ class Driver(LabberDriver):
                 self.sequence_to_waveforms.set_parameters(config)
 
                 # check if calculating multiple sequences, for randomization
-                if config.get('Output multiple sequences', False):
+                multi_rb = config.get('Output multiple sequences', False)
+                multi_training = config.get('Train all states at once', False)
 
+                if (multi_rb or multi_training):
                     # create multiple randomizations, store in memory
-                    n_call = int(config.get('Number of multiple sequences', 1))
+                    if multi_rb:
+                        multi_param = 'Randomize'
+                        align_multi_to_end = config.get(
+                            'Align RB waveforms to end', False)
+                        n_call = int(
+                            config.get('Number of multiple sequences', 1))
+                    elif multi_training:
+                        # readout training
+                        multi_param = 'Training, input state'
+                        align_multi_to_end = False
+                        # for readout, always start with first state
+                        config[multi_param] = -1
+                        training_type = config['Training type']
+                        if training_type == 'Specific qubit':
+                            n_call = 2
+                        elif training_type == 'All qubits at once':
+                            n_call = 2
+                        elif training_type == 'All combinations':
+                            n_call = 2**self.sequence.n_qubit
+
                     calls = []
                     for n in range(n_call):
-                        config['Randomize'] += 1
+                        config[multi_param] += 1
                         calls.append(
                             copy.deepcopy(
                                 self.sequence_to_waveforms.get_waveforms(
@@ -132,9 +155,6 @@ class Driver(LabberDriver):
                     # after all calls are done, convert output to matrix form
                     self.waveforms = dict()
                     n_qubit = self.sequence.n_qubit
-                    # Align RB waveforms to end
-                    align_RB_to_end = config.get('Align RB waveforms to end',
-                                                 False)
                     # start with xy, z and gate waveforms, list of data
                     for key in ['xy', 'z', 'gate']:
                         # get size of longest waveform
@@ -147,7 +167,7 @@ class Driver(LabberDriver):
                             datatype = calls[0][key][n].dtype
                             data = np.zeros((n_call, length), dtype=datatype)
                             for m, call in enumerate(calls):
-                                if align_RB_to_end:
+                                if align_multi_to_end:
                                     data[m][-len(call[key][n]):] = call[key][n]
                                 else:
                                     data[m][:len(call[key][n])] = call[key][n]
@@ -159,7 +179,7 @@ class Driver(LabberDriver):
                         datatype = calls[0][key].dtype
                         data = np.zeros((n_call, length), dtype=datatype)
                         for m, call in enumerate(calls):
-                            if align_RB_to_end:
+                            if align_multi_to_end:
                                 data[m][-len(call[key]):] = call[key]
                             else:
                                 data[m][:len(call[key])] = call[key]

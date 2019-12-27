@@ -139,6 +139,8 @@ class Driver(LabberDriver):
         channels = ', '.join(x)
         self.log(channels)
 
+        # check version of API
+        new_style = hasattr(self.daq, 'setVector')
         # proceed depending on run mode
         run_mode = self.getValue('Run mode, group %d' % group)
         # in internal trigger mode, make buffer as long as trig interval
@@ -146,22 +148,40 @@ class Driver(LabberDriver):
             trig_period = self.getValue('Trig period, group %d' % group)
             sampling_rate = 2.4E9 / (
                 2 ** self.getValueIndex('Sampling rate, group %d' % group))
-            buffer_size = int(round(trig_period * sampling_rate))
+            # timing changed for new API version
+            if new_style:
+                # new style - large delays
+                buffer_size = int(round((trig_period - 30E-9 - 3.9E-6) * sampling_rate))
+                # wait time is in units of 10/3 ns
+                wait_time = int(round(3 * (30E-9 / 10E-9)))
+                # remove a few clock cycles to account for while/wait time
+                wait_time -= 7
+                awg_program += textwrap.dedent("""\
+                    setUserReg(0, 0);
+                    while(true){
+                        while(getUserReg(0) == 0){
+                            playWave(%s);
+                            waitWave();
+                            wait(%d);
+                        }
+                    }""") % (channels, wait_time)
+            else:
+                buffer_size = int(round(trig_period * sampling_rate))
+                # wait time is in units of 10/3 ns
+                wait_time = int(round(3 * (trig_period / 10E-9)))
+                # remove a few clock cycles to account for while/wait time
+                wait_time -= 7
+                awg_program += textwrap.dedent("""\
+                    setUserReg(0, 0);
+                    while(true){
+                        while(getUserReg(0) == 0){
+                            playWave(%s);
+                            wait(%d);
+                        }
+                    }""") % (channels, wait_time)
+
             # limit to max memory of unit
             buffer_size = min(buffer_size, 64E6)
-            # wait time is in units of 10/3 ns
-            wait_time = int(round(3 * (trig_period / 10E-9)))
-            # remove a few clock cycles to account for while/wait time
-            wait_time -= 7
-
-            awg_program += textwrap.dedent("""\
-                setUserReg(0, 0);
-                while(true){
-                    while(getUserReg(0) == 0){
-                        playWave(%s);
-                        wait(%d);
-                    }
-                }""") % (channels, wait_time)
             awg_program = awg_program.replace('_n_', ('%d' % buffer_size))
 
         elif run_mode == 'External trigger':

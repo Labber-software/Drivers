@@ -99,8 +99,9 @@ class LabBrick_Synthesizer():
         lSerial = [d['serial'] for d in lDev]
         if iSerial not in lSerial:
             # raise error if device not found
-            sErr = ('Device with serial number "%d" cannot be found.\n\n' % iSerial) +\
-                    'Devices detected:\n'
+            sErr = (
+                ('Device with serial number "%d" cannot be found.' % iSerial) +
+                '\n\nDevices detected:\n')
             for dDev in lDev:
                 sErr += ('Name: %s, Serial: %d\n' % (dDev['name'], dDev['serial']))
             raise Error(sErr)
@@ -126,11 +127,11 @@ class LabBrick_Synthesizer():
         devices = ACTIVEDEVICES()
         nDev = fnLMS_GetDevInfo(byref(devices))
         for n1 in range(nDev):
-            nameBuffer = STRING(' '*32)
+            nameBuffer = STRING(b' '*32)
             fnLMS_GetModelName(devices[n1], nameBuffer)
             serial = int(fnLMS_GetSerialNumber(devices[n1]))
             d = dict()
-            d['name'] = str(nameBuffer.value)
+            d['name'] = str(nameBuffer.value.decode())
             d['serial'] = serial
             d['device_id'] = int(devices[n1])
             lDevice.append(d)
@@ -200,7 +201,6 @@ class LabBrick_Synthesizer():
     def getExternalPulseMod(self):
         reply = fnLMS_GetUseInternalPulseMod(self.device_id)
         return not bool(reply)
-
 
     def check_error(self, status=0):
         """If error occurred, get error message and raise error"""
