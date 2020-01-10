@@ -134,6 +134,8 @@ def Gate_to_strGate(_Gate):
         str_Gate = 'Z2m'
     elif (_Gate == gates.CZ):
         str_Gate = 'CZ'
+    elif (_Gate == gates.iSWAP):
+        str_Gate = 'iSWAP'
 
     return str_Gate
 
@@ -180,6 +182,8 @@ def strGate_to_Gate(_strGate):
         g = gates.Z2m
     elif (_strGate == 'CZ'):
         g = gates.CZ
+    elif (_strGate == 'iSWAP'):
+        g = gates.iSWAP
 
     return g
 
@@ -206,15 +210,18 @@ def get_stabilizer(_psi):
 
     return stabilizer
 
-def generate_2QB_Cliffords(_index):
+def generate_2QB_Cliffords(_index, **kwargs):
     seq_QB1 = []
     seq_QB2 = []
-    sequence_rb.add_twoQ_clifford(_index, seq_QB1, seq_QB2)
+    generator = kwargs.get('generator', 'CZ')
+    sequence_rb.add_twoQ_clifford(_index, seq_QB1, seq_QB2, generator = generator)
     m2QBClifford = np.identity(4, dtype = complex)
     for i in range(len(seq_QB1)):
         _mGate = np.matrix([1])
         if (seq_QB1[i] == gates.CZ or seq_QB2[i] == gates.CZ ): # two qubit gates
             _mGate = np.kron(dict_m2QBGate['CZ'], _mGate)
+        elif (seq_QB1[i] == gates.iSWAP or seq_QB2[i] == gates.iSWAP ): 
+            _mGate = np.kron(dict_m2QBGate['iSWAP'], _mGate)
         else: # 1QB gates
             for g in [seq_QB2[i], seq_QB1[i]]:
                 if (g == gates.I):
@@ -296,6 +303,9 @@ if __name__ == "__main__":
     # ----- THIS IS FOR GENERATING RECOVERY CLIFFORD LOOK-UP TABLE ------
     # -------------------------------------------------------------------
 
+    # Native 2QB Gate ('CZ' or 'iSWAP')
+    generator = 'iSWAP'
+
     # Start with ground state
     psi_00 = np.matrix('1;0;0;0')
     psi_01 = np.matrix('0;1;0;0')
@@ -314,7 +324,7 @@ if __name__ == "__main__":
         if (i/N_2QBcliffords > cnt):
             print('Running... %d %%'%(cnt*100))
             cnt = cnt+0.01
-        g = generate_2QB_Cliffords(i)
+        g = generate_2QB_Cliffords(i, generator = generator)
 
         final_psi_00 = dot(g, psi_00)
         final_psi_01 = dot(g, psi_01)
@@ -337,7 +347,7 @@ if __name__ == "__main__":
             cheapest_index = None
 
             for j in range(N_2QBcliffords):
-                recovery_gate = generate_2QB_Cliffords(j)
+                recovery_gate = generate_2QB_Cliffords(j, generator = generator)
                 seq_QB1 = []
                 seq_QB2 = []
                 # sequence_rb.add_twoQ_clifford(j, seq_QB1, seq_QB2)
@@ -419,7 +429,7 @@ if __name__ == "__main__":
     dict_result['psi'] = list_psi
     dict_result['recovery_gates_QB1'] = list_recovery_gates_QB1
     dict_result['recovery_gates_QB2'] = list_recovery_gates_QB2
-    saveData('recovery_rb_table.pickle', dict_result)
+    saveData('recovery_rb_table_iSWAP.pickle', dict_result)
 
     # load the results.
     # dict_result =loadData('recovery_rb_table.dill')
