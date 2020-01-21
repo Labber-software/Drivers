@@ -551,6 +551,13 @@ class SequenceToWaveforms:
         self.gate_overlap = 20E-9
         self.minimal_gate_time = 20E-9
 
+        #z offset
+        self.use_z_offset=False
+        self.extend_Z_offset_readout=True
+        self.z_offset_time_after_readout=10e-9
+        self.z_offset_ringup=10.e-9
+        self.z_offset_amplitude=[0.]*self.n_qubit
+
         # filters
         self.use_gate_filter = False
         self.use_z_filter = False
@@ -616,6 +623,8 @@ class SequenceToWaveforms:
             for n in range(1, self.n_qubit):
                 self._wave_xy[n][:] = 0.0
 
+        if self.use_z_offset:
+            self._add_global_Z_offset()
         # log.info('before predistortion, _wave_z max is {}'.format(np.max(self._wave_z)))
         # if self.compensate_crosstalk:
         #     self._perform_crosstalk_compensation()
@@ -628,6 +637,7 @@ class SequenceToWaveforms:
         if self.generate_gate_switch:
             self._add_microwave_gate()
         self._filter_output_waveforms()
+        self._zero_last_z_point()
 
         # Apply offsets
         self.readout_iq += self.readout_i_offset + 1j * self.readout_q_offset
@@ -873,6 +883,24 @@ class SequenceToWaveforms:
             # store results
             self._wave_gate[n] = gate
 
+    def _add_global_Z_offset(self):
+        """ Create waveforms for global Z offset. """
+
+        z_offset=np.ones_like(self._wave_z[0])
+        # add cosine ring-up and ring-down
+        n_width = int(np.round(0.5*self.z_offset_ringup * self.sample_rate))
+        slope=0.5*(1-np.cos(np.pi*np.arange(n_width)/n_width))
+        z_offset[1:int(1+n_width)]=slope
+        z_offset[(-n_width-1):-1]=slope[::-1]
+
+        # make sure z_offset starts/ends in 0
+        z_offset[0]=0.
+        z_offset[-1]=0.
+
+        # append offset to Z waveforms
+        for n in range(self.n_qubit):
+            self._wave_z[n]+=(z_offset*self.z_offset_amplitude[n])
+
     def _filter_output_waveforms(self):
         """Filter output waveforms"""
         # start with gate
@@ -945,6 +973,13 @@ class SequenceToWaveforms:
         y = np.convolve(s, window, mode='same')
         return y[n:-n+1]
 
+    def _zero_last_z_point(self):
+        """Make sure last point in z waveforms is always zero, since this is 
+           the value output by the AWG between sequences.
+        """
+        for n in range(self.n_qubit):
+            self._wave_z[n][-1]=0
+
     def _round(self, t, acc=1E-12):
         """Round the time `t` with a certain accuarcy `acc`.
 
@@ -1008,6 +1043,12 @@ class SequenceToWaveforms:
 
         # create empty waveforms of the correct size
         if self.trim_to_sequence:
+            if self.extend_Z_offset_readout and not self.readout_match_main_size:
+                t_max_readout=0
+                for pulse in self.pulses_readout:
+                    if pulse.total_duration()>t_max_readout: t_max_readout=pulse.total_duration()
+                if self.readout_trig_duration>t_max_readout: t_max_readout=self.readout_trig_duration
+                end+=(t_max_readout+self.z_offset_time_after_readout)
             self.n_pts = int(np.ceil(end * self.sample_rate)) + 1
             if self.n_pts % 2 == 1:
                 # Odd n_pts give spectral leakage in FFT
@@ -1249,6 +1290,13 @@ class SequenceToWaveforms:
                 pulse.amplitude = config.get('Amplitude #%d, Z' % m)
 
             self.pulses_1qb_z[n] = pulse
+
+        #z offset
+        self.use_z_offset=config.get('Use global Z offset')
+        self.extend_Z_offset_readout=config.get('Extend Z offset to readout')
+        self.z_offset_time_after_readout=config.get('Time after readout, Z global')
+        self.z_offset_ringup=config.get('Ringup, Z global')
+        for n in range(len(self.pulses_1qb_z)): self.z_offset_amplitude[n]=config.get('Amplitude #{:d}, Z global'.format(n+1))
 
         # two-qubit pulses
         for n, pulse in enumerate(self.pulses_2qb):
