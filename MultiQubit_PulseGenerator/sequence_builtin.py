@@ -46,7 +46,7 @@ class CPMG(Sequence):
             self.add_gate_to_all(gates.X2p)
             # for ramsey, just add final pulse
             if n_pulse == 0:
-                self.add_gate_to_all(gates.X2p, dt=duration)
+                self.add_gate_to_all(pi2_final, dt=duration)
             else:
                 dt = duration / n_pulse
                 # add first pi pulse after half duration
