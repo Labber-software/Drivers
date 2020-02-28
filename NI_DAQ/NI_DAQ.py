@@ -15,10 +15,15 @@ class Driver(InstrumentDriver.InstrumentWorker):
     def performOpen(self, options={}):
         """Perform the operation of opening the instrument connection"""
         # init object variables
+        self.address = self.comCfg.address.strip()
+        if len(self.address) == 0:
+            self.address = 'Dev1'
         self.nCh = 8
         self.lTrace = [np.array([])]*self.nCh
-        self.lChName = [("Dev1/ai%d" % n) for n in range(self.nCh)]
-        self.lChDig = [("Dev1/port0/line%d" % n) for n in range(self.nCh)]
+        self.lChName = [("%s/ai%d" % (self.address, n))
+                        for n in range(self.nCh)]
+        self.lChDig = [("%s/port0/line%d" % (self.address, n))
+                       for n in range(self.nCh)]
         self.lSignalName = [('Ch%d: Data' % (n+1)) for n in range(self.nCh)]
         self.dt = 1.0
         self.mAI = None
@@ -159,7 +164,7 @@ class MultiChannelAnalogInput(object):
         DAQmxCfgSampClkTiming(self.taskHandle,"",float(rate),DAQmx_Val_Rising,DAQmx_Val_FiniteSamps,int(nSample))
         if trig is None:
             DAQmxDisableStartTrig(self.taskHandle)
-        elif str(trig).startswith('Dev1/port'):
+        elif str(trig).startswith('%s/port' % self.address):
             # digital trigger
             trigEdge = DAQmx_Val_Rising if trigSlopePositive else DAQmx_Val_Falling 
             DAQmxCfgDigEdgeStartTrig(self.taskHandle,str(trig),trigEdge)
