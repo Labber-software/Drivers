@@ -961,7 +961,7 @@ class SequenceToWaveforms:
             The rounded time.
 
         """
-        return int(np.round(t / acc)) * acc
+        return int(round(t / acc)) * acc
 
     def _add_readout_trig(self):
         """Create waveform for readout trigger."""
@@ -1039,9 +1039,29 @@ class SequenceToWaveforms:
 
     def _generate_waveforms(self):
         """Generate the waveforms corresponding to the sequence."""
-        # log.info('generating waveform from sequence. Len is {}'.format(len(self.sequence_list)))
+        # check if drag and modulations frequencies are equal for all pulses
+        all_drag_f_equal = True
+        freqs = [self.pulses_1qb_xy[n].frequency for n in range(self.n_qubit)]
+        drags = [self.pulses_1qb_xy[n].use_drag for n in range(self.n_qubit)]
         for step in self.sequence_list:
-            # log.info('Generating gates {}'.format(step.gates))
+            for gate in step.gates:
+                # only keep track of single-qubit xy gates
+                if not isinstance(gate.gate, gates.SingleQubitXYRotation):
+                    continue
+                n = gate.qubit
+                if isinstance(n, list):
+                    n = n[0]
+                # check drag and freq params
+                if (gate.pulse.frequency != freqs[n] or
+                        gate.pulse.use_drag != drags[n]):
+                    all_drag_f_equal = False
+                if gate.pulse.use_drag and gate.pulse.drag_detuning != 0:
+                    all_drag_f_equal = False
+            # break for loop at first difference
+            if not all_drag_f_equal:
+                break
+
+        for step in self.sequence_list:
             for gate in step.gates:
                 qubit = gate.qubit
                 if isinstance(qubit, list):
@@ -1144,7 +1164,21 @@ class SequenceToWaveforms:
                         t0 = middle - (max_duration - gate.duration) / 2
                     elif step.align == 'right':
                         t0 = middle + (max_duration - gate.duration) / 2
-                    waveform[indices] += gate.pulse.calculate_waveform(t0, t)
+                    waveform[indices] += gate.pulse.calculate_waveform(
+                        t0, t, ignore_drag_modulation=all_drag_f_equal)
+
+        # if all frequencies and drag were the same, apply afterwards
+        if all_drag_f_equal:
+            dt = self.t[1] - self.t[0]
+            for n, wave in enumerate(self._wave_xy):
+                # apply drag
+                if drags[n]:
+                    beta = self.pulses_1qb_xy[n].drag_coefficient / dt
+                    wave -= 1j * beta * np.gradient(wave)
+
+                # modulation
+                if freqs[n] != 0:
+                    wave *= np.exp(1j * 2 * np.pi * freqs[n] * self.t)
 
     def set_parameters(self, config={}):
         """Set base parameters using config from from Labber driver.

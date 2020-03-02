@@ -83,7 +83,7 @@ class Pulse:
         """
         raise NotImplementedError()
 
-    def calculate_waveform(self, t0, t):
+    def calculate_waveform(self, t0, t, ignore_drag_modulation=False):
         """Calculate pulse waveform including phase shifts and SSB-mixing.
 
         Parameters
@@ -93,6 +93,9 @@ class Pulse:
 
         t : numpy array
             Array with time values for which to calculate the pulse waveform.
+
+        ignore_drag_modulation : bool
+            If True, drag and modulation is disabled.
 
         Returns
         -------
@@ -104,6 +107,15 @@ class Pulse:
         # Make sure the waveform is zero outside the pulse
         y[t < (t0 - self.total_duration() / 2)] = 0
         y[t > (t0 + self.total_duration() / 2)] = 0
+
+        # speed up generation by not applying transforms if not necessary
+        if not self.complex:
+            return y
+
+        # if ignoring modulation, just apply global phase and return
+        if ignore_drag_modulation:
+            y = y * np.exp(- 1j * self.phase)
+            return y
 
         if self.use_drag and self.complex:
             beta = self.drag_coefficient / (t[1] - t[0])
