@@ -609,8 +609,8 @@ class TwoQubit_RB(Sequence):
         # get parameters
 
         sequence = config['Sequence']
-        qubits_to_benchmark = [int(config['Qubits to Benchmark'][0]) - 1,
-                               int(config['Qubits to Benchmark'][2]) - 1]
+        qubits_to_benchmark = [int(config['Qubit 1 to Benchmark']) - 1,
+                               int(config['Qubit 2 to Benchmark']) - 1]
         # Number of Cliffords to generate
         N_cliffords = int(config['Number of Cliffords'])
         randomize = config['Randomize']
@@ -763,7 +763,8 @@ class TwoQubit_RB(Sequence):
             self.prev_gate_seq = multi_gate_seq
         else:
             for gate_seq in self.prev_gate_seq:
-                if gate_seq[0] == gates.CZ:
+                #if gate_seq[0] == gates.CZ:
+                if ((gate_seq[0] == gates.CZ) or (gate_seq[0] == gates.iSWAP)):
                     self.add_gate(qubit=qubits_to_benchmark, gate=gate_seq[0])
                 else:
                     self.add_gate(qubit=qubits_to_benchmark, gate=gate_seq)

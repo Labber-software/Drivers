@@ -128,7 +128,6 @@ class Step:
             raise ValueError("Qubit index should be int.")
 
         def _in(input_list, n):
-            flat_list = []
             for sublist_or_el in input_list:
                 if isinstance(sublist_or_el, list):
                     if _in(sublist_or_el, n) is True:
@@ -558,6 +557,11 @@ class SequenceToWaveforms:
         self.z_offset_ringup=10.e-9
         self.z_offset_amplitude=[0.]*self.n_qubit
 
+        #Z during readout
+        self.use_z_during_readout=False
+        self.z_readout_ringup=20e-9
+        self.z_readout_amplitude=[0.]*self.n_qubit
+
         # filters
         self.use_gate_filter = False
         self.use_z_filter = False
@@ -625,6 +629,8 @@ class SequenceToWaveforms:
 
         if self.use_z_offset:
             self._add_global_Z_offset()
+        if self.use_z_during_readout:
+            self._add_z_during_readout()
         # log.info('before predistortion, _wave_z max is {}'.format(np.max(self._wave_z)))
         # if self.compensate_crosstalk:
         #     self._perform_crosstalk_compensation()
@@ -900,6 +906,32 @@ class SequenceToWaveforms:
         # append offset to Z waveforms
         for n in range(self.n_qubit):
             self._wave_z[n]+=(z_offset*self.z_offset_amplitude[n])
+
+    def _add_z_during_readout(self):
+        """ Add Z pulses during readout. """
+
+        #find readout waveform with maximum readout time
+        z_during_readout=np.ones(int((sorted([p.total_duration() for p in self.pulses_readout])[-1]+ \
+            self.readout_delay)*self.sample_rate))
+
+        log.info(len(z_during_readout))
+
+        # add cosine ring-up and ring-down
+        n_width = int(np.round(0.5*self.z_readout_ringup * self.sample_rate))
+        slope=0.5*(1-np.cos(np.pi*np.arange(n_width)/n_width))
+        z_during_readout[1:int(1+n_width)]=slope
+        z_during_readout[(-n_width-1):-1]=slope[::-1]
+
+        # make sure z_offset starts/ends in 0
+        z_during_readout[0]=0.
+        z_during_readout[-1]=0.
+
+        #len of z during readout pulses
+        z_during_readout_length=len(z_during_readout)
+
+        # add to Z waveforms during readout (at their ends)
+        for n in range(self.n_qubit):
+            self._wave_z[n][-z_during_readout_length:]+=(z_during_readout*self.z_readout_amplitude[n])
 
     def _filter_output_waveforms(self):
         """Filter output waveforms"""
@@ -1332,6 +1364,11 @@ class SequenceToWaveforms:
         self.z_offset_ringup=config.get('Ringup, Z global')
         for n in range(len(self.pulses_1qb_z)): self.z_offset_amplitude[n]=config.get('Amplitude #{:d}, Z global'.format(n+1))
 
+        #Z during readout
+        self.use_z_during_readout=config.get('Use Z pulse during readout')
+        self.z_readout_ringup=config.get('Ringup time, Z during readout')
+        for n in range(len(self.pulses_1qb_z)): self.z_readout_amplitude[n]=config.get('Amplitude #{:d}, Z during readout'.format(n+1))
+
         # two-qubit pulses
         for n, pulse in enumerate(self.pulses_2qb):
             # pulses are indexed from 1 in Labber
@@ -1446,6 +1483,8 @@ class SequenceToWaveforms:
         self.readout_trig_duration = config.get('Readout trig duration')
         self.readout_predistort = config.get('Predistort readout waveform')
         self.readout.set_parameters(config)
+
+        self.readout_delay=config.get('Readout delay')
 
         # get readout pulse parameters
         phases = 2 * np.pi * np.array([
