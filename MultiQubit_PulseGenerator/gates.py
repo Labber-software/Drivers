@@ -166,6 +166,10 @@ class CPHASE(TwoQubitGate):
     """ CPHASE gate. """
 
 
+class iSWAP_no_1qb_phases(TwoQubitGate):
+    """ ISWAP gate. """
+
+
 class ReadoutGate(OneQubitGate):
     """Readouts the qubit state."""
 
@@ -292,6 +296,39 @@ class CompositeGate:
         return self.__str__()
 
 
+class iSWAP_with_1qb_phases(CompositeGate):
+    """iSWAP gate followed by single qubit Z rotations.
+
+    Parameters
+    ----------
+    phi1 : float
+        Z rotation angle for qubit 1.
+    phi2 : float
+        Z rotation angle for qubit 2.
+
+    """
+
+    def __init__(self, phi1, phi2):
+        super().__init__(n_qubit=2)
+        self.add_gate(iSWAP_no_1qb_phases())
+        self.add_gate([VirtualZGate(phi1), VirtualZGate(phi2)])
+
+    def new_angles(self, phi1, phi2):
+        """Update the angles of the single qubit rotations.
+
+        Parameters
+        ----------
+        phi1 : float
+            Z rotation angle for qubit 1.
+        phi2 : float
+            Z rotation angle for qubit 2.
+
+        """
+        self.__init__(phi1, phi2)
+
+    def __str__(self):
+        return "iSWAP"
+
 class CPHASE_with_1qb_phases(CompositeGate):
     """CPHASE gate followed by single qubit Z rotations.
 
@@ -356,6 +393,7 @@ VZ2m = VirtualZGate(np.pi / 2, name='VZ2m')
 
 # two-qubit gates
 CPh = CPHASE()
+iSWAP_without_Z = iSWAP_no_1qb_phases()
 
 # Composite gates
 CZEcho = CompositeGate(n_qubit=2)
@@ -371,6 +409,7 @@ H.add_gate(Y2p)
 
 CZ = CPHASE_with_1qb_phases(
     0, 0)  # Start with 0, 0 as the single qubit phase shifts.
+iSWAP = iSWAP_with_1qb_phases(0,0)
 
 CNOT = CompositeGate(n_qubit=2, name='CNOT')
 CNOT.add_gate(H, 1)

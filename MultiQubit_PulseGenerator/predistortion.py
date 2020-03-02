@@ -210,7 +210,7 @@ class ExponentialPredistortion:
 
         """
         # pad with zeros at end to make sure response has time to go to zero
-        pad_time = 6 * max([self.tau1, self.tau2, self.tau3])
+        pad_time = 6 * max([self.tau1, self.tau2, self.tau3, self.tau4])
         padded = np.zeros(len(waveform) + round(pad_time / self.dt))
         padded[:len(waveform)] = waveform
 
