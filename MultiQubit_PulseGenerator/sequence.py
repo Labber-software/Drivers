@@ -1238,7 +1238,11 @@ class SequenceToWaveforms:
                     elif step.align == 'right':
                         t0 = middle + (max_duration - gate.duration) / 2
                     waveform[indices] += gate.pulse.calculate_waveform(
-                        t0, t, ignore_drag_modulation=all_drag_f_equal)
+                        t0, t, ignore_drag_modulation=(
+                            all_drag_f_equal and isinstance(
+                                gate_obj, gates.SingleQubitXYRotation)
+                        )
+                    )
 
         # if all frequencies and drag were the same, apply afterwards
         if all_drag_f_equal:
