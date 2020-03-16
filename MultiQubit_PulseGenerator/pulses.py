@@ -52,6 +52,8 @@ class Pulse:
         self.drag_detuning = 0.0
         self.start_at_zero = False
         self.complex = complex
+        self.iq_skew = 0.0
+        self.iq_ratio = 1.0
 
     def total_duration(self):
         """Get the total duration for the pulse.
@@ -131,9 +133,10 @@ class Pulse:
             # apply SSBM transform
             data_i = (y.real * np.cos(omega * t - phase) +
                       -y.imag * np.cos(omega * t - phase + +np.pi / 2))
-            data_q = (y.real * np.sin(omega * t - phase) +
-                      -y.imag * np.sin(omega * t - phase + +np.pi / 2))
-            y = data_i + 1j * data_q
+            data_q = (y.real * np.sin(omega * t - phase + self.iq_skew) +
+                      -y.imag * np.sin(omega * t - phase + np.pi / 2 +
+                      self.iq_skew))
+            y = self.iq_ratio * data_i + 1j * data_q
         return y
 
 
