@@ -74,10 +74,17 @@ class Driver(LabberDriver):
 
     def configure_hvi(self):
         """Configure and start/stop HVI depending on UI settings"""
-        # get units
-        units = self.get_pxi_config_from_ui()
-        n_awg = len([x for x in units if x == 1])
-        n_dig = len([x for x in units if x == 2])
+        # special case for custom HVI
+        if self.getValue('Use custom HVI'):
+            units = None
+            n_awg = 2
+            n_dig = int(self.getValue('Number of digitizers in custom HVI'))
+
+        else:
+            # get units
+            units = self.get_pxi_config_from_ui()
+            n_awg = len([x for x in units if x == 1])
+            n_dig = len([x for x in units if x == 2])
 
         # if no units in use, just stop
         if (n_awg + n_dig) == 0:
@@ -85,45 +92,60 @@ class Driver(LabberDriver):
             return
 
         # check if unit configuration changed, if so reload HVI
+        if self.getValue('Use custom HVI'):
+            self.HVI.stop()
+            self.HVI.close()
+            self.units = units
+            self.HVI.open(os.path.normpath(self.getValue('Custom HVI file')))
+            # clear old trig period to force update
+            self.old_trig_period = 0.0
+
         if units != self.units:
             # stop current HVI, may not even be running
             self.HVI.stop()
             self.HVI.close()
             self.units = units
 
-            # we need at least one AWG
-            if n_awg == 0:
-                raise Error('This driver requires at least one AWG.')
-            # currently only support 2 digitizers
-            if n_dig > 2:
-                raise Error('This driver only supports up to two digitizers.')
+            if self.getValue('Use custom HVI'):
+                # open custom HVI file
+                self.HVI.open(os.path.normpath(
+                    self.getValue('Custom HVI file')))
 
-            # get HVI name and open
-            hvi_name = 'InternalTrigger_%d_%d.HVI' % (n_awg, n_dig)
-            dir_path = os.path.dirname(os.path.realpath(__file__))
-            self.HVI.open(os.path.join(dir_path, 'HVI_Delay', hvi_name))
+            else:
+                # we need at least one AWG
+                if n_awg == 0:
+                    raise Error('This driver requires at least one AWG.')
+                # currently only support 2 digitizers
+                if n_dig > 2:
+                    raise Error(
+                        'This driver only supports up to two digitizers.')
 
-            # assign units, run twice to ignore errors before all units are set
-            for m in range(2):
-                awg_number = 0
-                dig_number = 0
-                for n, unit in enumerate(units):
-                    # if unit in use, assign to module
-                    if unit == 0:
-                        continue
-                    elif unit == 1:
-                        # AWG
-                        module_name = 'Module %d' % awg_number
-                        awg_number += 1
-                    elif unit == 2:
-                        # digitizer
-                        module_name = 'DAQ %d' % dig_number
-                        dig_number += 1
-                    r = self.HVI.assignHardwareWithUserNameAndSlot(
-                        module_name, self.chassis, n + 1)
-                    # only check for errors after second run
-                    if m > 0:
-                        self.check_keysight_error(r)
+                # get HVI name and open
+                hvi_name = 'InternalTrigger_%d_%d.HVI' % (n_awg, n_dig)
+                dir_path = os.path.dirname(os.path.realpath(__file__))
+                self.HVI.open(os.path.join(dir_path, 'HVI_Delay', hvi_name))
+
+                # assign units, run twice to ignore errors before units are set
+                for m in range(2):
+                    awg_number = 0
+                    dig_number = 0
+                    for n, unit in enumerate(units):
+                        # if unit in use, assign to module
+                        if unit == 0:
+                            continue
+                        elif unit == 1:
+                            # AWG
+                            module_name = 'Module %d' % awg_number
+                            awg_number += 1
+                        elif unit == 2:
+                            # digitizer
+                            module_name = 'DAQ %d' % dig_number
+                            dig_number += 1
+                        r = self.HVI.assignHardwareWithUserNameAndSlot(
+                            module_name, self.chassis, n + 1)
+                        # only check for errors after second run
+                        if m > 0:
+                            self.check_keysight_error(r)
             # clear old trig period to force update
             self.old_trig_period = 0.0
 
