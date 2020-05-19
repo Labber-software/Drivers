@@ -196,18 +196,26 @@ class RabiGate(SingleQubitXYRotation):
     amplitude : Amplitude of the pulse
     plateau : The duration of the pulse.
     phase : Phase of the Rabi gate. 0 corresponds to rotation around X axis.
+    frequency: Drive frequency
     """
 
-    def __init__(self, amplitude, plateau, phase):
+    def __init__(self, amplitude=None, plateau=None, phase=None,
+                 frequency=None):
         self.amplitude = amplitude
         self.plateau = plateau
         self.phase = phase
+        self.frequency = frequency
 
     def get_adjusted_pulse(self, pulse):
         pulse = copy(pulse)
-        pulse.amplitude = self.amplitude
-        pulse.plateau = self.plateau
-        pulse.phase = self.phase
+        if self.amplitude is not None:
+            pulse.amplitude = self.amplitude
+        if self.plateau is not None:
+            pulse.plateau = self.plateau
+        if self.phase is not None:
+            pulse.phase = self.phase
+        if self.frequency is not None:
+            pulse.frequency = self.frequency
         return pulse
 
 
