@@ -427,20 +427,10 @@ class Sequence:
 
         """
         # sequence parameters
-        d = dict(
-            Zero=0,
-            One=1,
-            Two=2,
-            Three=3,
-            Four=4,
-            Five=5,
-            Six=6,
-            Seven=7,
-            Eight=8,
-            Nine=9)
+
         # If the number of qubits changed, we need to re-init
-        if self.n_qubit != d[config.get('Number of qubits')]:
-            self.__init__(d[config.get('Number of qubits')])
+        if self.n_qubit != int(config.get('Number of qubits')):
+            self.__init__(int(config.get('Number of qubits')))
 
         # Readout
         self.readout_delay = config.get('Readout delay')
@@ -559,6 +549,7 @@ class SequenceToWaveforms:
 
         #Z during readout
         self.use_z_during_readout=False
+        self.z_readout_net_zero=False
         self.z_readout_ringup=20e-9
         self.z_readout_amplitude=[0.]*self.n_qubit
 
@@ -573,6 +564,7 @@ class SequenceToWaveforms:
         self.readout = readout.Demodulation(self.n_qubit)
         self.readout_trig = np.array([], dtype=float)
         self.readout_iq = np.array([], dtype=np.complex)
+        self.readout_iq2 = np.array([], dtype=np.complex)
 
     def get_waveforms(self, sequence):
         """Compile the given sequence into waveforms.
@@ -646,7 +638,9 @@ class SequenceToWaveforms:
         self._zero_last_z_point()
 
         # Apply offsets
-        self.readout_iq += self.readout_i_offset + 1j * self.readout_q_offset
+        self.readout_iq += self.readout_i_offset + 1j*self.readout_q_offset
+        if self.number_readout_waveforms == 'Two':
+            self.readout_iq2 += self.readout_i_offset2 + 1j*self.readout_q_offset2
 
         # create and return dictionary with waveforms
         waveforms = dict()
@@ -655,6 +649,7 @@ class SequenceToWaveforms:
         waveforms['gate'] = self._wave_gate
         waveforms['readout_trig'] = self.readout_trig
         waveforms['readout_iq'] = self.readout_iq
+        waveforms['readout_iq2'] = self.readout_iq2
 
         # log.info('returning z waveforms in get_waveforms. Max is {}'.format(np.max(waveforms['z'])))
         return waveforms
@@ -913,14 +908,22 @@ class SequenceToWaveforms:
         #find readout waveform with maximum readout time
         z_during_readout=np.ones(int((sorted([p.total_duration() for p in self.pulses_readout])[-1]+ \
             self.readout_delay)*self.sample_rate))
+        #z_during_readout is an array of the right number of 'one' samples
+        #log.info(len(z_during_readout))
 
-        log.info(len(z_during_readout))
+        if self.z_readout_net_zero:
+            #trim to half length
+            z_during_readout=z_during_readout[:int(0.5*len(z_during_readout))]
 
         # add cosine ring-up and ring-down
         n_width = int(np.round(0.5*self.z_readout_ringup * self.sample_rate))
         slope=0.5*(1-np.cos(np.pi*np.arange(n_width)/n_width))
         z_during_readout[1:int(1+n_width)]=slope
         z_during_readout[(-n_width-1):-1]=slope[::-1]
+
+        if self.z_readout_net_zero:
+            #add inverted pulse
+            z_during_readout=np.append(z_during_readout, -z_during_readout)
 
         # make sure z_offset starts/ends in 0
         z_during_readout[0]=0.
@@ -1109,6 +1112,7 @@ class SequenceToWaveforms:
 
         self.readout_trig = np.zeros(self.n_pts_readout, dtype=float)
         self.readout_iq = np.zeros(self.n_pts_readout, dtype=np.complex)
+        self.readout_iq2 = np.zeros(self.n_pts_readout, dtype=np.complex)
 
     def _generate_waveforms(self):
         """Generate the waveforms corresponding to the sequence."""
@@ -1162,7 +1166,10 @@ class SequenceToWaveforms:
                     waveform = self._wave_xy[qubit]
                     delay = self.wave_xy_delays[qubit]
                 elif isinstance(gate_obj, gates.ReadoutGate):
-                    waveform = self.readout_iq
+                    if gate.pulse.readout_target == 0:
+                        waveform = self.readout_iq
+                    else:
+                        waveform = self.readout_iq2
                     delay = 0
                 else:
                     raise ValueError(
@@ -1267,21 +1274,10 @@ class SequenceToWaveforms:
 
         """
         # sequence parameters
-        d = dict(
-            Zero=0,
-            One=1,
-            Two=2,
-            Three=3,
-            Four=4,
-            Five=5,
-            Six=6,
-            Seven=7,
-            Eight=8,
-            Nine=9)
 
         # If the number of qubits changed, re-init to update pulses etc
-        if self.n_qubit != d[config.get('Number of qubits')]:
-            self.__init__(d[config.get('Number of qubits')])
+        if self.n_qubit != int(config.get('Number of qubits')):
+            self.__init__(int(config.get('Number of qubits')))
 
         self.dt = config.get('Pulse spacing')
         self.local_xy = config.get('Local XY control')
@@ -1370,10 +1366,23 @@ class SequenceToWaveforms:
 
         #Z during readout
         self.use_z_during_readout=config.get('Use Z pulse during readout')
+        self.z_readout_net_zero=config.get('Net zero, Z during readout')
         self.z_readout_ringup=config.get('Ringup time, Z during readout')
         for n in range(len(self.pulses_1qb_z)): self.z_readout_amplitude[n]=config.get('Amplitude #{:d}, Z during readout'.format(n+1))
 
         # two-qubit pulses
+        d = dict(
+            Zero=0,
+            One=1,
+            Two=2,
+            Three=3,
+            Four=4,
+            Five=5,
+            Six=6,
+            Seven=7,
+            Eight=8,
+            Nine=9)
+            
         for n, pulse in enumerate(self.pulses_2qb):
             # pulses are indexed from 1 in Labber
             s = ' #%d%d' % (n + 1, n + 2)
@@ -1478,10 +1487,13 @@ class SequenceToWaveforms:
             'Z - Kaiser beta', 14.0)
 
         # readout
+        self.number_readout_waveforms = config.get('Number of readout waveforms')
         self.readout_match_main_size = config.get(
             'Match main sequence waveform size')
         self.readout_i_offset = config.get('Readout offset - I')
         self.readout_q_offset = config.get('Readout offset - Q')
+        self.readout_i_offset2 = config.get('Readout offset - I2')
+        self.readout_q_offset2 = config.get('Readout offset - Q2')
         self.readout_trig_generate = config.get('Generate readout trig')
         self.readout_trig_amplitude = config.get('Readout trig amplitude')
         self.readout_trig_duration = config.get('Readout trig duration')
@@ -1500,10 +1512,23 @@ class SequenceToWaveforms:
             m = n + 1
             pulse = (getattr(pulses,
                              config.get('Readout pulse type'))(complex=True))
+            # find target waveform
+            if self.number_readout_waveforms == 'One':
+                readout_target = 0
+            else:
+                if config.get('Readout target #%d' % m, 'One') == 'One':
+                    readout_target = 0
+                else:
+                    readout_target = 1
+            pulse.readout_target = readout_target
             pulse.truncation_range = config.get('Readout truncation range')
             pulse.start_at_zero = config.get('Readout start at zero')
-            pulse.iq_skew = config.get('Readout IQ skew') * np.pi / 180
-            pulse.iq_ratio = config.get('Readout I/Q ratio')
+            if pulse.readout_target == 0:
+                pulse.iq_skew = config.get('Readout IQ skew') * np.pi / 180
+                pulse.iq_ratio = config.get('Readout I/Q ratio')
+            else:
+                pulse.iq_skew = config.get('Readout IQ skew 2') * np.pi / 180
+                pulse.iq_ratio = config.get('Readout I/Q ratio 2')
 
             if config.get('Distribute readout phases'):
                 pulse.phase = phases[n]
