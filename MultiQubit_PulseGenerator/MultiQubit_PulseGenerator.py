@@ -174,7 +174,7 @@ class Driver(LabberDriver):
                             self.waveforms[key].append(data)
 
                     # same for readout waveforms
-                    for key in ['readout_trig', 'readout_iq']:
+                    for key in ['readout_trig', 'readout_iq', 'readout_iq2']:
                         length = max([len(call[key]) for call in calls])
                         datatype = calls[0][key].dtype
                         data = np.zeros((n_call, length), dtype=datatype)
@@ -201,25 +201,24 @@ class Driver(LabberDriver):
     def getWaveformFromMemory(self, quant):
         """Return data from already calculated waveforms."""
         # check which data to return
-        if quant.name[-1] in ('1', '2', '3', '4', '5', '6', '7', '8', '9'):
-            # get name and number of qubit waveform asked for
-            name = quant.name[:-1]
-            n = int(quant.name[-1]) - 1
-            # get correct vector
-            if name == 'Trace - I':
-                if self.getValue('Swap IQ'):
-                    value = self.waveforms['xy'][n].imag
-                else:
-                    value = self.waveforms['xy'][n].real
-            elif name == 'Trace - Q':
-                if self.getValue('Swap IQ'):
-                    value = self.waveforms['xy'][n].real
-                else:
-                    value = self.waveforms['xy'][n].imag
-            elif name == 'Trace - Z':
-                value = self.waveforms['z'][n]
-            elif name == 'Trace - G':
-                value = self.waveforms['gate'][n]
+        if quant.name.startswith('Trace - I'):
+            n = int(quant.name[9:]) - 1
+            if self.getValue('Swap IQ'):
+                value = self.waveforms['xy'][n].imag
+            else:
+                value = self.waveforms['xy'][n].real
+        elif quant.name.startswith('Trace - Q'):
+            n = int(quant.name[9:]) - 1
+            if self.getValue('Swap IQ'):
+                value = self.waveforms['xy'][n].real
+            else:
+                value = self.waveforms['xy'][n].imag
+        elif quant.name.startswith('Trace - Z'):
+            n = int(quant.name[9:]) - 1
+            value = self.waveforms['z'][n]
+        elif quant.name.startswith('Trace - G'):
+            n = int(quant.name[9:]) - 1
+            value = self.waveforms['gate'][n]
 
         elif quant.name == 'Trace - Readout trig':
             value = self.waveforms['readout_trig']
@@ -227,6 +226,10 @@ class Driver(LabberDriver):
             value = self.waveforms['readout_iq'].real
         elif quant.name == 'Trace - Readout Q':
             value = self.waveforms['readout_iq'].imag
+        elif quant.name == 'Trace - Readout I2':
+            value = self.waveforms['readout_iq2'].real
+        elif quant.name == 'Trace - Readout Q2':
+            value = self.waveforms['readout_iq2'].imag
 
         # return data as dict with sampling information
         dt = 1 / self.sequence_to_waveforms.sample_rate

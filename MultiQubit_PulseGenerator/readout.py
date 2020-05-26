@@ -41,9 +41,9 @@ class Demodulation(object):
 
         """
         # get other parameters
-        d = dict(Zero=0, One=1, Two=2, Three=3, Four=4, Five=5, Six=6, Seven=7,
-                 Eight=8, Nine=9)
-        self.n_readout = d[config.get('Number of qubits')]
+        #d = dict(Zero=0, One=1, Two=2, Three=3, Four=4, Five=5, Six=6, Seven=7,
+        #         Eight=8, Nine=9)
+        self.n_readout = int(config.get('Number of qubits'))
 
         # demodulation
         for n in range(self.n_qubit):

@@ -31,9 +31,7 @@ class Crosstalk(object):
             path = config.get('Cross-talk (CT) matrix')
             self.import_crosstalk_matrix(path)
 
-        dTranslate = {'One': int(1), 'Two': int(
-            2), 'Three': int(3), 'Four': int(4), 'Five': int(5)}
-        nQBs = dTranslate[config.get('Number of qubits')]
+        nQBs = int(config.get('Number of qubits'))
 
         if config.get('1-1 QB <--> Crosstalk matrix'):
             self.Sequence = []
@@ -47,8 +45,8 @@ class Crosstalk(object):
                     if element == 'None':
                         continue
                     else:
-                        self.Sequence.append(dTranslate[element])
-                    if self.compensation_matrix.shape[0] < dTranslate[element]:
+                        self.Sequence.append(int(element))
+                    if self.compensation_matrix.shape[0] < int(element):
                         raise 'Element of Cross-talk matrix is too large for '\
                             'actual matrix size'
 
