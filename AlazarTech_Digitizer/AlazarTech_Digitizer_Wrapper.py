@@ -1,7 +1,7 @@
 import ctypes, os
 from ctypes import (
     c_int, c_uint8, c_uint16, c_uint32, c_int32, c_float, c_char_p, c_void_p,
-    c_long, byref, windll, c_double)
+    c_long, byref, c_double)
 import numpy as np
 
 # add logger, to allow logging to Labber's instrument log 
@@ -19,6 +19,24 @@ DSP_MODULE_FFT = 0x10000
 U8 = c_uint8
 U16 = c_uint16
 U32 = c_uint32
+
+# open dll
+libc = None
+
+if os.name == 'nt':
+    try:
+        DLL = ctypes.CDLL('ATSApi')
+    except Exception:
+        # if failure, try to open in driver folder
+        sPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'atsapi')
+        DLL = ctypes.CDLL(os.path.join(sPath, 'ATSApi'))
+
+elif os.name == 'posix':
+    DLL = ctypes.CDLL("libATSApi.so")
+    libc = ctypes.CDLL("libc.so.6")
+else:
+    raise Exception("Unsupported OS")
+
 
 class DMABuffer:
     """"Buffer for DMA"""
@@ -82,15 +100,6 @@ class Error(Exception):
         
 class TimeoutError(Error):
     pass
-
-# open dll
-try:
-    DLL = ctypes.CDLL('ATSApi')
-except:
-    # if failure, try to open in driver folder
-    sPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'atsapi')
-    DLL = ctypes.CDLL(os.path.join(sPath, 'ATSApi'))
-
 
 class AlazarTechDigitizer():
     """Represent the Alazartech digitizer, redefines the dll functions in python"""
