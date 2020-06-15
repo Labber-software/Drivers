@@ -197,14 +197,28 @@ class RabiGate(SingleQubitXYRotation):
     plateau : The duration of the pulse.
     phase : Phase of the Rabi gate. 0 corresponds to rotation around X axis.
     frequency: Drive frequency
+    width:  Pulse rise/fall time
+    use_drag:  Turn on/off drag
+    drag_coefficient: DRAG scaling
+    drag_detuning: DRAG detuning
+    iq_skew: Phase delay between I/Q arms
+    iq_ratio: Imbalance between I/Q amplitudes
     """
 
     def __init__(self, amplitude=None, plateau=None, phase=None,
-                 frequency=None):
+                 frequency=None, width=None,
+                 use_drag=None, drag_coefficient=None,
+                 drag_detuning=None, iq_skew=None, iq_ratio=None):
         self.amplitude = amplitude
         self.plateau = plateau
         self.phase = phase
         self.frequency = frequency
+        self.width = width
+        self.use_drag = use_drag
+        self.drag_coefficient = drag_coefficient
+        self.drag_detuning = drag_detuning
+        self.iq_skew = iq_skew
+        self.iq_ratio = iq_ratio
 
     def get_adjusted_pulse(self, pulse):
         pulse = copy(pulse)
@@ -216,6 +230,18 @@ class RabiGate(SingleQubitXYRotation):
             pulse.phase = self.phase
         if self.frequency is not None:
             pulse.frequency = self.frequency
+        if self.width is not None:
+            pulse.width = self.width
+        if self.use_drag is not None:
+            pulse.use_drag = self.use_drag
+        if self.drag_coefficient is not None:
+            pulse.drag_coefficient = self.drag_coefficient
+        if self.drag_detuning is not None:
+            pulse.drag_detuning = self.drag_detuning
+        if self.iq_skew is not None:
+            pulse.iq_skew = self.iq_skew
+        if self.iq_ratio is not None:
+            pulse.iq_ratio = self.iq_ratio
         return pulse
 
 
