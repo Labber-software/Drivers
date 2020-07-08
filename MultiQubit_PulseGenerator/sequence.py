@@ -1262,7 +1262,23 @@ class SequenceToWaveforms:
 
                 # modulation
                 if freqs[n] != 0:
-                    wave *= np.exp(1j * 2 * np.pi * freqs[n] * self.t)
+                    # check for skew parameters
+                    p = self.pulses_1qb_xy[n]
+                    if p.iq_skew == 0.0 and p.iq_ratio == 1.0:
+                        wave *= np.exp(1j * 2 * np.pi * freqs[n] * self.t)
+                    else:
+                        # apply skew
+                        omega = 2 * np.pi * freqs[n]
+                        # apply SSBM transform
+                        data_i = (
+                            wave.real * np.cos(omega * self.t) +
+                            -wave.imag * np.cos(omega * self.t + +np.pi / 2))
+                        data_q = (
+                            wave.real * np.sin(omega * self.t + p.iq_skew) +
+                            -wave.imag * np.sin(omega * self.t + np.pi / 2 +
+                                                p.iq_skew))
+                        wave[:] = p.iq_ratio * data_i + 1j * data_q
+
 
     def set_parameters(self, config={}):
         """Set base parameters using config from from Labber driver.
