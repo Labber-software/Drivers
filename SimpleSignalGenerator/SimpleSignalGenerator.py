@@ -41,7 +41,11 @@ class Driver(InstrumentDriver.InstrumentWorker):
                 noise_amp = self.getValue('Noise amplitude')
                 signal += noise_amp * np.random.randn(len(signal))
             # create trace object that contains timing info
-            trace = quant.getTraceDict(signal, t0=0.0, dt=time[1]-time[0])
+            try:
+                trace = quant.getTraceDict(signal, t0=0.0, dt=time[1]-time[0])
+            except Exception:
+                trace = quant.getTraceDict(signal, t0=0.0, dt=1.0)
+
             # finally, return the trace object
             return trace
         else: 
