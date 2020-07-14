@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from VISA_Driver import VISA_Driver
-import SG_String
+import SR_String
 
 __version__ = "0.0.1"
 
@@ -30,7 +30,7 @@ class Driver(VISA_Driver):
             sCh = quant.name[2]
             s1 = self.askAndLog(':CH%s:FREQ?' % sCh)
             s2 = s1.split('Hz')[0]
-            return SG_String.getValueFromSIString(s2)
+            return SR_String.getValueFromSIString(s2)
         else:
             # run the generic visa driver case
             return VISA_Driver.performGetValue(self, quant, options=options)
