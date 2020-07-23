@@ -60,6 +60,7 @@ class Driver(VISA_Driver):
                 self.Log("Switch Heater delay unreasonably short. Will not continue as this seems to be an error.")
                 return value
             self.askAndLog(quant.set_cmd + ":" + vstring)
+            self.wait(delay)
             
         return value
 
