@@ -6,7 +6,6 @@ import visa
 from InstrumentConfig import InstrumentQuantity
 import numpy as np
 import string
-import Tkinter
 
 __version__ = "0.0.1"
 
@@ -62,11 +61,6 @@ class Driver(VISA_Driver):
                 return value
             self.askAndLog(quant.set_cmd + ":" + vstring)
             
-            tk = Tkinter.Tk()
-            label = Tkinter.Label(tk, text="Waiting for switch heater...")
-            label.pack(expand=1)
-            tk.after(int(delay*1000), lambda: tk.destroy())
-            tk.mainloop()
         return value
 
     def waitForIdle(self, dev):
