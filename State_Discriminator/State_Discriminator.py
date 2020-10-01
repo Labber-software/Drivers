@@ -13,13 +13,15 @@ class Error(Exception):
 class Driver(LabberDriver):
     """ This class implements a Labber driver"""
 
-    MAX_QUBITS = 9
+    MAX_QUBITS = 16
 
     def performOpen(self, options={}):
         """Perform the operation of opening the instrument connection"""
         # define variables for training data sets
         self.training_cfg = {}
         self.init_training_data()
+        self.beta_calibration_matrices = {}
+        self.use_beta_calibration = False
 
     def performClose(self, bError=False, options={}):
         """Perform the close instrument connection operation"""
@@ -46,7 +48,8 @@ class Driver(LabberDriver):
             quant.setValue(value)
             training_vector = quant.getValueArray()
             # get qubit/state for which data is valid
-            qubit = int(quant.name[-1])
+            #qubit = int(quant.name[-1])
+            qubit = extract_qubit_number(quant.name)
             state = int(self.getValue('Training, input state'))
             all_states = self.getValue('Train all states at once')
 
@@ -76,6 +79,23 @@ class Driver(LabberDriver):
                     quant.name.startswith('Pointer,'))):
             self.training_valid = False
 
+        elif quant.name == 'Activate beta-calibration':
+            self.use_beta_calibration=value  
+
+        elif quant.name.startswith('beta-calibration'):
+            #qubit = int(quant.name[-1]) - 1
+            qubit = extract_qubit_number(quant.name) - 1
+            try:
+                matrix = np.load(value)
+                if matrix.shape != (2,2):
+                    self.log('Beta-calibration matrix has the incorrect shape')
+                    raise Exception('Incorrect matrix shape')
+                else:
+                    self.beta_calibration_matrices[qubit]=matrix
+            except:
+                self.beta_calibration_matrices[qubit]=None
+                self.log('Error loading beta-calibration matrix from npy file.')
+        
         return value
 
     def performGetValue(self, quant, options={}):
@@ -86,15 +106,22 @@ class Driver(LabberDriver):
         # check input
         if quant.name.startswith('QB'):
             # qubit = int(quant.name[2]) - 1
-            qubit = int(quant.name.split("QB")[1].split(' ')[0]) - 1
+            # qubit = int(quant.name.split("QB")[1].split(' ')[0]) - 1
+            qubit = extract_qubit_number(quant.name) - 1
             value = self.qubit_states[qubit]
         elif quant.name.startswith('Average QB'):
             # qubit = int(quant.name[10]) - 1
-            qubit = int(quant.name.split('QB')[1].split(' ')[0]) - 1
+            # qubit = int(quant.name.split('QB')[1].split(' ')[0]) - 1
+            qubit = extract_qubit_number(quant.name) - 1
             value = np.mean(self.qubit_states[qubit])
+            if self.use_beta_calibration and self.beta_calibration_matrices[qubit] is not None:
+                beta = self.beta_calibration_matrices[qubit]
+                m_vector = np.array( [1-value,value] )
+                value=np.linalg.inv(beta).dot(m_vector)[1]
         elif quant.name.startswith('Assignment fidelity QB'):
-            #qubit = int(quant.name[22]) - 1
-            qubit = int(quant.name.split('QB')[1].split(' ')[0]) - 1
+            # qubit = int(quant.name[22]) - 1
+            # qubit = int(quant.name.split('QB')[1].split(' ')[0]) - 1
+            qubit = extract_qubit_number(quant.name) - 1
             value = self.assignment_fidelity[qubit]
         elif quant.name.startswith('Average state vector'):
             # states are encoded in array of ints
@@ -267,6 +294,11 @@ class Driver(LabberDriver):
                 self.state_vector = np.zeros(len(output), dtype=int)
             self.state_vector += (output * (self.n_state ** n))
 
+def extract_qubit_number(string):
+    for word in string.split():
+        if 'QB' in word:
+            num=word.split('QB')[1].split('-')[0].split(' ')[0]
+            return int(num)
 
 if __name__ == '__main__':
     pass
